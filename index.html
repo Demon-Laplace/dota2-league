@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Dota2 宁德联赛</title>
-  <link rel="stylesheet" href="style.css?v=20260401-20" />
+  <link rel="stylesheet" href="style.css?v=20260401-21" />
 </head>
 <body>
   <main class="container">
@@ -65,7 +65,7 @@
             <span id="matchDayStatus" class="muted">未发起</span>
           </div>
           <div class="row">
-            <input id="matchStartTimeInput" type="time" />
+            <input id="matchStartTimeInput" type="text" inputmode="numeric" placeholder="HH:mm，例如 19:30" maxlength="5" />
             <button id="startMatchDayBtn">发起当日比赛</button>
           </div>
           <p id="matchStartTimeDisplay" class="muted"></p>
@@ -201,6 +201,6 @@
   </main>
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="app.js?v=20260401-20"></script>
+  <script src="app.js?v=20260401-21"></script>
 </body>
 </html>

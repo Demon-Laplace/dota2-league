@@ -113,6 +113,26 @@ function formatTime24(value) {
   return `${hours}:${minutes}`;
 }
 
+function normalizeTimeInput(value) {
+  const raw = String(value || "").trim();
+  if (!raw) return "";
+
+  const digits = raw.replace(/\D/g, "");
+  if (digits.length === 3) {
+    return formatTime24(`${digits.slice(0, 1)}:${digits.slice(1)}`);
+  }
+  if (digits.length === 4) {
+    return formatTime24(`${digits.slice(0, 2)}:${digits.slice(2)}`);
+  }
+
+  const colonMatch = raw.match(/^(\d{1,2}):(\d{1,2})$/);
+  if (colonMatch) {
+    return formatTime24(`${colonMatch[1]}:${colonMatch[2]}`);
+  }
+
+  return raw;
+}
+
 function downloadTextFile(filename, content) {
   const blob = new Blob([content], { type: "text/plain;charset=utf-8" });
   const url = URL.createObjectURL(blob);
@@ -1712,8 +1732,15 @@ async function clearTodayPlayersForTesting() {
 }
 
 async function startMatchDay() {
+  matchStartTimeInput.value = normalizeTimeInput(matchStartTimeInput.value);
+
   if (!matchStartTimeInput.value) {
     setMessage("请先填写开始时间。", true);
+    return;
+  }
+
+  if (!/^\d{2}:\d{2}$/.test(matchStartTimeInput.value)) {
+    setMessage("请按 24 小时制填写开始时间，例如 19:30。", true);
     return;
   }
 
@@ -2243,6 +2270,10 @@ rewardExtraInput.addEventListener("keydown", async (event) => {
   if (event.key !== "Enter") return;
   event.preventDefault();
   await addRewardExtra();
+});
+
+matchStartTimeInput.addEventListener("blur", () => {
+  matchStartTimeInput.value = normalizeTimeInput(matchStartTimeInput.value);
 });
 
 rewardLogsList.addEventListener("click", async (event) => {
