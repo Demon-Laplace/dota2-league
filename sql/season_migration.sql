@@ -92,6 +92,13 @@ execute function public.set_updated_at();
 alter table public.signup_queue
 add column if not exists season_id uuid references public.seasons(id);
 
+alter table public.signup_queue
+drop constraint if exists signup_queue_status_check;
+
+alter table public.signup_queue
+add constraint signup_queue_status_check
+check (status = any (array['active'::text, 'cancelled'::text, 'confirmed'::text]));
+
 create index if not exists idx_signup_queue_season_id
 on public.signup_queue (season_id);
 

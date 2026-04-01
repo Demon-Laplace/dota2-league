@@ -117,7 +117,12 @@ function getSelectablePlayersForField(currentValue) {
     selected.delete(currentValue);
   }
 
-  return todayPlayers.filter((player) => !selected.has(player.id) || player.id === currentValue);
+  return todayPlayers
+    .map((player) => ({
+      id: player.player_id,
+      display_name: player.display_name,
+    }))
+    .filter((player) => !selected.has(player.id) || player.id === currentValue);
 }
 
 function refreshMatchSelectOptions() {
