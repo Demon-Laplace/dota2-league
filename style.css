@@ -39,7 +39,8 @@ h1 {
 }
 
 select,
-button {
+button,
+input {
   padding: 10px 12px;
   border-radius: 8px;
   border: 1px solid #4b5563;
@@ -50,6 +51,12 @@ select {
   background: #111827;
   color: #f3f4f6;
   min-width: 220px;
+}
+
+input {
+  background: #111827;
+  color: #f3f4f6;
+  min-width: 260px;
 }
 
 button {
@@ -83,6 +90,34 @@ button:disabled {
 
 .muted {
   color: #9ca3af;
+}
+
+.match-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+  margin: 16px 0;
+}
+
+.team-panel {
+  padding: 14px;
+  border: 1px solid #374151;
+  border-radius: 12px;
+  background: rgba(17, 24, 39, 0.45);
+}
+
+.team-panel h3 {
+  margin: 0 0 12px;
+}
+
+.team-fields {
+  display: grid;
+  gap: 10px;
+}
+
+.team-fields select {
+  min-width: 0;
+  width: 100%;
 }
 
 table {
@@ -168,4 +203,15 @@ ol {
   color: #fca5a5;
   background: rgba(185, 28, 28, 0.18);
   border-color: rgba(248, 113, 113, 0.35);
+}
+
+@media (max-width: 720px) {
+  .match-grid {
+    grid-template-columns: 1fr;
+  }
+
+  input,
+  select {
+    width: 100%;
+  }
 }
