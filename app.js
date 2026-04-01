@@ -15,7 +15,9 @@ const seasonPlayersList = document.getElementById("seasonPlayersList");
 const seasonPlayersEmpty = document.getElementById("seasonPlayersEmpty");
 const resetSeasonBtn = document.getElementById("resetSeasonBtn");
 const startMatchDayBtn = document.getElementById("startMatchDayBtn");
+const matchStartTimeInput = document.getElementById("matchStartTimeInput");
 const matchDayStatus = document.getElementById("matchDayStatus");
+const matchStartTimeDisplay = document.getElementById("matchStartTimeDisplay");
 const matchDayInfo = document.getElementById("matchDayInfo");
 const confirmQueueBtn = document.getElementById("confirmQueueBtn");
 const clearQueueBtn = document.getElementById("clearQueueBtn");
@@ -62,6 +64,27 @@ let backfillPlayers = [];
 let isMatchFormOpen = false;
 let isBackfillFormOpen = false;
 let isSeasonPanelOpen = false;
+
+function getMatchDayStartTimeKey() {
+  return "dota2sys_match_day_start_time";
+}
+
+function readStoredMatchDayStartTime() {
+  try {
+    const raw = window.localStorage.getItem(getMatchDayStartTimeKey());
+    return raw ? JSON.parse(raw) : null;
+  } catch {
+    return null;
+  }
+}
+
+function writeStoredMatchDayStartTime(payload) {
+  window.localStorage.setItem(getMatchDayStartTimeKey(), JSON.stringify(payload));
+}
+
+function clearStoredMatchDayStartTime() {
+  window.localStorage.removeItem(getMatchDayStartTimeKey());
+}
 
 function setMessage(text, isError = false) {
   messageEl.textContent = text;
@@ -305,11 +328,25 @@ function renderSeasonPlayersPanel() {
 }
 
 function renderMatchDayStatus() {
+  const storedStartTime = readStoredMatchDayStartTime();
+
   if (activeMatchDay) {
     matchDayStatus.textContent = `${activeMatchDay.match_date} 进行中`;
     matchDayStatus.className = "muted day-status-active";
     matchDayInfo.textContent = "当前比赛日已发起。北京时间次日凌晨 2 点会自动结束并清空报名队列与当日选手。";
     startMatchDayBtn.disabled = true;
+    matchStartTimeInput.disabled = true;
+
+    if (
+      storedStartTime &&
+      storedStartTime.seasonId === activeMatchDay.season_id &&
+      storedStartTime.matchDate === activeMatchDay.match_date &&
+      storedStartTime.startTime
+    ) {
+      matchStartTimeDisplay.textContent = `开始时间：${storedStartTime.startTime}`;
+    } else {
+      matchStartTimeDisplay.textContent = "";
+    }
     return;
   }
 
@@ -317,6 +354,8 @@ function renderMatchDayStatus() {
   matchDayStatus.className = "muted day-status-inactive";
   matchDayInfo.textContent = "需要先发起当日比赛，报名功能才会开放。";
   startMatchDayBtn.disabled = false;
+  matchStartTimeInput.disabled = false;
+  matchStartTimeDisplay.textContent = "";
 }
 
 function renderSignupOptions() {
@@ -1174,6 +1213,11 @@ async function clearTodayPlayersForTesting() {
 }
 
 async function startMatchDay() {
+  if (!matchStartTimeInput.value) {
+    setMessage("请先填写开始时间。", true);
+    return;
+  }
+
   startMatchDayBtn.disabled = true;
   setMessage("正在发起当日比赛...");
 
@@ -1188,6 +1232,11 @@ async function startMatchDay() {
     return;
   }
 
+  writeStoredMatchDayStartTime({
+    seasonId: activeSeason?.id || null,
+    matchDate: getBeijingBusinessDateString(),
+    startTime: matchStartTimeInput.value,
+  });
   setMessage("当日比赛已发起，可以开始报名和记录比赛。");
   await refreshPlayerDrivenViews();
 }
@@ -1556,6 +1605,7 @@ async function init() {
   setMatchFormOpen(false);
   setBackfillFormOpen(false);
   setSeasonPanelOpen(false);
+  matchStartTimeInput.value = readStoredMatchDayStartTime()?.startTime || "";
   backfillDateInput.value = getBeijingBusinessDateString();
   renderMatchForm();
   renderBackfillForm();
