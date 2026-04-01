@@ -84,6 +84,10 @@ let isMatchFormOpen = false;
 let isBackfillFormOpen = false;
 let isSeasonPanelOpen = false;
 let isRewardPanelOpen = false;
+let matchTeamSelections = {
+  teamA: [],
+  teamB: [],
+};
 let realtimeChannel = null;
 let refreshTimer = null;
 let refreshFlushPromise = null;
@@ -425,11 +429,7 @@ function buildSeasonOptions(seasons, currentValue = "") {
 }
 
 function getSelectedMatchPlayerIds() {
-  return Array.from(
-    document.querySelectorAll("#teamAFields select, #teamBFields select")
-  )
-    .map((select) => select.value)
-    .filter(Boolean);
+  return [...matchTeamSelections.teamA, ...matchTeamSelections.teamB];
 }
 
 function getSelectedBackfillPlayerIds() {
@@ -440,18 +440,19 @@ function getSelectedBackfillPlayerIds() {
     .filter(Boolean);
 }
 
-function getSelectablePlayersForField(currentValue) {
-  const selected = new Set(getSelectedMatchPlayerIds());
-  if (currentValue) {
-    selected.delete(currentValue);
-  }
+function getTodayMatchPlayers() {
+  return todayPlayers.map((player) => ({
+    id: player.player_id || player.id,
+    display_name: player.display_name,
+  }));
+}
 
-  return todayPlayers
-    .map((player) => ({
-      id: player.player_id,
-      display_name: player.display_name,
-    }))
-    .filter((player) => !selected.has(player.id) || player.id === currentValue);
+function syncMatchTeamSelections() {
+  const todayPlayerIds = new Set(getTodayMatchPlayers().map((player) => player.id));
+  matchTeamSelections.teamA = matchTeamSelections.teamA.filter((playerId) => todayPlayerIds.has(playerId));
+  matchTeamSelections.teamB = matchTeamSelections.teamB.filter(
+    (playerId) => todayPlayerIds.has(playerId) && !matchTeamSelections.teamA.includes(playerId)
+  );
 }
 
 function getSelectableBackfillPlayersForField(currentValue) {
@@ -464,13 +465,50 @@ function getSelectableBackfillPlayersForField(currentValue) {
 }
 
 function refreshMatchSelectOptions() {
-  document
-    .querySelectorAll("#teamAFields select, #teamBFields select")
-    .forEach((select) => {
-      const currentValue = select.value;
-      const selectablePlayers = getSelectablePlayersForField(currentValue);
-      select.innerHTML = buildOptionsFromPlayers(selectablePlayers, currentValue);
+  syncMatchTeamSelections();
+
+  [
+    { container: teamAFields, teamKey: "teamA", title: "天辉方已选" },
+    { container: teamBFields, teamKey: "teamB", title: "夜魇方已选" },
+  ].forEach(({ container, teamKey, title }) => {
+    const oppositeTeamKey = teamKey === "teamA" ? "teamB" : "teamA";
+    const selectedIds = new Set(matchTeamSelections[teamKey]);
+    const oppositeIds = new Set(matchTeamSelections[oppositeTeamKey]);
+    const selectedPlayers = getTodayMatchPlayers().filter((player) => selectedIds.has(player.id));
+    const summaryHtml = selectedPlayers.length
+      ? selectedPlayers.map((player) => `<span class="match-picked-player">${escapeHtml(player.display_name)}</span>`).join("")
+      : '<span class="muted">尚未选择队员</span>';
+
+    container.innerHTML = `
+      <div class="match-team-summary">
+        <span class="queue-slot">${title} ${selectedPlayers.length}/${TEAM_SIZE}</span>
+        <div class="match-picked-list">${summaryHtml}</div>
+      </div>
+      <div class="match-player-pool"></div>
+    `;
+
+    const pool = container.querySelector(".match-player-pool");
+    getTodayMatchPlayers().forEach((player) => {
+      const chip = document.createElement("button");
+      chip.type = "button";
+      chip.className = "match-player-chip";
+      chip.dataset.team = teamKey;
+      chip.dataset.playerId = player.id;
+      chip.textContent = player.display_name;
+
+      if (selectedIds.has(player.id)) {
+        chip.classList.add("match-player-chip-selected");
+      } else if (oppositeIds.has(player.id)) {
+        chip.classList.add("match-player-chip-disabled");
+        chip.disabled = true;
+      } else if (matchTeamSelections[teamKey].length >= TEAM_SIZE) {
+        chip.classList.add("match-player-chip-disabled");
+        chip.disabled = true;
+      }
+
+      pool.appendChild(chip);
     });
+  });
 }
 
 function refreshBackfillSelectOptions() {
@@ -746,8 +784,7 @@ function renderSignupOptions() {
 }
 
 function renderMatchForm() {
-  renderMatchPlayerFields(teamAFields, "teamA");
-  renderMatchPlayerFields(teamBFields, "teamB");
+  syncMatchTeamSelections();
   refreshMatchSelectOptions();
 
   const hasEnoughPlayers = Boolean(activeMatchDay) && todayPlayers.length >= TEAM_SIZE * 2;
@@ -771,11 +808,10 @@ function renderBackfillForm() {
 }
 
 function clearMatchForm() {
-  document
-    .querySelectorAll("#teamAFields select, #teamBFields select")
-    .forEach((select) => {
-      select.value = "";
-    });
+  matchTeamSelections = {
+    teamA: [],
+    teamB: [],
+  };
   winnerSelect.value = "";
   matchNoteInput.value = "";
   refreshMatchSelectOptions();
@@ -2091,9 +2127,35 @@ async function removeTodayPlayer(entryId, buttonEl) {
   });
 }
 
+function toggleMatchPlayerSelection(teamKey, playerId) {
+  if (!["teamA", "teamB"].includes(teamKey) || !playerId) {
+    return;
+  }
+
+  const oppositeTeamKey = teamKey === "teamA" ? "teamB" : "teamA";
+
+  if (matchTeamSelections[teamKey].includes(playerId)) {
+    matchTeamSelections[teamKey] = matchTeamSelections[teamKey].filter((id) => id !== playerId);
+    refreshMatchSelectOptions();
+    return;
+  }
+
+  if (matchTeamSelections[oppositeTeamKey].includes(playerId)) {
+    return;
+  }
+
+  if (matchTeamSelections[teamKey].length >= TEAM_SIZE) {
+    setMatchMessage(`每边最多选择 ${TEAM_SIZE} 名选手。`, true);
+    return;
+  }
+
+  matchTeamSelections[teamKey] = [...matchTeamSelections[teamKey], playerId];
+  setMatchMessage("");
+  refreshMatchSelectOptions();
+}
+
 function getSelectedTeamIds(prefix) {
-  return Array.from(document.querySelectorAll(`select[data-team="${prefix}"]`))
-    .map((select) => select.value);
+  return [...(matchTeamSelections[prefix] || [])];
 }
 
 function validateMatchPlayers(teamAIds, teamBIds) {
@@ -2427,10 +2489,11 @@ closeBackfillFormBtn.addEventListener("click", () => {
   renderBackfillForm();
 });
 
-matchFormPanel.addEventListener("change", (event) => {
-  if (event.target.matches("#teamAFields select, #teamBFields select")) {
-    refreshMatchSelectOptions();
-  }
+matchFormPanel.addEventListener("click", (event) => {
+  const chip = event.target.closest(".match-player-chip");
+  if (!chip || chip.disabled) return;
+
+  toggleMatchPlayerSelection(chip.dataset.team, chip.dataset.playerId);
 });
 
 backfillFormPanel.addEventListener("change", async (event) => {

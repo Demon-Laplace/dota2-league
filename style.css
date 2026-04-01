@@ -517,6 +517,60 @@ button:disabled {
   gap: 10px;
 }
 
+.match-team-summary {
+  display: grid;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.match-picked-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  min-height: 24px;
+}
+
+.match-picked-player {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 12px;
+  color: #dff0ff;
+  background: rgba(47, 95, 174, 0.24);
+  border: 1px solid rgba(86, 166, 255, 0.28);
+}
+
+.match-player-pool {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.match-player-chip {
+  padding: 6px 10px;
+  min-height: 32px;
+  border-radius: 999px;
+  background: rgba(14, 31, 54, 0.82);
+  border: 1px solid var(--border);
+  color: var(--text);
+  box-shadow: none;
+}
+
+.match-player-chip:hover:not(:disabled) {
+  transform: translateY(-1px);
+}
+
+.match-player-chip-selected {
+  background: linear-gradient(135deg, rgba(58, 126, 215, 0.95), rgba(34, 90, 171, 0.95));
+  border-color: rgba(150, 206, 255, 0.4);
+  color: #f8fcff;
+}
+
+.match-player-chip-disabled {
+  opacity: 0.34;
+}
+
 .team-fields select {
   min-width: 0;
   width: 100%;
