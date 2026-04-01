@@ -58,6 +58,15 @@ button {
   cursor: pointer;
 }
 
+.button-secondary {
+  background: #374151;
+}
+
+.button-danger {
+  background: #7f1d1d;
+  border-color: #b91c1c;
+}
+
 button:disabled {
   opacity: 0.6;
   cursor: not-allowed;
@@ -91,4 +100,72 @@ td {
 
 ol {
   padding-left: 22px;
+}
+
+#queueList {
+  margin: 0;
+}
+
+#queueList li {
+  margin-bottom: 10px;
+}
+
+#queueList li.queue-cutoff {
+  margin-bottom: 18px;
+  padding-bottom: 18px;
+  border-bottom: 2px solid #6b7280;
+}
+
+.queue-item {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.queue-main {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.queue-slot {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 12px;
+  line-height: 1.5;
+  color: #fde68a;
+  background: rgba(120, 53, 15, 0.35);
+  border: 1px solid rgba(245, 158, 11, 0.4);
+}
+
+.queue-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.queue-status {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 12px;
+  line-height: 1.5;
+  border: 1px solid #4b5563;
+}
+
+.queue-status-active {
+  color: #bfdbfe;
+  background: rgba(37, 99, 235, 0.2);
+  border-color: rgba(59, 130, 246, 0.4);
+}
+
+.queue-status-cancelled {
+  color: #fca5a5;
+  background: rgba(185, 28, 28, 0.18);
+  border-color: rgba(248, 113, 113, 0.35);
 }

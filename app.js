@@ -37,6 +37,27 @@ function formatLocalTime(value) {
   });
 }
 
+function getQueueTimestamp(row) {
+  const value = row.status === "cancelled" || row.is_active === false
+    ? row.cancelled_at || row.created_at
+    : row.created_at;
+  const time = new Date(value).getTime();
+  return Number.isNaN(time) ? 0 : time;
+}
+
+function sortQueueEntries(data) {
+  return [...data].sort((a, b) => {
+    const aCancelled = a.status === "cancelled" || a.is_active === false;
+    const bCancelled = b.status === "cancelled" || b.is_active === false;
+
+    if (aCancelled !== bCancelled) {
+      return aCancelled ? 1 : -1;
+    }
+
+    return getQueueTimestamp(a) - getQueueTimestamp(b);
+  });
+}
+
 function renderQueue(data) {
   queueList.innerHTML = "";
 
@@ -47,11 +68,53 @@ function renderQueue(data) {
 
   queueEmpty.style.display = "none";
 
-  data.forEach((row) => {
+  const sortedData = sortQueueEntries(data);
+  let activeCount = 0;
+
+  sortedData.forEach((row) => {
     const li = document.createElement("li");
     const playerName = row.players?.display_name || "未知玩家";
     const time = formatLocalTime(row.created_at);
-    li.textContent = time ? `${playerName} · ${time}` : playerName;
+    const cancelledTime = formatLocalTime(row.cancelled_at);
+    const isCancelled = row.status === "cancelled" || row.is_active === false;
+    const statusLabel = isCancelled ? "已取消报名" : "报名中";
+    const statusClass = isCancelled
+      ? "queue-status queue-status-cancelled"
+      : "queue-status queue-status-active";
+    const metaText = isCancelled && cancelledTime
+      ? `取消于 ${cancelledTime}`
+      : time
+        ? `报名于 ${time}`
+        : "";
+    const actionHtml = isCancelled
+      ? ""
+      : `<button class="button-danger queue-cancel-btn" data-entry-id="${row.id}" data-player-name="${escapeHtml(playerName)}">取消报名</button>`;
+    let laneLabel = "";
+
+    if (!isCancelled) {
+      activeCount += 1;
+      if (activeCount <= 10) {
+        laneLabel = `正式队列 #${activeCount}`;
+      } else {
+        laneLabel = `替补区 #${activeCount - 10}`;
+      }
+    }
+
+    li.className = "queue-item";
+    if (!isCancelled && activeCount === 10) {
+      li.classList.add("queue-cutoff");
+    }
+    li.innerHTML = `
+      <div class="queue-main">
+        ${laneLabel ? `<span class="queue-slot">${laneLabel}</span>` : ""}
+        <strong>${escapeHtml(playerName)}</strong>
+        <span class="${statusClass}">${statusLabel}</span>
+      </div>
+      <div class="queue-actions">
+        <span class="muted">${escapeHtml(metaText)}</span>
+        ${actionHtml}
+      </div>
+    `;
     queueList.appendChild(li);
   });
 }
@@ -79,12 +142,16 @@ function renderLeaderboard(data) {
 }
 
 async function loadPlayers() {
+  playerSelect.disabled = true;
+  signupBtn.disabled = true;
+
   const { data, error } = await db
     .from("players")
     .select("id, display_name")
     .order("display_name", { ascending: true });
 
   if (error) {
+    playerSelect.innerHTML = '<option value="">加载失败</option>';
     setMessage(`加载玩家失败：${error.message}`, true);
     return;
   }
@@ -97,6 +164,10 @@ async function loadPlayers() {
     opt.textContent = player.display_name;
     playerSelect.appendChild(opt);
   });
+
+  const hasPlayers = (data || []).length > 0;
+  playerSelect.disabled = !hasPlayers;
+  signupBtn.disabled = !hasPlayers;
 }
 
 async function loadLeaderboard() {
@@ -135,11 +206,11 @@ async function loadQueue() {
       player_id,
       is_active,
       status,
+      cancelled_at,
       players (
         display_name
       )
     `)
-    .eq("is_active", true)
     .order("created_at", { ascending: true });
 
   if (error) {
@@ -181,6 +252,39 @@ async function signup() {
   await loadQueue();
 }
 
+async function cancelSignupByEntry(entryId, playerName, buttonEl) {
+  if (!entryId) {
+    setMessage("缺少报名记录，无法取消。", true);
+    return;
+  }
+
+  if (buttonEl) {
+    buttonEl.disabled = true;
+  }
+
+  setMessage(`正在取消 ${playerName || "该玩家"} 的报名...`);
+
+  const { error } = await db
+    .from("signup_queue")
+    .update({
+      is_active: false,
+      status: "cancelled",
+      cancelled_at: new Date().toISOString(),
+    })
+    .eq("id", entryId);
+
+  if (error) {
+    if (buttonEl) {
+      buttonEl.disabled = false;
+    }
+    setMessage(`取消报名失败：${error.message}`, true);
+    return;
+  }
+
+  setMessage(`${playerName || "该玩家"} 已取消报名，队列中会保留取消记录。`);
+  await loadQueue();
+}
+
 function subscribeQueueChanges() {
   db.channel("queue-changes")
     .on(
@@ -198,6 +302,19 @@ function subscribeQueueChanges() {
 }
 
 signupBtn.addEventListener("click", signup);
+queueList.addEventListener("click", async (event) => {
+  const button = event.target.closest(".queue-cancel-btn");
+
+  if (!button) {
+    return;
+  }
+
+  await cancelSignupByEntry(
+    button.dataset.entryId,
+    button.dataset.playerName,
+    button
+  );
+});
 
 async function init() {
   await loadPlayers();
