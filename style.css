@@ -2,13 +2,50 @@
   box-sizing: border-box;
 }
 
+:root {
+  --bg-deep: #06111f;
+  --bg-mid: #0b1c31;
+  --panel: rgba(9, 25, 45, 0.72);
+  --panel-strong: rgba(10, 30, 55, 0.9);
+  --panel-soft: rgba(18, 39, 66, 0.54);
+  --border: rgba(126, 173, 224, 0.18);
+  --border-strong: rgba(122, 176, 239, 0.34);
+  --text: #edf5ff;
+  --text-soft: #b3c4db;
+  --text-dim: #83a0c4;
+  --blue: #56a6ff;
+  --blue-strong: #2f7ce4;
+  --blue-soft: rgba(86, 166, 255, 0.16);
+  --teal: #63d5d0;
+  --teal-soft: rgba(99, 213, 208, 0.16);
+  --gold: #f0c36a;
+  --gold-soft: rgba(240, 195, 106, 0.18);
+  --danger: #ff8a8a;
+  --danger-soft: rgba(255, 138, 138, 0.16);
+  --shadow: 0 18px 48px rgba(1, 10, 24, 0.34);
+}
+
 body {
   margin: 0;
-  font-family: Arial, "Microsoft YaHei", sans-serif;
+  font-family: "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
   background:
-    linear-gradient(rgba(6, 10, 18, 0.78), rgba(10, 14, 24, 0.88)),
+    radial-gradient(circle at top left, rgba(78, 148, 225, 0.14), transparent 26%),
+    radial-gradient(circle at top right, rgba(99, 213, 208, 0.12), transparent 24%),
+    linear-gradient(rgba(4, 13, 25, 0.78), rgba(5, 16, 31, 0.9)),
     url("./assets/dota-bg.jpg") center / cover no-repeat fixed;
-  color: #f3f4f6;
+  color: var(--text);
+  min-height: 100vh;
+}
+
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  background:
+    linear-gradient(180deg, rgba(117, 186, 255, 0.05), transparent 28%),
+    radial-gradient(circle at 20% 12%, rgba(255, 255, 255, 0.06), transparent 18%);
+  mix-blend-mode: screen;
 }
 
 .loading-screen {
@@ -19,7 +56,7 @@ body {
   place-items: center;
   overflow: hidden;
   background:
-    linear-gradient(rgba(6, 10, 18, 0.4), rgba(10, 14, 24, 0.7)),
+    linear-gradient(rgba(4, 13, 25, 0.42), rgba(5, 16, 31, 0.78)),
     url("./assets/dota-bg.jpg") center / cover no-repeat;
   transition: opacity 0.45s ease, visibility 0.45s ease;
 }
@@ -34,8 +71,8 @@ body {
   position: absolute;
   inset: 0;
   background:
-    radial-gradient(circle at center, rgba(251, 191, 36, 0.18), transparent 24%),
-    linear-gradient(rgba(2, 6, 23, 0.25), rgba(2, 6, 23, 0.68));
+    radial-gradient(circle at center, rgba(240, 195, 106, 0.18), transparent 24%),
+    linear-gradient(rgba(2, 10, 22, 0.25), rgba(2, 10, 22, 0.72));
 }
 
 .loading-screen__content {
@@ -44,10 +81,10 @@ body {
   text-align: center;
   padding: 28px 32px;
   border-radius: 18px;
-  border: 1px solid rgba(148, 163, 184, 0.22);
-  background: rgba(15, 23, 42, 0.42);
-  backdrop-filter: blur(8px);
-  box-shadow: 0 20px 50px rgba(2, 6, 23, 0.35);
+  border: 1px solid var(--border-strong);
+  background: rgba(10, 26, 47, 0.5);
+  backdrop-filter: blur(14px);
+  box-shadow: var(--shadow);
 }
 
 .loading-screen__content h1 {
@@ -56,13 +93,13 @@ body {
 
 .loading-screen__content p {
   margin: 0;
-  color: #d1d5db;
+  color: var(--text-soft);
 }
 
 .container {
   max-width: 1440px;
-  margin: 32px auto;
-  padding: 0 16px;
+  margin: 36px auto;
+  padding: 0 18px 36px;
 }
 
 .page-head {
@@ -100,22 +137,25 @@ body {
 
 h1 {
   margin-bottom: 8px;
+  letter-spacing: 0.02em;
+  text-shadow: 0 8px 30px rgba(2, 8, 18, 0.42);
 }
 
 .sub {
-  color: #9ca3af;
-  margin-bottom: 18px;
+  color: var(--text-dim);
+  margin-bottom: 20px;
 }
 
 .season-chip {
-  background: rgba(30, 41, 59, 0.95);
-  border: 1px solid rgba(96, 165, 250, 0.45);
-  color: #dbeafe;
+  background: linear-gradient(135deg, rgba(20, 45, 78, 0.96), rgba(11, 29, 52, 0.96));
+  border: 1px solid var(--border-strong);
+  color: #dff0ff;
   white-space: nowrap;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
 }
 
 .season-chip:hover {
-  background: rgba(37, 99, 235, 0.22);
+  background: linear-gradient(135deg, rgba(26, 61, 104, 0.96), rgba(11, 33, 60, 0.96));
 }
 
 .season-total {
@@ -123,19 +163,19 @@ h1 {
   display: inline-block;
   padding: 9px 12px;
   border-radius: 999px;
-  color: #d1fae5;
-  background: rgba(6, 95, 70, 0.28);
-  border: 1px solid rgba(16, 185, 129, 0.35);
+  color: #d9fbfa;
+  background: linear-gradient(135deg, rgba(21, 72, 88, 0.5), rgba(10, 49, 56, 0.5));
+  border: 1px solid rgba(99, 213, 208, 0.34);
 }
 
 .season-total:hover {
-  background: rgba(6, 95, 70, 0.4);
+  background: linear-gradient(135deg, rgba(26, 91, 111, 0.56), rgba(11, 59, 68, 0.56));
 }
 
 button.season-total {
-  background: rgba(6, 95, 70, 0.28);
-  color: #d1fae5;
-  border: 1px solid rgba(16, 185, 129, 0.35);
+  background: linear-gradient(135deg, rgba(21, 72, 88, 0.5), rgba(10, 49, 56, 0.5));
+  color: #d9fbfa;
+  border: 1px solid rgba(99, 213, 208, 0.34);
 }
 
 .reward-logs {
@@ -151,9 +191,10 @@ button.season-total {
   gap: 12px;
   flex-wrap: wrap;
   padding: 12px 14px;
-  border: 1px solid #374151;
+  border: 1px solid var(--border);
   border-radius: 12px;
-  background: rgba(17, 24, 39, 0.45);
+  background: var(--panel-soft);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.03);
 }
 
 .reward-log-main {
@@ -169,28 +210,30 @@ button.season-total {
   border-radius: 999px;
   font-size: 12px;
   line-height: 1.5;
-  color: #d1fae5;
-  background: rgba(6, 95, 70, 0.28);
-  border: 1px solid rgba(16, 185, 129, 0.35);
+  color: #d9fbfa;
+  background: var(--teal-soft);
+  border: 1px solid rgba(99, 213, 208, 0.34);
 }
 
 .reward-log-cancelled {
-  color: #fca5a5;
-  background: rgba(185, 28, 28, 0.18);
-  border-color: rgba(248, 113, 113, 0.35);
+  color: #ffd0d0;
+  background: var(--danger-soft);
+  border-color: rgba(255, 138, 138, 0.34);
 }
 
 .reward-log-outside {
-  border-color: rgba(245, 158, 11, 0.32);
-  background: linear-gradient(135deg, rgba(120, 53, 15, 0.28), rgba(17, 24, 39, 0.52));
+  border-color: rgba(240, 195, 106, 0.28);
+  background: linear-gradient(135deg, rgba(93, 64, 18, 0.36), rgba(15, 31, 52, 0.62));
 }
 
 .season-panel {
   margin-bottom: 24px;
-  background: #172033;
-  border: 1px solid #334155;
-  border-radius: 14px;
-  padding: 16px;
+  background: linear-gradient(180deg, rgba(14, 34, 58, 0.9), rgba(10, 25, 45, 0.82));
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  padding: 18px;
+  box-shadow: var(--shadow);
+  backdrop-filter: blur(14px);
 }
 
 .season-panel h2 {
@@ -206,14 +249,14 @@ button.season-total {
 
 .season-player-item {
   padding: 0;
-  border: 1px solid #374151;
-  border-radius: 10px;
-  background: rgba(17, 24, 39, 0.55);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: rgba(14, 32, 54, 0.64);
 }
 
 .season-player-item-active {
-  border-color: rgba(59, 130, 246, 0.45);
-  background: linear-gradient(135deg, rgba(30, 64, 175, 0.22), rgba(17, 24, 39, 0.6));
+  border-color: rgba(86, 166, 255, 0.34);
+  background: linear-gradient(135deg, rgba(37, 97, 186, 0.22), rgba(14, 33, 56, 0.72));
 }
 
 .season-player-button {
@@ -230,11 +273,11 @@ button.season-total {
 }
 
 .season-player-button:hover {
-  background: rgba(37, 99, 235, 0.14);
+  background: rgba(86, 166, 255, 0.1);
 }
 
 .season-player-button-active {
-  background: rgba(37, 99, 235, 0.12);
+  background: rgba(86, 166, 255, 0.08);
 }
 
 .signup-player-grid {
@@ -249,17 +292,19 @@ button.season-total {
   min-width: 0;
   padding: 10px 8px;
   border-radius: 12px;
-  border: 1px solid #374151;
-  background: rgba(17, 24, 39, 0.55);
+  border: 1px solid var(--border);
+  background: rgba(14, 31, 54, 0.64);
   display: grid;
   gap: 4px;
   justify-items: center;
   text-align: center;
-  transition: background 0.15s ease, border-color 0.15s ease, transform 0.15s ease;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.03);
+  transition: background 0.18s ease, border-color 0.18s ease, transform 0.18s ease, box-shadow 0.18s ease;
 }
 
 .signup-player-chip:hover:not(:disabled) {
   transform: translateY(-1px);
+  box-shadow: 0 10px 24px rgba(2, 10, 24, 0.22);
 }
 
 .signup-player-chip strong {
@@ -270,25 +315,25 @@ button.season-total {
 .signup-player-chip small {
   font-size: 12px;
   line-height: 1.4;
-  color: #9ca3af;
+  color: var(--text-dim);
 }
 
 .signup-player-chip-active {
-  border-color: rgba(59, 130, 246, 0.45);
-  background: linear-gradient(135deg, rgba(30, 64, 175, 0.22), rgba(17, 24, 39, 0.72));
+  border-color: rgba(86, 166, 255, 0.36);
+  background: linear-gradient(135deg, rgba(37, 97, 186, 0.22), rgba(12, 29, 49, 0.78));
 }
 
 .signup-player-chip-active small {
-  color: #bfdbfe;
+  color: #cde7ff;
 }
 
 .signup-player-chip-cancelled {
-  border-color: rgba(248, 113, 113, 0.35);
-  background: linear-gradient(135deg, rgba(127, 29, 29, 0.22), rgba(17, 24, 39, 0.7));
+  border-color: rgba(255, 138, 138, 0.32);
+  background: linear-gradient(135deg, rgba(111, 33, 47, 0.26), rgba(16, 28, 47, 0.72));
 }
 
 .signup-player-chip-cancelled small {
-  color: #fca5a5;
+  color: #ffc1c1;
 }
 
 .signup-player-chip-disabled {
@@ -302,16 +347,19 @@ button.season-total {
   border-radius: 999px;
   font-size: 12px;
   line-height: 1.5;
-  color: #fef3c7;
-  background: rgba(146, 64, 14, 0.35);
-  border: 1px solid rgba(245, 158, 11, 0.4);
+  color: #fff2d2;
+  background: var(--gold-soft);
+  border: 1px solid rgba(240, 195, 106, 0.36);
 }
 
 .card {
-  background: #1f2937;
-  border: 1px solid #374151;
-  border-radius: 12px;
-  padding: 16px;
+  background:
+    linear-gradient(180deg, rgba(13, 30, 52, 0.92), rgba(8, 22, 40, 0.84));
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  padding: 18px;
+  box-shadow: var(--shadow);
+  backdrop-filter: blur(14px);
 }
 
 .row {
@@ -336,54 +384,62 @@ select,
 button,
 input {
   padding: 10px 12px;
-  border-radius: 8px;
-  border: 1px solid #4b5563;
+  border-radius: 10px;
+  border: 1px solid rgba(117, 155, 197, 0.28);
   font-size: 14px;
 }
 
 select {
-  background: #111827;
-  color: #f3f4f6;
+  background: rgba(7, 20, 37, 0.88);
+  color: var(--text);
   min-width: 220px;
 }
 
 input {
-  background: #111827;
-  color: #f3f4f6;
+  background: rgba(7, 20, 37, 0.88);
+  color: var(--text);
   min-width: 260px;
 }
 
 button {
-  background: #2563eb;
+  background: linear-gradient(135deg, var(--blue), var(--blue-strong));
   color: white;
   cursor: pointer;
+  box-shadow: 0 10px 24px rgba(23, 76, 149, 0.24);
+  transition: transform 0.18s ease, filter 0.18s ease, box-shadow 0.18s ease;
+}
+
+button:hover:not(:disabled) {
+  transform: translateY(-1px);
+  filter: brightness(1.05);
 }
 
 .button-secondary {
-  background: #374151;
+  background: linear-gradient(135deg, rgba(58, 88, 122, 0.92), rgba(38, 59, 82, 0.92));
 }
 
 .button-danger {
-  background: #7f1d1d;
-  border-color: #b91c1c;
+  background: linear-gradient(135deg, rgba(153, 47, 62, 0.96), rgba(109, 31, 47, 0.96));
+  border-color: rgba(255, 138, 138, 0.26);
 }
 
 button:disabled {
-  opacity: 0.6;
+  opacity: 0.52;
   cursor: not-allowed;
+  box-shadow: none;
 }
 
 .message {
   margin-top: 12px;
-  color: #93c5fd;
+  color: #9fd2ff;
 }
 
 .message.error {
-  color: #fca5a5;
+  color: #ffc1c1;
 }
 
 .muted {
-  color: #9ca3af;
+  color: var(--text-dim);
 }
 
 .match-grid {
@@ -408,9 +464,9 @@ button:disabled {
   gap: 12px;
   flex-wrap: wrap;
   padding: 12px 14px;
-  border: 1px solid #374151;
+  border: 1px solid var(--border);
   border-radius: 12px;
-  background: rgba(17, 24, 39, 0.45);
+  background: var(--panel-soft);
 }
 
 .today-player-main {
@@ -426,30 +482,30 @@ button:disabled {
   border-radius: 999px;
   font-size: 12px;
   line-height: 1.5;
-  color: #c7d2fe;
-  background: rgba(49, 46, 129, 0.28);
-  border: 1px solid rgba(99, 102, 241, 0.35);
+  color: #d6e6ff;
+  background: rgba(47, 95, 174, 0.22);
+  border: 1px solid rgba(86, 166, 255, 0.28);
 }
 
 .day-status-active {
-  color: #bbf7d0;
+  color: #bff6e8;
 }
 
 .day-status-inactive {
-  color: #fca5a5;
+  color: #ffc1c1;
 }
 
 .match-form-panel {
   margin-top: 16px;
   padding-top: 16px;
-  border-top: 1px solid #374151;
+  border-top: 1px solid var(--border);
 }
 
 .team-panel {
   padding: 14px;
-  border: 1px solid #374151;
+  border: 1px solid var(--border);
   border-radius: 12px;
-  background: rgba(17, 24, 39, 0.45);
+  background: var(--panel-soft);
 }
 
 .team-panel h3 {
@@ -473,16 +529,16 @@ button:disabled {
 }
 
 .recent-match-card {
-  border: 1px solid #374151;
+  border: 1px solid var(--border);
   border-radius: 12px;
   padding: 14px;
-  background: rgba(17, 24, 39, 0.45);
+  background: var(--panel-soft);
 }
 
 .match-day-group {
-  border: 1px solid #374151;
+  border: 1px solid var(--border);
   border-radius: 12px;
-  background: rgba(17, 24, 39, 0.35);
+  background: rgba(10, 26, 47, 0.52);
   overflow: hidden;
 }
 
@@ -495,7 +551,7 @@ button:disabled {
   align-items: center;
   gap: 12px;
   flex-wrap: wrap;
-  background: rgba(31, 41, 55, 0.55);
+  background: rgba(20, 43, 73, 0.62);
 }
 
 .match-day-group summary::-webkit-details-marker {
@@ -538,10 +594,10 @@ button:disabled {
 }
 
 .recent-match-team {
-  border: 1px solid #374151;
+  border: 1px solid var(--border);
   border-radius: 10px;
   padding: 10px 12px;
-  background: rgba(31, 41, 55, 0.5);
+  background: rgba(18, 39, 66, 0.48);
 }
 
 .recent-match-team h3 {
@@ -560,9 +616,9 @@ button:disabled {
   border-radius: 999px;
   font-size: 12px;
   line-height: 1.5;
-  color: #bbf7d0;
-  background: rgba(20, 83, 45, 0.35);
-  border: 1px solid rgba(34, 197, 94, 0.35);
+  color: #d8fbf3;
+  background: var(--teal-soft);
+  border: 1px solid rgba(99, 213, 208, 0.3);
 }
 
 table {
@@ -575,7 +631,7 @@ th,
 td {
   text-align: left;
   padding: 10px 8px;
-  border-bottom: 1px solid #374151;
+  border-bottom: 1px solid rgba(110, 150, 193, 0.16);
 }
 
 .leaderboard-rank {
@@ -587,8 +643,8 @@ td {
   padding: 0 10px;
   border-radius: 999px;
   font-weight: 700;
-  background: rgba(51, 65, 85, 0.45);
-  border: 1px solid rgba(100, 116, 139, 0.35);
+  background: rgba(31, 59, 92, 0.56);
+  border: 1px solid rgba(124, 165, 209, 0.26);
 }
 
 .leaderboard-row-top1 {
@@ -652,7 +708,7 @@ ol {
 #queueList li.queue-cutoff {
   margin-bottom: 18px;
   padding-bottom: 18px;
-  border-bottom: 2px solid #6b7280;
+  border-bottom: 2px solid rgba(240, 195, 106, 0.32);
 }
 
 .queue-item {
@@ -676,9 +732,9 @@ ol {
   border-radius: 999px;
   font-size: 12px;
   line-height: 1.5;
-  color: #fde68a;
-  background: rgba(120, 53, 15, 0.35);
-  border: 1px solid rgba(245, 158, 11, 0.4);
+  color: #fff1c8;
+  background: rgba(104, 73, 27, 0.36);
+  border: 1px solid rgba(240, 195, 106, 0.34);
 }
 
 .queue-actions {
@@ -694,25 +750,25 @@ ol {
   border-radius: 999px;
   font-size: 12px;
   line-height: 1.5;
-  border: 1px solid #4b5563;
+  border: 1px solid rgba(117, 155, 197, 0.22);
 }
 
 .queue-status-active {
-  color: #bfdbfe;
-  background: rgba(37, 99, 235, 0.2);
-  border-color: rgba(59, 130, 246, 0.4);
+  color: #d4e8ff;
+  background: var(--blue-soft);
+  border-color: rgba(86, 166, 255, 0.3);
 }
 
 .queue-status-cancelled {
-  color: #fca5a5;
-  background: rgba(185, 28, 28, 0.18);
-  border-color: rgba(248, 113, 113, 0.35);
+  color: #ffd0d0;
+  background: var(--danger-soft);
+  border-color: rgba(255, 138, 138, 0.3);
 }
 
 .queue-status-ready {
-  color: #bbf7d0;
-  background: rgba(20, 83, 45, 0.35);
-  border-color: rgba(34, 197, 94, 0.35);
+  color: #d8fbf3;
+  background: var(--teal-soft);
+  border-color: rgba(99, 213, 208, 0.3);
 }
 
 @media (max-width: 720px) {

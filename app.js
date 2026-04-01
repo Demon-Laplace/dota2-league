@@ -1269,7 +1269,7 @@ async function loadPlayersForSeason(seasonId) {
     .order("player_id", { ascending: true });
 
   if (error) {
-    console.error("加载补登赛季选手失败：", error);
+    console.error("加载补录赛季选手失败：", error);
     backfillPlayers = [];
     renderBackfillForm();
     setBackfillMessage(`加载赛季选手失败：${error.message}`, true);
@@ -2125,7 +2125,7 @@ function validateBackfillPlayers(teamAIds, teamBIds) {
   }
 
   if (!backfillDateInput.value) {
-    return "请选择补登日期。";
+    return "请选择补录比赛日期。";
   }
 
   if (!backfillWinnerSelect.value) {
@@ -2133,7 +2133,7 @@ function validateBackfillPlayers(teamAIds, teamBIds) {
   }
 
   if (backfillPlayers.length < TEAM_SIZE * 2) {
-    return "该赛季选手不足 10 人，无法补登比赛。";
+    return "该赛季选手不足 10 人，无法补录比赛。";
   }
 
   if (teamAIds.some((id) => !id) || teamBIds.some((id) => !id)) {
@@ -2204,7 +2204,7 @@ async function recordBackfillMatch() {
   }
 
   recordBackfillBtn.disabled = true;
-  setBackfillMessage("正在补登比赛...");
+  setBackfillMessage("正在补录比赛...");
 
   const { error } = await db.rpc("record_match_result_backfill", {
     p_team_a_player_ids: teamAIds,
@@ -2219,14 +2219,14 @@ async function recordBackfillMatch() {
   recordBackfillBtn.disabled = false;
 
   if (error) {
-    setBackfillMessage(`补登比赛失败：${error.message}。请先在 Supabase 执行对应 SQL。`, true);
+    setBackfillMessage(`补录比赛失败：${error.message}。请先在 Supabase 执行对应 SQL。`, true);
     return;
   }
 
   clearBackfillForm();
   setBackfillFormOpen(false);
   renderBackfillForm();
-  setMessage("历史比赛补登成功。");
+  setMessage("历史比赛补录成功。");
   requestImmediateRefresh({
     leaderboard: true,
     recentMatches: true,
