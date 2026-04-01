@@ -13,6 +13,7 @@ const seasonPanelTitle = document.getElementById("seasonPanelTitle");
 const seasonPlayersCount = document.getElementById("seasonPlayersCount");
 const seasonPlayersList = document.getElementById("seasonPlayersList");
 const seasonPlayersEmpty = document.getElementById("seasonPlayersEmpty");
+const resetSeasonBtn = document.getElementById("resetSeasonBtn");
 const startMatchDayBtn = document.getElementById("startMatchDayBtn");
 const matchDayStatus = document.getElementById("matchDayStatus");
 const matchDayInfo = document.getElementById("matchDayInfo");
@@ -672,6 +673,51 @@ async function loadRecentMatches() {
   renderRecentMatches(data || []);
 }
 
+async function resetCurrentSeason() {
+  if (!activeSeason?.id) {
+    setMessage("当前没有可重置的赛季。", true);
+    return;
+  }
+
+  const confirmed = window.confirm(
+    `确认重置 ${activeSeason.name} 吗？这会清空本赛季报名、当日名单、比赛日、比赛记录和赛季积分。`
+  );
+
+  if (!confirmed) {
+    return;
+  }
+
+  const confirmText = window.prompt('请输入“重置赛季”以继续执行：', "");
+
+  if (confirmText !== "重置赛季") {
+    setMessage("未输入正确确认文字，已取消重置。", true);
+    return;
+  }
+
+  resetSeasonBtn.disabled = true;
+  setMessage(`正在重置 ${activeSeason.name}...`);
+
+  const { data, error } = await db.rpc("reset_current_season", {
+    p_season_id: activeSeason.id,
+  });
+
+  resetSeasonBtn.disabled = false;
+
+  if (error) {
+    setMessage(`重置赛季失败：${error.message}。请先在 Supabase 执行对应 SQL。`, true);
+    return;
+  }
+
+  setMatchMessage("");
+  clearMatchForm();
+  setMatchFormOpen(false);
+  setMessage(`已重置 ${activeSeason.name}，并从总表同步了 ${data ?? 0} 名选手。`);
+  await refreshPlayerDrivenViews();
+  await loadQueue();
+  await loadLeaderboard();
+  await loadRecentMatches();
+}
+
 async function loadQueue() {
   let query = db
     .from("signup_queue")
@@ -1118,6 +1164,7 @@ signupBtn.addEventListener("click", signup);
 seasonToggleBtn.addEventListener("click", () => {
   setSeasonPanelOpen(!isSeasonPanelOpen);
 });
+resetSeasonBtn.addEventListener("click", resetCurrentSeason);
 startMatchDayBtn.addEventListener("click", startMatchDay);
 confirmQueueBtn.addEventListener("click", confirmQueueToTodayPlayers);
 clearQueueBtn.addEventListener("click", clearSignupQueueForTesting);
