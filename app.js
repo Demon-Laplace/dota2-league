@@ -71,17 +71,21 @@ async function loadQueue() {
       id,
       created_at,
       player_id,
+      is_active,
       players (
         name
       )
     `)
-    .eq('is_active', true)
     .order('created_at', { ascending: true });
 
   if (error) {
     setMessage(`加载队列失败：${error.message}`, true);
     return;
   }
+
+  renderQueue(data || []);
+}
+
 
   queueList.innerHTML = '';
 
