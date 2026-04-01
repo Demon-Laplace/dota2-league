@@ -402,6 +402,24 @@ td {
   border-bottom: 1px solid #374151;
 }
 
+.reward-editor {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.reward-input {
+  min-width: 0;
+  width: 90px;
+  padding: 8px 10px;
+}
+
+.reward-save-btn {
+  padding: 8px 10px;
+  font-size: 13px;
+}
+
 ol {
   padding-left: 22px;
 }
