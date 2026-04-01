@@ -74,6 +74,7 @@ const closeHeroPickerBtn = document.getElementById("closeHeroPickerBtn");
 const heroPickerTitle = document.getElementById("heroPickerTitle");
 const heroPickerSubtitle = document.getElementById("heroPickerSubtitle");
 const heroSearchInput = document.getElementById("heroSearchInput");
+const heroSearchSuggestions = document.getElementById("heroSearchSuggestions");
 const heroSelect = document.getElementById("heroSelect");
 const saveHeroBtn = document.getElementById("saveHeroBtn");
 const clearHeroBtn = document.getElementById("clearHeroBtn");
@@ -639,6 +640,17 @@ function getHeroSearchKeywords(heroName) {
     chinese,
     (HERO_PINYIN_INITIALS[heroName] || "").toLowerCase(),
   ].filter(Boolean);
+}
+
+function getFilteredHeroes(searchTerm = "") {
+  const normalizedSearch = String(searchTerm || "").trim().toLowerCase();
+  if (!normalizedSearch) {
+    return DOTA_HEROES;
+  }
+
+  return DOTA_HEROES.filter((hero) =>
+    getHeroSearchKeywords(hero).some((keyword) => keyword.toLowerCase().includes(normalizedSearch))
+  );
 }
 
 function setMatchFormOpen(isOpen) {
@@ -2561,13 +2573,35 @@ function togglePlayerSelection(formType, teamKey, playerId) {
   rerenderSelectionsByFormType(formType);
 }
 
+function renderHeroSuggestions(searchTerm = "") {
+  const normalizedSearch = String(searchTerm || "").trim().toLowerCase();
+
+  if (normalizedSearch.length < 2) {
+    heroSearchSuggestions.hidden = true;
+    heroSearchSuggestions.innerHTML = "";
+    return;
+  }
+
+  const heroes = getFilteredHeroes(searchTerm).slice(0, 12);
+
+  if (!heroes.length) {
+    heroSearchSuggestions.hidden = false;
+    heroSearchSuggestions.innerHTML = '<div class="hero-search-empty">没有匹配到英雄</div>';
+    return;
+  }
+
+  heroSearchSuggestions.hidden = false;
+  heroSearchSuggestions.innerHTML = heroes.map((hero) => `
+    <button type="button" class="hero-search-option" data-hero-name="${escapeHtml(hero)}">
+      <span>${escapeHtml(getHeroDisplayName(hero))}</span>
+      <small>${escapeHtml(hero)}</small>
+    </button>
+  `).join("");
+}
+
 function renderHeroOptions(searchTerm = "") {
   const normalizedSearch = String(searchTerm || "").trim().toLowerCase();
-  const filteredHeroes = normalizedSearch
-    ? DOTA_HEROES.filter((hero) =>
-        getHeroSearchKeywords(hero).some((keyword) => keyword.toLowerCase().includes(normalizedSearch))
-      )
-    : DOTA_HEROES;
+  const filteredHeroes = getFilteredHeroes(searchTerm);
 
   heroSelect.innerHTML = ['<option value="">不选择英雄</option>']
     .concat(
@@ -2585,10 +2619,12 @@ function renderHeroOptions(searchTerm = "") {
 
   if (normalizedSearch && filteredHeroes.length === 0) {
     setHeroPickerMessage("没有匹配到英雄，可以换英文、中文或拼音首字母再试。", true);
+    renderHeroSuggestions(searchTerm);
     return;
   }
 
   setHeroPickerMessage("");
+  renderHeroSuggestions(searchTerm);
 }
 
 function openHeroPicker(state) {
@@ -2608,6 +2644,8 @@ function closeHeroPicker() {
   heroPickerState = null;
   heroPickerModal.hidden = true;
   heroSearchInput.value = "";
+  heroSearchSuggestions.hidden = true;
+  heroSearchSuggestions.innerHTML = "";
   heroSelect.value = "";
   setHeroPickerMessage("");
 }
@@ -3223,6 +3261,20 @@ heroPickerBackdrop.addEventListener("click", closeHeroPicker);
 heroSearchInput.addEventListener("input", () => {
   renderHeroOptions(heroSearchInput.value);
 });
+heroSearchInput.addEventListener("focus", () => {
+  renderHeroSuggestions(heroSearchInput.value);
+});
+heroSearchSuggestions.addEventListener("click", (event) => {
+  const option = event.target.closest(".hero-search-option");
+  if (!option) return;
+
+  const heroName = option.dataset.heroName;
+  heroSelect.value = heroName;
+  heroSearchInput.value = getHeroDisplayName(heroName);
+  heroSearchSuggestions.hidden = true;
+  heroSearchSuggestions.innerHTML = "";
+  setHeroPickerMessage("");
+});
 saveHeroBtn.addEventListener("click", async () => {
   await saveHeroSelection(heroSelect.value);
 });
@@ -3234,6 +3286,17 @@ clearHeroBtn.addEventListener("click", async () => {
 document.addEventListener("keydown", (event) => {
   if (event.key === "Escape" && !heroPickerModal.hidden) {
     closeHeroPicker();
+  }
+});
+
+document.addEventListener("click", (event) => {
+  if (
+    !heroPickerModal.hidden &&
+    !heroSearchInput.contains(event.target) &&
+    !heroSearchSuggestions.contains(event.target)
+  ) {
+    heroSearchSuggestions.hidden = true;
+    heroSearchSuggestions.innerHTML = "";
   }
 });
 
