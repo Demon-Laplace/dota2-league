@@ -78,6 +78,12 @@ function setBackfillMessage(text, isError = false) {
   backfillMessageEl.className = isError ? "message error" : "message";
 }
 
+function formatScore(value) {
+  const numericValue = Number(value ?? 0);
+  if (Number.isNaN(numericValue)) return "0";
+  return numericValue.toFixed(2).replace(/\.00$/, "").replace(/(\.\d)0$/, "$1");
+}
+
 function setMatchFormOpen(isOpen) {
   isMatchFormOpen = isOpen;
   matchFormPanel.hidden = !isOpen;
@@ -261,7 +267,8 @@ function updateSeasonInfo() {
     seasonInfoEl.textContent = "当前未识别到赛季，将使用全局玩家名单。";
   }
 
-  seasonToggleBtn.textContent = `当前赛季：${seasonName}`;
+  const koiSuffix = activeSeason?.koi_player_id ? " · 已设锦鲤" : "";
+  seasonToggleBtn.textContent = `当前赛季：${seasonName}${koiSuffix}`;
   seasonPanelTitle.textContent = `${seasonName} 选手名单`;
 }
 
@@ -279,7 +286,20 @@ function renderSeasonPlayersPanel() {
   seasonPlayers.forEach((player) => {
     const item = document.createElement("div");
     item.className = "season-player-item";
-    item.innerHTML = `<strong>${escapeHtml(player.display_name)}</strong>`;
+    const koiBadge = player.id === activeSeason?.koi_player_id
+      ? '<span class="koi-badge">赛季锦鲤</span>'
+      : '<span class="muted">点击设为锦鲤</span>';
+    item.innerHTML = `
+      <button
+        class="season-player-button"
+        type="button"
+        data-player-id="${player.id}"
+        data-player-name="${escapeHtml(player.display_name)}"
+      >
+        <strong>${escapeHtml(player.display_name)}</strong>
+        ${koiBadge}
+      </button>
+    `;
     seasonPlayersList.appendChild(item);
   });
 }
@@ -486,7 +506,7 @@ function renderLeaderboard(data) {
     tr.innerHTML = `
       <td>${idx + 1}</td>
       <td>${escapeHtml(player.display_name)}</td>
-      <td>${player.score ?? 0}</td>
+      <td>${formatScore(player.score)}</td>
       <td>${player.games_played ?? 0}</td>
       <td>${player.reward_points ?? 0}</td>
     `;
@@ -588,7 +608,7 @@ function renderRecentMatches(data) {
 async function loadActiveSeason() {
   const { data, error } = await db
     .from("seasons")
-    .select("id, name")
+    .select("id, name, koi_player_id")
     .eq("is_active", true)
     .limit(1)
     .maybeSingle();
@@ -874,6 +894,47 @@ async function resetCurrentSeason() {
   await loadQueue();
   await loadLeaderboard();
   await loadRecentMatches();
+}
+
+async function setSeasonKoi(playerId, playerName) {
+  if (!activeSeason?.id) {
+    setMessage("当前没有可设置的赛季。", true);
+    return;
+  }
+
+  const isCurrentKoi = activeSeason.koi_player_id === playerId;
+  const confirmed = window.confirm(
+    isCurrentKoi
+      ? `确认取消 ${playerName} 的赛季锦鲤身份吗？`
+      : `确认将 ${playerName} 设为 ${activeSeason.name} 的赛季锦鲤吗？`
+  );
+
+  if (!confirmed) {
+    return;
+  }
+
+  setMessage(
+    isCurrentKoi ? "正在取消赛季锦鲤并重算积分..." : `正在设置 ${playerName} 为赛季锦鲤并重算积分...`
+  );
+
+  const { error } = await db.rpc("set_season_koi", {
+    p_player_id: isCurrentKoi ? null : playerId,
+    p_season_id: activeSeason.id,
+  });
+
+  if (error) {
+    setMessage(`设置赛季锦鲤失败：${error.message}。请先在 Supabase 执行对应 SQL。`, true);
+    return;
+  }
+
+  await loadActiveSeason();
+  renderSeasonPlayersPanel();
+  await loadLeaderboard();
+  setMessage(
+    isCurrentKoi
+      ? "已取消赛季锦鲤，并按当前规则重算积分。"
+      : `${playerName} 已设为赛季锦鲤，并按当前规则重算积分。`
+  );
 }
 
 async function loadQueue() {
@@ -1482,6 +1543,13 @@ recentMatchesList.addEventListener("click", async (event) => {
   if (!button) return;
 
   await deleteMatch(button.dataset.matchId, button);
+});
+
+seasonPlayersList.addEventListener("click", async (event) => {
+  const button = event.target.closest(".season-player-button");
+  if (!button) return;
+
+  await setSeasonKoi(button.dataset.playerId, button.dataset.playerName);
 });
 
 async function init() {

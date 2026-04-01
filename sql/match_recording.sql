@@ -20,8 +20,11 @@ declare
   v_season_id uuid;
   v_match_day_id uuid;
   v_match_date date;
-  v_score_delta_a integer;
-  v_score_delta_b integer;
+  v_koi_player_id uuid;
+  v_team_a_has_koi boolean := false;
+  v_team_b_has_koi boolean := false;
+  v_score_delta_a numeric(10,2);
+  v_score_delta_b numeric(10,2);
 begin
   if coalesce(array_length(p_team_a_player_ids, 1), 0) <> 5 then
     raise exception '天辉必须正好 5 名选手';
@@ -55,6 +58,11 @@ begin
   end if;
 
   if v_season_id is not null then
+    select koi_player_id
+    into v_koi_player_id
+    from public.seasons
+    where id = v_season_id;
+
     select id, match_date
     into v_match_day_id, v_match_date
     from public.match_days
@@ -92,10 +100,19 @@ begin
     from public.players p
     where p.id = any(p_team_a_player_ids || p_team_b_player_ids)
     on conflict (season_id, player_id) do nothing;
+
+    v_team_a_has_koi := v_koi_player_id is not null and v_koi_player_id = any(p_team_a_player_ids);
+    v_team_b_has_koi := v_koi_player_id is not null and v_koi_player_id = any(p_team_b_player_ids);
   end if;
 
-  v_score_delta_a := case when p_winner_team = 'A' then 1 else -1 end;
-  v_score_delta_b := case when p_winner_team = 'B' then 1 else -1 end;
+  v_score_delta_a := case
+    when p_winner_team = 'A' then case when v_team_a_has_koi then 1.25 else 1.00 end
+    else -1.00
+  end;
+  v_score_delta_b := case
+    when p_winner_team = 'B' then case when v_team_b_has_koi then 1.25 else 1.00 end
+    else -1.00
+  end;
 
   insert into public.matches (winner_team, created_by, note, season_id, match_day_id, match_date)
   values (p_winner_team, p_created_by, p_note, v_season_id, v_match_day_id, v_match_date)
@@ -205,8 +222,11 @@ as $$
 declare
   v_match_id uuid;
   v_match_day_id uuid;
-  v_score_delta_a integer;
-  v_score_delta_b integer;
+  v_koi_player_id uuid;
+  v_team_a_has_koi boolean := false;
+  v_team_b_has_koi boolean := false;
+  v_score_delta_a numeric(10,2);
+  v_score_delta_b numeric(10,2);
 begin
   if p_season_id is null then
     raise exception '补登比赛必须选择赛季';
@@ -236,6 +256,11 @@ begin
   ) then
     raise exception '同一名选手不能在同一场比赛中重复出现';
   end if;
+
+  select koi_player_id
+  into v_koi_player_id
+  from public.seasons
+  where id = p_season_id;
 
   insert into public.match_days (season_id, match_date, note, is_active, started_at)
   values (p_season_id, p_match_date, '历史补登', false, now())
@@ -269,8 +294,17 @@ begin
   where p.id = any(p_team_a_player_ids || p_team_b_player_ids)
   on conflict (season_id, player_id) do nothing;
 
-  v_score_delta_a := case when p_winner_team = 'A' then 1 else -1 end;
-  v_score_delta_b := case when p_winner_team = 'B' then 1 else -1 end;
+  v_team_a_has_koi := v_koi_player_id is not null and v_koi_player_id = any(p_team_a_player_ids);
+  v_team_b_has_koi := v_koi_player_id is not null and v_koi_player_id = any(p_team_b_player_ids);
+
+  v_score_delta_a := case
+    when p_winner_team = 'A' then case when v_team_a_has_koi then 1.25 else 1.00 end
+    else -1.00
+  end;
+  v_score_delta_b := case
+    when p_winner_team = 'B' then case when v_team_b_has_koi then 1.25 else 1.00 end
+    else -1.00
+  end;
 
   insert into public.matches (winner_team, created_by, note, season_id, match_day_id, match_date)
   values (p_winner_team, p_created_by, p_note, p_season_id, v_match_day_id, p_match_date)

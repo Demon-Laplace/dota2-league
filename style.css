@@ -81,10 +81,38 @@ h1 {
 }
 
 .season-player-item {
-  padding: 10px 12px;
+  padding: 0;
   border: 1px solid #374151;
   border-radius: 10px;
   background: rgba(17, 24, 39, 0.55);
+}
+
+.season-player-button {
+  width: 100%;
+  background: transparent;
+  border: 0;
+  color: inherit;
+  text-align: left;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+}
+
+.season-player-button:hover {
+  background: rgba(37, 99, 235, 0.14);
+}
+
+.koi-badge {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 12px;
+  line-height: 1.5;
+  color: #fef3c7;
+  background: rgba(146, 64, 14, 0.35);
+  border: 1px solid rgba(245, 158, 11, 0.4);
 }
 
 .card {
