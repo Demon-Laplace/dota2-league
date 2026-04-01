@@ -24,8 +24,26 @@
 
     <section class="card">
       <h2>当前报名队列</h2>
+      <div class="row">
+        <button id="confirmQueueBtn" class="button-secondary" disabled>全部到齐</button>
+      </div>
       <ol id="queueList"></ol>
       <p id="queueEmpty" class="muted">当前无人报名</p>
+    </section>
+
+    <section class="card">
+      <div class="section-head">
+        <h2>当日选手名单</h2>
+        <span id="todayPlayersCount" class="muted">0 人</span>
+      </div>
+      <div class="row">
+        <select id="todayAddPlayerSelect">
+          <option value="">请选择临时添加选手</option>
+        </select>
+        <button id="addTodayPlayerBtn">临时添加选手</button>
+      </div>
+      <ul id="todayPlayersList" class="today-players-list"></ul>
+      <p id="todayPlayersEmpty" class="muted">今日尚未确认到场选手</p>
     </section>
 
     <section class="card">
