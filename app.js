@@ -32,6 +32,7 @@ const recentMatchesEmpty = document.getElementById("recentMatchesEmpty");
 
 let seasonPlayers = [];
 let todayPlayers = [];
+let queueEntries = [];
 let activeSeason = null;
 let isMatchFormOpen = false;
 
@@ -151,9 +152,16 @@ function updateSeasonInfo() {
 }
 
 function renderSignupOptions() {
-  const hasPlayers = seasonPlayers.length > 0;
+  const queuedPlayerIds = new Set(
+    queueEntries
+      .filter((row) => row.is_active === true || row.status === "cancelled")
+      .map((row) => row.player_id)
+  );
+  const signablePlayers = seasonPlayers.filter((player) => !queuedPlayerIds.has(player.id));
+  const hasPlayers = signablePlayers.length > 0;
+
   playerSelect.innerHTML = hasPlayers
-    ? buildOptionsFromPlayers(seasonPlayers)
+    ? buildOptionsFromPlayers(signablePlayers)
     : '<option value="">暂无可报名选手</option>';
   playerSelect.disabled = !hasPlayers;
   signupBtn.disabled = !hasPlayers;
@@ -568,7 +576,9 @@ async function loadQueue() {
     return;
   }
 
-  renderQueue(data || []);
+  queueEntries = data || [];
+  renderQueue(queueEntries);
+  renderSignupOptions();
 }
 
 async function signup() {
