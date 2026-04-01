@@ -4,8 +4,8 @@ const TEAM_SIZE = 5;
 
 const db = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-const playerSelect = document.getElementById("playerSelect");
-const signupBtn = document.getElementById("signupBtn");
+const signupPlayerGrid = document.getElementById("signupPlayerGrid");
+const signupEmpty = document.getElementById("signupEmpty");
 const messageEl = document.getElementById("message");
 const seasonToggleBtn = document.getElementById("seasonToggleBtn");
 const seasonPlayersPanel = document.getElementById("seasonPlayersPanel");
@@ -489,19 +489,60 @@ function renderMatchDayStatus() {
 }
 
 function renderSignupOptions() {
-  const queuedPlayerIds = new Set(
-    queueEntries
-      .filter((row) => row.is_active === true || row.status === "cancelled")
-      .map((row) => row.player_id)
-  );
-  const signablePlayers = seasonPlayers.filter((player) => player.is_in_season && !queuedPlayerIds.has(player.id));
-  const hasPlayers = signablePlayers.length > 0 && Boolean(activeMatchDay);
+  signupPlayerGrid.innerHTML = "";
 
-  playerSelect.innerHTML = hasPlayers
-    ? buildOptionsFromPlayers(signablePlayers)
-    : `<option value="">${activeMatchDay ? "暂无可报名选手" : "请先发起当日比赛"}</option>`;
-  playerSelect.disabled = !hasPlayers;
-  signupBtn.disabled = !hasPlayers;
+  const queueByPlayerId = new Map();
+  queueEntries.forEach((row) => {
+    if (row.status === "confirmed") {
+      return;
+    }
+    queueByPlayerId.set(row.player_id, row);
+  });
+
+  const participants = seasonPlayers.filter((player) => player.is_in_season);
+
+  if (!participants.length) {
+    signupEmpty.style.display = "block";
+    signupEmpty.textContent = "当前赛季暂无可报名选手";
+  } else if (!activeMatchDay) {
+    signupEmpty.style.display = "block";
+    signupEmpty.textContent = "请先发起当日比赛";
+  } else {
+    signupEmpty.style.display = "none";
+  }
+
+  participants.forEach((player) => {
+    const entry = queueByPlayerId.get(player.id);
+    const isActive = entry?.is_active === true && entry?.status !== "confirmed";
+    const isCancelled = entry?.status === "cancelled" || entry?.is_active === false;
+    const chip = document.createElement("button");
+    chip.type = "button";
+    chip.className = "signup-player-chip";
+    chip.dataset.playerId = player.id;
+    chip.dataset.playerName = player.display_name;
+
+    if (isActive) {
+      chip.classList.add("signup-player-chip-active");
+      chip.dataset.action = "cancel";
+    } else if (isCancelled) {
+      chip.classList.add("signup-player-chip-cancelled");
+      chip.dataset.action = "resignup";
+      chip.dataset.entryId = entry.id;
+    } else {
+      chip.dataset.action = "signup";
+    }
+
+    if (!activeMatchDay) {
+      chip.disabled = true;
+      chip.classList.add("signup-player-chip-disabled");
+    }
+
+    chip.innerHTML = `
+      <strong>${escapeHtml(player.display_name)}</strong>
+      <small>${isActive ? "已报名，点击取消" : isCancelled ? "已取消，点击恢复" : "点击报名"}</small>
+    `;
+    signupPlayerGrid.appendChild(chip);
+  });
 
   const todayPlayerIds = new Set(todayPlayers.map((player) => player.player_id || player.id));
   const addablePlayers = seasonPlayers.filter((player) => player.is_in_season && !todayPlayerIds.has(player.id));
@@ -582,6 +623,7 @@ function renderQueue(data) {
 
   const sortedData = sortQueueEntries(visibleRows);
   let activeCount = 0;
+  const todayPlayerIds = new Set(todayPlayers.map((player) => player.player_id || player.id));
 
   sortedData.forEach((row) => {
     const li = document.createElement("li");
@@ -598,9 +640,10 @@ function renderQueue(data) {
       : time
         ? `报名于 ${time}`
         : "";
+    const hasArrived = todayPlayerIds.has(row.player_id);
     const actionHtml = isCancelled
       ? `<button class="button-secondary queue-resignup-btn" data-entry-id="${row.id}" data-player-name="${escapeHtml(playerName)}">重新报名</button>`
-      : `<button class="button-danger queue-cancel-btn" data-entry-id="${row.id}" data-player-name="${escapeHtml(playerName)}">取消报名</button>`;
+      : `<button class="button-secondary queue-ready-btn" data-entry-id="${row.id}" data-player-id="${row.player_id}" data-player-name="${escapeHtml(playerName)}" ${hasArrived ? "disabled" : ""}>${hasArrived ? "已就位" : "就位"}</button>`;
     let laneLabel = "";
 
     if (!isCancelled) {
@@ -620,6 +663,7 @@ function renderQueue(data) {
         ${laneLabel ? `<span class="queue-slot">${laneLabel}</span>` : ""}
         <strong>${escapeHtml(playerName)}</strong>
         <span class="${statusClass}">${statusLabel}</span>
+        ${!isCancelled && hasArrived ? '<span class="queue-status queue-status-ready">已开机入场</span>' : ""}
       </div>
       <div class="queue-actions">
         <span class="muted">${escapeHtml(metaText)}</span>
@@ -1023,7 +1067,6 @@ async function loadSeasonPlayers() {
   if (playersResult.error) {
     seasonPlayers = [];
     renderSeasonPlayersPanel();
-    playerSelect.innerHTML = '<option value="">加载失败</option>';
     renderSignupOptions();
     renderMatchForm();
     setMessage(`加载玩家失败：${playersResult.error.message}`, true);
@@ -1370,14 +1413,12 @@ async function signup() {
     return;
   }
 
-  const playerId = playerSelect.value;
+  const playerId = arguments[0];
 
   if (!playerId) {
-    setMessage("请先选择玩家。", true);
+    setMessage("缺少选手信息，无法报名。", true);
     return;
   }
-
-  signupBtn.disabled = true;
   setMessage("正在报名...");
 
   const payload = {
@@ -1391,8 +1432,6 @@ async function signup() {
   }
 
   const { error } = await db.from("signup_queue").insert([payload]);
-
-  signupBtn.disabled = false;
 
   if (error) {
     if (error.message.includes("signup_queue_one_active_per_player")) {
@@ -1439,6 +1478,19 @@ async function cancelSignupByEntry(entryId, playerName, buttonEl) {
 
   setMessage(`${playerName || "该玩家"} 已取消报名，队列中会保留取消记录。`);
   await loadQueue();
+}
+
+async function cancelSignupByPlayer(playerId, playerName, buttonEl) {
+  const entry = queueEntries.find(
+    (row) => row.player_id === playerId && row.is_active === true && row.status !== "confirmed"
+  );
+
+  if (!entry) {
+    setMessage(`${playerName || "该玩家"} 当前不在报名队列中。`, true);
+    return;
+  }
+
+  await cancelSignupByEntry(entry.id, playerName, buttonEl);
 }
 
 async function reSignupByEntry(entryId, playerName, buttonEl) {
@@ -1637,6 +1689,54 @@ async function addTodayPlayer() {
 
   setMessage("已加入当日选手名单。");
   await refreshPlayerDrivenViews();
+}
+
+async function markQueuePlayerReady(playerId, playerName, buttonEl) {
+  if (!activeMatchDay) {
+    setMessage("请先发起当日比赛。", true);
+    return;
+  }
+
+  if (!playerId) {
+    setMessage("缺少选手信息，无法就位。", true);
+    return;
+  }
+
+  if (todayPlayers.some((player) => (player.player_id || player.id) === playerId)) {
+    setMessage(`${playerName || "该玩家"} 已在当日选手名单中。`);
+    return;
+  }
+
+  if (buttonEl) {
+    buttonEl.disabled = true;
+  }
+
+  setMessage(`正在将 ${playerName || "该玩家"} 标记为就位...`);
+
+  const payload = {
+    player_id: playerId,
+    play_date: getBeijingBusinessDateString(),
+    source: "queue",
+  };
+
+  if (activeSeason?.id) {
+    payload.season_id = activeSeason.id;
+  }
+
+  const { error } = await db.from("daily_player_roster").insert([payload]);
+
+  if (buttonEl) {
+    buttonEl.disabled = false;
+  }
+
+  if (error) {
+    setMessage(`选手就位失败：${error.message}`, true);
+    return;
+  }
+
+  setMessage(`${playerName || "该玩家"} 已开机入场。`);
+  await refreshPlayerDrivenViews();
+  await loadQueue();
 }
 
 async function removeTodayPlayer(entryId, buttonEl) {
@@ -1862,7 +1962,6 @@ function subscribeRealtime() {
     .subscribe();
 }
 
-signupBtn.addEventListener("click", signup);
 seasonToggleBtn.addEventListener("click", () => {
   setSeasonPanelOpen(!isSeasonPanelOpen);
 });
@@ -1932,22 +2031,49 @@ backfillFormPanel.addEventListener("change", async (event) => {
 });
 
 queueList.addEventListener("click", async (event) => {
-  const cancelButton = event.target.closest(".queue-cancel-btn");
-  if (cancelButton) {
-    await cancelSignupByEntry(
-      cancelButton.dataset.entryId,
-      cancelButton.dataset.playerName,
-      cancelButton
-    );
-    return;
-  }
-
   const reSignupButton = event.target.closest(".queue-resignup-btn");
   if (reSignupButton) {
     await reSignupByEntry(
       reSignupButton.dataset.entryId,
       reSignupButton.dataset.playerName,
       reSignupButton
+    );
+    return;
+  }
+
+  const readyButton = event.target.closest(".queue-ready-btn");
+  if (readyButton) {
+    await markQueuePlayerReady(
+      readyButton.dataset.playerId,
+      readyButton.dataset.playerName,
+      readyButton
+    );
+  }
+});
+
+signupPlayerGrid.addEventListener("click", async (event) => {
+  const button = event.target.closest(".signup-player-chip");
+  if (!button || button.disabled) return;
+
+  if (button.dataset.action === "signup") {
+    await signup(button.dataset.playerId);
+    return;
+  }
+
+  if (button.dataset.action === "cancel") {
+    await cancelSignupByPlayer(
+      button.dataset.playerId,
+      button.dataset.playerName,
+      button
+    );
+    return;
+  }
+
+  if (button.dataset.action === "resignup") {
+    await reSignupByEntry(
+      button.dataset.entryId,
+      button.dataset.playerName,
+      button
     );
   }
 });

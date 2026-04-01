@@ -187,6 +187,65 @@ button.season-total {
   background: rgba(37, 99, 235, 0.12);
 }
 
+.signup-player-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(96px, 1fr));
+  gap: 10px;
+  margin-top: 10px;
+}
+
+.signup-player-chip {
+  width: 100%;
+  min-width: 0;
+  padding: 10px 8px;
+  border-radius: 12px;
+  border: 1px solid #374151;
+  background: rgba(17, 24, 39, 0.55);
+  display: grid;
+  gap: 4px;
+  justify-items: center;
+  text-align: center;
+  transition: background 0.15s ease, border-color 0.15s ease, transform 0.15s ease;
+}
+
+.signup-player-chip:hover:not(:disabled) {
+  transform: translateY(-1px);
+}
+
+.signup-player-chip strong {
+  font-size: 14px;
+  line-height: 1.3;
+}
+
+.signup-player-chip small {
+  font-size: 12px;
+  line-height: 1.4;
+  color: #9ca3af;
+}
+
+.signup-player-chip-active {
+  border-color: rgba(59, 130, 246, 0.45);
+  background: linear-gradient(135deg, rgba(30, 64, 175, 0.22), rgba(17, 24, 39, 0.72));
+}
+
+.signup-player-chip-active small {
+  color: #bfdbfe;
+}
+
+.signup-player-chip-cancelled {
+  border-color: rgba(248, 113, 113, 0.35);
+  background: linear-gradient(135deg, rgba(127, 29, 29, 0.22), rgba(17, 24, 39, 0.7));
+}
+
+.signup-player-chip-cancelled small {
+  color: #fca5a5;
+}
+
+.signup-player-chip-disabled {
+  opacity: 0.6;
+  border-style: dashed;
+}
+
 .koi-badge {
   display: inline-block;
   padding: 2px 8px;
@@ -598,6 +657,12 @@ ol {
   color: #fca5a5;
   background: rgba(185, 28, 28, 0.18);
   border-color: rgba(248, 113, 113, 0.35);
+}
+
+.queue-status-ready {
+  color: #bbf7d0;
+  background: rgba(20, 83, 45, 0.35);
+  border-color: rgba(34, 197, 94, 0.35);
 }
 
 @media (max-width: 720px) {
