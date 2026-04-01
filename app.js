@@ -334,7 +334,8 @@ function renderMatchDayStatus() {
     matchDayStatus.textContent = `${activeMatchDay.match_date} 进行中`;
     matchDayStatus.className = "muted day-status-active";
     matchDayInfo.textContent = "当前比赛日已发起。北京时间次日凌晨 2 点会自动结束并清空报名队列与当日选手。";
-    startMatchDayBtn.disabled = true;
+    startMatchDayBtn.textContent = "取消发起";
+    startMatchDayBtn.disabled = false;
     matchStartTimeInput.disabled = true;
 
     if (
@@ -353,6 +354,7 @@ function renderMatchDayStatus() {
   matchDayStatus.textContent = "未发起";
   matchDayStatus.className = "muted day-status-inactive";
   matchDayInfo.textContent = "需要先发起当日比赛，报名功能才会开放。";
+  startMatchDayBtn.textContent = "发起当日比赛";
   startMatchDayBtn.disabled = false;
   matchStartTimeInput.disabled = false;
   matchStartTimeDisplay.textContent = "";
@@ -1241,6 +1243,33 @@ async function startMatchDay() {
   await refreshPlayerDrivenViews();
 }
 
+async function cancelMatchDay() {
+  const confirmed = window.confirm("确认取消当前已发起的比赛吗？这会清空当前赛季的报名队列和当日选手名单。");
+
+  if (!confirmed) {
+    return;
+  }
+
+  startMatchDayBtn.disabled = true;
+  setMessage("正在取消当日比赛...");
+
+  const { error } = await db.rpc("cancel_active_match_day", {
+    p_season_id: activeSeason?.id || null,
+  });
+
+  if (error) {
+    startMatchDayBtn.disabled = false;
+    setMessage(`取消发起失败：${error.message}。请先在 Supabase 执行对应 SQL。`, true);
+    return;
+  }
+
+  clearStoredMatchDayStartTime();
+  matchStartTimeInput.value = "";
+  setMessage("已取消当日比赛发起。");
+  await refreshPlayerDrivenViews();
+  await loadQueue();
+}
+
 async function addTodayPlayer() {
   const playerId = todayAddPlayerSelect.value;
 
@@ -1502,7 +1531,14 @@ seasonToggleBtn.addEventListener("click", () => {
   setSeasonPanelOpen(!isSeasonPanelOpen);
 });
 resetSeasonBtn.addEventListener("click", resetCurrentSeason);
-startMatchDayBtn.addEventListener("click", startMatchDay);
+startMatchDayBtn.addEventListener("click", async () => {
+  if (activeMatchDay) {
+    await cancelMatchDay();
+    return;
+  }
+
+  await startMatchDay();
+});
 confirmQueueBtn.addEventListener("click", confirmQueueToTodayPlayers);
 clearQueueBtn.addEventListener("click", clearSignupQueueForTesting);
 addTodayPlayerBtn.addEventListener("click", addTodayPlayer);

@@ -137,6 +137,46 @@ begin
 end;
 $$;
 
+create or replace function public.cancel_active_match_day(
+  p_season_id uuid default null
+)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_season_id uuid;
+begin
+  v_season_id := p_season_id;
+
+  if v_season_id is null then
+    select id
+    into v_season_id
+    from public.seasons
+    where is_active = true
+    limit 1;
+  end if;
+
+  if v_season_id is null then
+    raise exception '未找到当前赛季';
+  end if;
+
+  update public.match_days
+  set
+    is_active = false,
+    closed_at = now()
+  where season_id = v_season_id
+    and is_active = true;
+
+  delete from public.signup_queue
+  where season_id = v_season_id;
+
+  delete from public.daily_player_roster
+  where season_id = v_season_id;
+end;
+$$;
+
 create or replace function public.clear_today_players_for_testing(
   p_season_id uuid default null
 )
@@ -221,6 +261,7 @@ group by
 grant select on public.match_day_groups to anon, authenticated;
 grant select on public.match_day_recent_matches to anon, authenticated;
 grant execute on function public.start_match_day(uuid, text) to anon, authenticated;
+grant execute on function public.cancel_active_match_day(uuid) to anon, authenticated;
 grant execute on function public.close_active_match_day_and_reset() to anon, authenticated;
 grant execute on function public.clear_today_players_for_testing(uuid) to anon, authenticated;
 
