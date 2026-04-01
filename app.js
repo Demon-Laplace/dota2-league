@@ -576,15 +576,8 @@ function renderLeaderboard(data) {
             value="${Number(player.reward_points ?? 0)}"
             data-player-id="${player.player_id || player.id}"
             data-player-name="${escapeHtml(player.display_name)}"
+            data-initial-value="${Number(player.reward_points ?? 0)}"
           />
-          <button
-            class="button-secondary reward-save-btn"
-            type="button"
-            data-player-id="${player.player_id || player.id}"
-            data-player-name="${escapeHtml(player.display_name)}"
-          >
-            保存
-          </button>
         </div>
       </td>
     `;
@@ -592,7 +585,10 @@ function renderLeaderboard(data) {
   });
 }
 
-async function updateRewardPoints(playerId, playerName, nextValue, buttonEl) {
+async function updateRewardPoints(inputEl) {
+  const playerId = inputEl?.dataset.playerId;
+  const playerName = inputEl?.dataset.playerName || "该选手";
+  const nextValue = inputEl?.value;
   const parsedValue = Number.parseInt(nextValue, 10);
 
   if (!Number.isInteger(parsedValue) || parsedValue < 0) {
@@ -600,10 +596,11 @@ async function updateRewardPoints(playerId, playerName, nextValue, buttonEl) {
     return;
   }
 
-  if (buttonEl) {
-    buttonEl.disabled = true;
+  if (String(parsedValue) === String(inputEl.dataset.initialValue)) {
+    return;
   }
 
+  inputEl.disabled = true;
   setMessage(`正在更新 ${playerName} 的赞助额...`);
 
   const { error } = await db.rpc("update_player_reward_points", {
@@ -612,15 +609,15 @@ async function updateRewardPoints(playerId, playerName, nextValue, buttonEl) {
     p_season_id: activeSeason?.id || null,
   });
 
-  if (buttonEl) {
-    buttonEl.disabled = false;
-  }
+  inputEl.disabled = false;
 
   if (error) {
+    inputEl.value = inputEl.dataset.initialValue || "0";
     setMessage(`更新赞助额失败：${error.message}。请先在 Supabase 执行对应 SQL。`, true);
     return;
   }
 
+  inputEl.dataset.initialValue = String(parsedValue);
   setMessage(`${playerName} 的赞助额已更新为 ${parsedValue}。`);
   await loadLeaderboard();
 }
@@ -1701,22 +1698,6 @@ recentMatchesList.addEventListener("click", async (event) => {
   await deleteMatch(button.dataset.matchId, button);
 });
 
-leaderboardBody.addEventListener("click", async (event) => {
-  const button = event.target.closest(".reward-save-btn");
-  if (!button) return;
-
-  const row = button.closest("tr");
-  const input = row?.querySelector(".reward-input");
-  if (!input) return;
-
-  await updateRewardPoints(
-    button.dataset.playerId,
-    button.dataset.playerName,
-    input.value,
-    button
-  );
-});
-
 leaderboardBody.addEventListener("keydown", async (event) => {
   if (!event.target.matches(".reward-input") || event.key !== "Enter") {
     return;
@@ -1724,16 +1705,15 @@ leaderboardBody.addEventListener("keydown", async (event) => {
 
   event.preventDefault();
   const input = event.target;
-  const row = input.closest("tr");
-  const button = row?.querySelector(".reward-save-btn");
-  if (!button) return;
+  await updateRewardPoints(input);
+});
 
-  await updateRewardPoints(
-    button.dataset.playerId,
-    button.dataset.playerName,
-    input.value,
-    button
-  );
+leaderboardBody.addEventListener("change", async (event) => {
+  if (!event.target.matches(".reward-input")) {
+    return;
+  }
+
+  await updateRewardPoints(event.target);
 });
 
 seasonPlayersList.addEventListener("click", async (event) => {
