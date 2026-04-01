@@ -3,30 +3,48 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>DOTA2 宁德联赛</title>
-  <link rel="stylesheet" href="./style.css" />
+  <title>Dota2 朋友联赛</title>
+  <link rel="stylesheet" href="style.css" />
 </head>
 <body>
-  <h1>DOTA2 宁德联赛</h1>
+  <main class="container">
+    <h1>Dota2 朋友联赛</h1>
+    <p class="sub">最小版：报名队列 + 积分榜</p>
 
-  <section>
-    <h2>排行榜</h2>
-    <button id="loadLeaderboard">刷新排行榜</button>
-    <div id="leaderboard"></div>
-  </section>
+    <section class="card">
+      <h2>报名</h2>
+      <div class="row">
+        <select id="playerSelect">
+          <option value="">加载中...</option>
+        </select>
+        <button id="signupBtn">报名</button>
+      </div>
+      <p id="message" class="message"></p>
+    </section>
 
-  <section>
-    <h2>玩家报名</h2>
-    <button id="loadPlayers">加载玩家</button>
-    <div id="players"></div>
-  </section>
+    <section class="card">
+      <h2>当前报名队列</h2>
+      <ol id="queueList"></ol>
+      <p id="queueEmpty" class="muted">当前无人报名</p>
+    </section>
 
-  <section>
-    <h2>当前队列</h2>
-    <button id="loadQueue">刷新队列</button>
-    <div id="queue"></div>
-  </section>
+    <section class="card">
+      <h2>积分榜</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>排名</th>
+            <th>玩家</th>
+            <th>积分</th>
+            <th>奖励点</th>
+          </tr>
+        </thead>
+        <tbody id="leaderboardBody"></tbody>
+      </table>
+    </section>
+  </main>
 
-  <script type="module" src="./app.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="app.js"></script>
 </body>
 </html>
