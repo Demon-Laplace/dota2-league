@@ -88,6 +88,48 @@ button.season-total {
   border: 1px solid rgba(16, 185, 129, 0.35);
 }
 
+.reward-logs {
+  display: grid;
+  gap: 10px;
+  margin-top: 14px;
+}
+
+.reward-log-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding: 12px 14px;
+  border: 1px solid #374151;
+  border-radius: 12px;
+  background: rgba(17, 24, 39, 0.45);
+}
+
+.reward-log-main {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.reward-log-amount {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 12px;
+  line-height: 1.5;
+  color: #d1fae5;
+  background: rgba(6, 95, 70, 0.28);
+  border: 1px solid rgba(16, 185, 129, 0.35);
+}
+
+.reward-log-cancelled {
+  color: #fca5a5;
+  background: rgba(185, 28, 28, 0.18);
+  border-color: rgba(248, 113, 113, 0.35);
+}
+
 .season-panel {
   margin-bottom: 24px;
   background: #172033;

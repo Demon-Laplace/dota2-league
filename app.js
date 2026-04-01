@@ -21,6 +21,8 @@ const rewardExtraInput = document.getElementById("rewardExtraInput");
 const addRewardBtn = document.getElementById("addRewardBtn");
 const rewardMinimumHint = document.getElementById("rewardMinimumHint");
 const rewardMessageEl = document.getElementById("rewardMessage");
+const rewardLogsList = document.getElementById("rewardLogsList");
+const rewardLogsEmpty = document.getElementById("rewardLogsEmpty");
 const resetSeasonBtn = document.getElementById("resetSeasonBtn");
 const startMatchDayBtn = document.getElementById("startMatchDayBtn");
 const matchStartTimeInput = document.getElementById("matchStartTimeInput");
@@ -70,6 +72,7 @@ let activeMatchDay = null;
 let allSeasons = [];
 let backfillPlayers = [];
 let leaderboardPlayers = [];
+let rewardLogs = [];
 let isMatchFormOpen = false;
 let isBackfillFormOpen = false;
 let isSeasonPanelOpen = false;
@@ -351,6 +354,42 @@ function updateRewardMinimumHint() {
   }
 
   rewardMinimumHint.textContent = `${selectedPlayer.display_name} 当前最低值 ${Number(selectedPlayer.reward_minimum ?? 20)}，当前额外赞助额 ${Number(selectedPlayer.reward_extra_points ?? 0)}。`;
+}
+
+function renderRewardLogs() {
+  rewardLogsList.innerHTML = "";
+
+  if (!rewardLogs.length) {
+    rewardLogsEmpty.style.display = "block";
+    return;
+  }
+
+  rewardLogsEmpty.style.display = "none";
+
+  rewardLogs.forEach((log) => {
+    const item = document.createElement("div");
+    const playerName = log.players?.display_name || "未知选手";
+    const statusBadge = log.is_cancelled
+      ? '<span class="reward-log-amount reward-log-cancelled">已取消</span>'
+      : `<span class="reward-log-amount">+${Number(log.amount ?? 0)}</span>`;
+    const actionHtml = log.is_cancelled
+      ? ""
+      : `<button class="button-danger cancel-reward-log-btn" type="button" data-donation-id="${log.id}" data-player-name="${escapeHtml(playerName)}">取消</button>`;
+
+    item.className = "reward-log-item";
+    item.innerHTML = `
+      <div class="reward-log-main">
+        <strong>${escapeHtml(playerName)}</strong>
+        ${statusBadge}
+        <span class="muted">${escapeHtml(formatLocalTime(log.created_at))}</span>
+      </div>
+      <div class="queue-actions">
+        ${log.cancelled_at ? `<span class="muted">取消于 ${escapeHtml(formatLocalTime(log.cancelled_at))}</span>` : ""}
+        ${actionHtml}
+      </div>
+    `;
+    rewardLogsList.appendChild(item);
+  });
 }
 
 function renderSeasonPlayersPanel() {
@@ -669,6 +708,74 @@ async function addRewardExtra() {
   rewardExtraInput.value = "";
   setRewardMessage(`${selectedPlayer.display_name} 已增加额外赞助额 ${extraAmount}。`);
   await loadLeaderboard();
+  await loadRewardLogs();
+}
+
+async function loadRewardLogs() {
+  let query = db
+    .from("reward_donations")
+    .select(`
+      id,
+      season_id,
+      player_id,
+      amount,
+      is_cancelled,
+      cancelled_at,
+      created_at,
+      players (
+        display_name
+      )
+    `)
+    .order("created_at", { ascending: false })
+    .limit(100);
+
+  if (activeSeason?.id) {
+    query = query.eq("season_id", activeSeason.id);
+  }
+
+  const { data, error } = await query;
+
+  if (error) {
+    console.error("加载赞助记录失败：", error);
+    rewardLogs = [];
+    renderRewardLogs();
+    return;
+  }
+
+  rewardLogs = data || [];
+  renderRewardLogs();
+}
+
+async function cancelRewardDonation(donationId, playerName, buttonEl) {
+  const confirmed = window.confirm(`确认取消 ${playerName} 这条赞助记录吗？`);
+
+  if (!confirmed) {
+    return;
+  }
+
+  if (buttonEl) {
+    buttonEl.disabled = true;
+  }
+
+  setRewardMessage(`正在取消 ${playerName} 的赞助记录...`);
+
+  const { error } = await db.rpc("cancel_reward_donation", {
+    p_donation_id: donationId,
+    p_season_id: activeSeason?.id || null,
+  });
+
+  if (buttonEl) {
+    buttonEl.disabled = false;
+  }
+
+  if (error) {
+    setRewardMessage(`取消赞助记录失败：${error.message}。请先在 Supabase 执行对应 SQL。`, true);
+    return;
+  }
+
+  setRewardMessage(`${playerName} 的赞助记录已取消。`);
+  await loadLeaderboard();
+  await loadRewardLogs();
 }
 
 function parseRecentMatchPlayers(players) {
@@ -1766,6 +1873,9 @@ seasonRewardTotal.addEventListener("click", () => {
   setRewardPanelOpen(!isRewardPanelOpen);
   renderRewardPlayerOptions();
   updateRewardMinimumHint();
+  if (isRewardPanelOpen) {
+    loadRewardLogs();
+  }
 });
 
 closeRewardPanelBtn.addEventListener("click", () => {
@@ -1784,6 +1894,17 @@ rewardExtraInput.addEventListener("keydown", async (event) => {
   await addRewardExtra();
 });
 
+rewardLogsList.addEventListener("click", async (event) => {
+  const button = event.target.closest(".cancel-reward-log-btn");
+  if (!button) return;
+
+  await cancelRewardDonation(
+    button.dataset.donationId,
+    button.dataset.playerName,
+    button
+  );
+});
+
 async function init() {
   setMatchFormOpen(false);
   setBackfillFormOpen(false);
@@ -1794,12 +1915,14 @@ async function init() {
   renderMatchForm();
   renderBackfillForm();
   renderSeasonPlayersPanel();
+  renderRewardLogs();
   updateSeasonInfo();
   renderMatchDayStatus();
   await loadActiveSeason();
   await refreshPlayerDrivenViews();
   await loadQueue();
   await loadLeaderboard();
+  await loadRewardLogs();
   await loadRecentMatches();
   subscribeRealtime();
 }
