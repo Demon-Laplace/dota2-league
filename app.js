@@ -561,8 +561,16 @@ function renderLeaderboard(data) {
 
   data.forEach((player, idx) => {
     const tr = document.createElement("tr");
+    const rank = idx + 1;
+    if (rank === 1) {
+      tr.className = "leaderboard-row-top1";
+    } else if (rank <= 3) {
+      tr.className = "leaderboard-row-top23";
+    } else if (rank <= 5) {
+      tr.className = "leaderboard-row-top45";
+    }
     tr.innerHTML = `
-      <td>${idx + 1}</td>
+      <td><span class="leaderboard-rank">${rank}</span></td>
       <td>${escapeHtml(player.display_name)}</td>
       <td>${formatScore(player.score)}</td>
       <td>${player.games_played ?? 0}</td>
