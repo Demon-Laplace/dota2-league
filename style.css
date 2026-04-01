@@ -11,6 +11,54 @@ body {
   color: #f3f4f6;
 }
 
+.loading-screen {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  background:
+    linear-gradient(rgba(6, 10, 18, 0.4), rgba(10, 14, 24, 0.7)),
+    url("./assets/dota-bg.jpg") center / cover no-repeat;
+  transition: opacity 0.45s ease, visibility 0.45s ease;
+}
+
+.loading-screen.is-hidden {
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+}
+
+.loading-screen__overlay {
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(circle at center, rgba(251, 191, 36, 0.18), transparent 24%),
+    linear-gradient(rgba(2, 6, 23, 0.25), rgba(2, 6, 23, 0.68));
+}
+
+.loading-screen__content {
+  position: relative;
+  z-index: 1;
+  text-align: center;
+  padding: 28px 32px;
+  border-radius: 18px;
+  border: 1px solid rgba(148, 163, 184, 0.22);
+  background: rgba(15, 23, 42, 0.42);
+  backdrop-filter: blur(8px);
+  box-shadow: 0 20px 50px rgba(2, 6, 23, 0.35);
+}
+
+.loading-screen__content h1 {
+  margin: 0 0 10px;
+}
+
+.loading-screen__content p {
+  margin: 0;
+  color: #d1d5db;
+}
+
 .container {
   max-width: 1440px;
   margin: 32px auto;

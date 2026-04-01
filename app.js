@@ -1,9 +1,11 @@
 const SUPABASE_URL = "https://snqzcnaymukposcbosyq.supabase.co";
 const SUPABASE_ANON_KEY = "sb_publishable_Ap-srffzI3MkOjmYAH0lag_kiP_1Ifm";
 const TEAM_SIZE = 5;
+const LOADING_SCREEN_MIN_MS = 900;
 
 const db = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
+const loadingScreen = document.getElementById("loadingScreen");
 const signupPlayerGrid = document.getElementById("signupPlayerGrid");
 const signupEmpty = document.getElementById("signupEmpty");
 const messageEl = document.getElementById("message");
@@ -82,6 +84,18 @@ let isMatchFormOpen = false;
 let isBackfillFormOpen = false;
 let isSeasonPanelOpen = false;
 let isRewardPanelOpen = false;
+const loadingStartedAt = Date.now();
+
+function hideLoadingScreen() {
+  if (!loadingScreen) return;
+
+  const elapsed = Date.now() - loadingStartedAt;
+  const waitMs = Math.max(0, LOADING_SCREEN_MIN_MS - elapsed);
+
+  window.setTimeout(() => {
+    loadingScreen.classList.add("is-hidden");
+  }, waitMs);
+}
 
 function getExternalDonationStorageKey(seasonId) {
   return `dota2sys_external_reward_logs_${seasonId || "global"}`;
@@ -2298,25 +2312,29 @@ rewardLogsList.addEventListener("click", async (event) => {
 });
 
 async function init() {
-  setMatchFormOpen(false);
-  setBackfillFormOpen(false);
-  setSeasonPanelOpen(false);
-  setRewardPanelOpen(false);
-  matchStartTimeInput.value = formatTime24(readStoredMatchDayStartTime()?.startTime || "");
-  backfillDateInput.value = getBeijingBusinessDateString();
-  renderMatchForm();
-  renderBackfillForm();
-  renderSeasonPlayersPanel();
-  renderRewardLogs();
-  updateSeasonInfo();
-  renderMatchDayStatus();
-  await loadActiveSeason();
-  await refreshPlayerDrivenViews();
-  await loadQueue();
-  await loadLeaderboard();
-  await loadRewardLogs();
-  await loadRecentMatches();
-  subscribeRealtime();
+  try {
+    setMatchFormOpen(false);
+    setBackfillFormOpen(false);
+    setSeasonPanelOpen(false);
+    setRewardPanelOpen(false);
+    matchStartTimeInput.value = formatTime24(readStoredMatchDayStartTime()?.startTime || "");
+    backfillDateInput.value = getBeijingBusinessDateString();
+    renderMatchForm();
+    renderBackfillForm();
+    renderSeasonPlayersPanel();
+    renderRewardLogs();
+    updateSeasonInfo();
+    renderMatchDayStatus();
+    await loadActiveSeason();
+    await refreshPlayerDrivenViews();
+    await loadQueue();
+    await loadLeaderboard();
+    await loadRewardLogs();
+    await loadRecentMatches();
+    subscribeRealtime();
+  } finally {
+    hideLoadingScreen();
+  }
 }
 
 init();
