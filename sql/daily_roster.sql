@@ -104,7 +104,43 @@ begin
 end;
 $$;
 
+create or replace function public.clear_signup_queue_for_testing(
+  p_season_id uuid default null
+)
+returns integer
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_season_id uuid;
+  v_deleted_count integer := 0;
+begin
+  v_season_id := p_season_id;
+
+  if v_season_id is null then
+    select id
+    into v_season_id
+    from public.seasons
+    where is_active = true
+    limit 1;
+  end if;
+
+  if v_season_id is null then
+    raise exception '未找到当前赛季';
+  end if;
+
+  delete from public.signup_queue
+  where season_id = v_season_id;
+
+  get diagnostics v_deleted_count = row_count;
+
+  return v_deleted_count;
+end;
+$$;
+
 grant select on public.current_day_players to anon, authenticated;
 grant execute on function public.confirm_queue_to_today_players(uuid) to anon, authenticated;
+grant execute on function public.clear_signup_queue_for_testing(uuid) to anon, authenticated;
 
 commit;

@@ -8,6 +8,7 @@ const playerSelect = document.getElementById("playerSelect");
 const signupBtn = document.getElementById("signupBtn");
 const messageEl = document.getElementById("message");
 const confirmQueueBtn = document.getElementById("confirmQueueBtn");
+const clearQueueBtn = document.getElementById("clearQueueBtn");
 const queueList = document.getElementById("queueList");
 const queueEmpty = document.getElementById("queueEmpty");
 const todayAddPlayerSelect = document.getElementById("todayAddPlayerSelect");
@@ -701,6 +702,31 @@ async function confirmQueueToTodayPlayers() {
   await refreshPlayerDrivenViews();
 }
 
+async function clearSignupQueueForTesting() {
+  const confirmed = window.confirm("确认清空当前赛季的全部报名队列记录吗？这会删除报名中、已取消和已确认记录。");
+
+  if (!confirmed) {
+    return;
+  }
+
+  clearQueueBtn.disabled = true;
+  setMessage("正在清空报名队列...");
+
+  const { data, error } = await db.rpc("clear_signup_queue_for_testing", {
+    p_season_id: activeSeason?.id || null,
+  });
+
+  clearQueueBtn.disabled = false;
+
+  if (error) {
+    setMessage(`清空报名队列失败：${error.message}`, true);
+    return;
+  }
+
+  setMessage(`已清空当前赛季报名队列，共删除 ${data ?? 0} 条记录。`);
+  await loadQueue();
+}
+
 async function addTodayPlayer() {
   const playerId = todayAddPlayerSelect.value;
 
@@ -873,6 +899,7 @@ function subscribeRealtime() {
 
 signupBtn.addEventListener("click", signup);
 confirmQueueBtn.addEventListener("click", confirmQueueToTodayPlayers);
+clearQueueBtn.addEventListener("click", clearSignupQueueForTesting);
 addTodayPlayerBtn.addEventListener("click", addTodayPlayer);
 recordMatchBtn.addEventListener("click", recordMatch);
 
