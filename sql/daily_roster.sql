@@ -80,25 +80,22 @@ begin
     raise exception '未找到当前赛季';
   end if;
 
-  insert into public.daily_player_roster (season_id, play_date, player_id, source)
-  select
-    v_season_id,
-    public.get_beijing_match_date(now()),
-    sq.player_id,
-    'queue'
-  from public.signup_queue sq
-  where sq.season_id = v_season_id
-    and sq.is_active = true
-  on conflict (season_id, play_date, player_id) do nothing;
-
-  get diagnostics v_inserted_count = row_count;
-
   update public.signup_queue
   set
     is_active = false,
     status = 'confirmed'
-  where season_id = v_season_id
-    and is_active = true;
+  where id in (
+    select sq.id
+    from public.signup_queue sq
+    join public.daily_player_roster dpr
+      on dpr.season_id = v_season_id
+     and dpr.play_date = public.get_beijing_match_date(now())
+     and dpr.player_id = sq.player_id
+    where sq.season_id = v_season_id
+      and sq.is_active = true
+  );
+
+  get diagnostics v_inserted_count = row_count;
 
   return v_inserted_count;
 end;

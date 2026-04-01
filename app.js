@@ -1769,19 +1769,19 @@ async function reSignupByEntry(entryId, playerName, buttonEl) {
 
 async function confirmQueueToTodayPlayers() {
   confirmQueueBtn.disabled = true;
-  setMessage("正在将报名队列加入当日名单...");
+  setMessage("正在确认已就位的选手...");
 
   const { data, error } = await db.rpc("confirm_queue_to_today_players", {
     p_season_id: activeSeason?.id || null,
   });
 
   if (error) {
-    setMessage(`全部到齐失败：${error.message}`, true);
+    setMessage(`确认已就位选手失败：${error.message}`, true);
     await loadQueue();
     return;
   }
 
-  setMessage(`已确认到齐，加入当日名单 ${data ?? 0} 人。`);
+  setMessage(`已确认已就位选手 ${data ?? 0} 人，未就位的报名选手仍保留在队列中。`);
 }
 
 async function clearSignupQueueForTesting() {
