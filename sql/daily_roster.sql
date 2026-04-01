@@ -52,7 +52,7 @@ select
   dpr.created_at
 from public.daily_player_roster dpr
 join public.players p on p.id = dpr.player_id
-where dpr.play_date = current_date;
+where dpr.play_date = public.get_beijing_match_date(now());
 
 create or replace function public.confirm_queue_to_today_players(
   p_season_id uuid default null
@@ -83,7 +83,7 @@ begin
   insert into public.daily_player_roster (season_id, play_date, player_id, source)
   select
     v_season_id,
-    current_date,
+    public.get_beijing_match_date(now()),
     sq.player_id,
     'queue'
   from public.signup_queue sq

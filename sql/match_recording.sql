@@ -18,6 +18,8 @@ as $$
 declare
   v_match_id uuid;
   v_season_id uuid;
+  v_match_day_id uuid;
+  v_match_date date;
   v_score_delta_a integer;
   v_score_delta_b integer;
 begin
@@ -53,6 +55,18 @@ begin
   end if;
 
   if v_season_id is not null then
+    select id, match_date
+    into v_match_day_id, v_match_date
+    from public.match_days
+    where season_id = v_season_id
+      and is_active = true
+    order by started_at desc
+    limit 1;
+
+    if v_match_day_id is null then
+      raise exception '当前尚未发起当日比赛，无法记录比赛';
+    end if;
+
     insert into public.season_players (season_id, player_id)
     select v_season_id, player_id
     from unnest(p_team_a_player_ids || p_team_b_player_ids) as t(player_id)
@@ -83,8 +97,8 @@ begin
   v_score_delta_a := case when p_winner_team = 'A' then 1 else -1 end;
   v_score_delta_b := case when p_winner_team = 'B' then 1 else -1 end;
 
-  insert into public.matches (winner_team, created_by, note, season_id)
-  values (p_winner_team, p_created_by, p_note, v_season_id)
+  insert into public.matches (winner_team, created_by, note, season_id, match_day_id, match_date)
+  values (p_winner_team, p_created_by, p_note, v_season_id, v_match_day_id, v_match_date)
   returning id into v_match_id;
 
   insert into public.match_results (

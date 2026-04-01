@@ -14,7 +14,8 @@ begin
     reward_points = 20,
     games_played = 0,
     wins = 0,
-    losses = 0;
+    losses = 0
+  where true;
 
   -- 2) 赛季榜也重置到赛季基础值
   update public.season_player_stats
@@ -23,7 +24,8 @@ begin
     reward_points = 20,
     games_played = 0,
     wins = 0,
-    losses = 0;
+    losses = 0
+  where true;
 
   -- 3) 确保所有参与过比赛的选手在对应赛季里都有统计行
   insert into public.season_player_stats (

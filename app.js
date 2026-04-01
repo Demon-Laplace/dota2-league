@@ -7,12 +7,16 @@ const db = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 const playerSelect = document.getElementById("playerSelect");
 const signupBtn = document.getElementById("signupBtn");
 const messageEl = document.getElementById("message");
+const startMatchDayBtn = document.getElementById("startMatchDayBtn");
+const matchDayStatus = document.getElementById("matchDayStatus");
+const matchDayInfo = document.getElementById("matchDayInfo");
 const confirmQueueBtn = document.getElementById("confirmQueueBtn");
 const clearQueueBtn = document.getElementById("clearQueueBtn");
 const queueList = document.getElementById("queueList");
 const queueEmpty = document.getElementById("queueEmpty");
 const todayAddPlayerSelect = document.getElementById("todayAddPlayerSelect");
 const addTodayPlayerBtn = document.getElementById("addTodayPlayerBtn");
+const clearTodayPlayersBtn = document.getElementById("clearTodayPlayersBtn");
 const todayPlayersList = document.getElementById("todayPlayersList");
 const todayPlayersEmpty = document.getElementById("todayPlayersEmpty");
 const todayPlayersCount = document.getElementById("todayPlayersCount");
@@ -34,6 +38,7 @@ let seasonPlayers = [];
 let todayPlayers = [];
 let queueEntries = [];
 let activeSeason = null;
+let activeMatchDay = null;
 let isMatchFormOpen = false;
 
 function setMessage(text, isError = false) {
@@ -50,7 +55,7 @@ function setMatchFormOpen(isOpen) {
   isMatchFormOpen = isOpen;
   matchFormPanel.hidden = !isOpen;
   openMatchFormBtn.textContent = isOpen ? "正在录入比赛" : "添加一场比赛记录";
-  openMatchFormBtn.disabled = isOpen || todayPlayers.length < TEAM_SIZE * 2;
+  openMatchFormBtn.disabled = isOpen || !activeMatchDay || todayPlayers.length < TEAM_SIZE * 2;
 }
 
 function escapeHtml(str) {
@@ -67,6 +72,22 @@ function formatLocalTime(value) {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return "";
   return date.toLocaleString("zh-CN", { hour12: false });
+}
+
+function getBeijingBusinessDateString() {
+  const now = new Date();
+  const beijing = new Date(
+    now.toLocaleString("en-US", { timeZone: "Asia/Shanghai" })
+  );
+
+  if (beijing.getHours() < 2) {
+    beijing.setDate(beijing.getDate() - 1);
+  }
+
+  const year = beijing.getFullYear();
+  const month = String(beijing.getMonth() + 1).padStart(2, "0");
+  const day = String(beijing.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
 }
 
 function getQueueTimestamp(row) {
@@ -156,6 +177,21 @@ function updateSeasonInfo() {
   seasonInfoEl.textContent = "当前未识别到赛季，将使用全局玩家名单。";
 }
 
+function renderMatchDayStatus() {
+  if (activeMatchDay) {
+    matchDayStatus.textContent = `${activeMatchDay.match_date} 进行中`;
+    matchDayStatus.className = "muted day-status-active";
+    matchDayInfo.textContent = "当前比赛日已发起。北京时间次日凌晨 2 点会自动结束并清空报名队列与当日选手。";
+    startMatchDayBtn.disabled = true;
+    return;
+  }
+
+  matchDayStatus.textContent = "未发起";
+  matchDayStatus.className = "muted day-status-inactive";
+  matchDayInfo.textContent = "需要先发起当日比赛，报名功能才会开放。";
+  startMatchDayBtn.disabled = false;
+}
+
 function renderSignupOptions() {
   const queuedPlayerIds = new Set(
     queueEntries
@@ -163,21 +199,23 @@ function renderSignupOptions() {
       .map((row) => row.player_id)
   );
   const signablePlayers = seasonPlayers.filter((player) => !queuedPlayerIds.has(player.id));
-  const hasPlayers = signablePlayers.length > 0;
+  const hasPlayers = signablePlayers.length > 0 && Boolean(activeMatchDay);
 
   playerSelect.innerHTML = hasPlayers
     ? buildOptionsFromPlayers(signablePlayers)
-    : '<option value="">暂无可报名选手</option>';
+    : `<option value="">${activeMatchDay ? "暂无可报名选手" : "请先发起当日比赛"}</option>`;
   playerSelect.disabled = !hasPlayers;
   signupBtn.disabled = !hasPlayers;
 
   const todayPlayerIds = new Set(todayPlayers.map((player) => player.player_id || player.id));
   const addablePlayers = seasonPlayers.filter((player) => !todayPlayerIds.has(player.id));
-  todayAddPlayerSelect.innerHTML = addablePlayers.length > 0
+  const canAddTodayPlayers = Boolean(activeMatchDay) && addablePlayers.length > 0;
+  todayAddPlayerSelect.innerHTML = canAddTodayPlayers
     ? buildOptionsFromPlayers(addablePlayers)
-    : '<option value="">暂无可添加选手</option>';
-  todayAddPlayerSelect.disabled = addablePlayers.length === 0;
-  addTodayPlayerBtn.disabled = addablePlayers.length === 0;
+    : `<option value="">${activeMatchDay ? "暂无可添加选手" : "请先发起当日比赛"}</option>`;
+  todayAddPlayerSelect.disabled = !canAddTodayPlayers;
+  addTodayPlayerBtn.disabled = !canAddTodayPlayers;
+  clearTodayPlayersBtn.disabled = !activeMatchDay;
 }
 
 function renderMatchForm() {
@@ -185,7 +223,7 @@ function renderMatchForm() {
   renderMatchPlayerFields(teamBFields, "teamB");
   refreshMatchSelectOptions();
 
-  const hasEnoughPlayers = todayPlayers.length >= TEAM_SIZE * 2;
+  const hasEnoughPlayers = Boolean(activeMatchDay) && todayPlayers.length >= TEAM_SIZE * 2;
   winnerSelect.disabled = !hasEnoughPlayers;
   matchNoteInput.disabled = !hasEnoughPlayers;
   recordMatchBtn.disabled = !hasEnoughPlayers;
@@ -348,38 +386,71 @@ function renderRecentMatches(data) {
 
   recentMatchesEmpty.style.display = "none";
 
-  data.forEach((match) => {
-    const players = parseRecentMatchPlayers(match.players);
-    const teamAPlayers = players.filter((player) => player.team === "A");
-    const teamBPlayers = players.filter((player) => player.team === "B");
-    const winnerLabel = match.winner_team === "A" ? "天辉方获胜" : "夜魇方获胜";
-    const card = document.createElement("article");
+  const groups = new Map();
 
-    card.className = "recent-match-card";
-    card.innerHTML = `
-      <div class="recent-match-head">
-        <div class="recent-match-title">
-          <strong>${winnerLabel}</strong>
-          <span class="winner-badge">比赛完成</span>
+  data.forEach((match) => {
+    const key = match.match_date || "未分组";
+    if (!groups.has(key)) {
+      groups.set(key, []);
+    }
+    groups.get(key).push(match);
+  });
+
+  groups.forEach((matches, matchDate) => {
+    const details = document.createElement("details");
+    const isActiveDay = matches.some((match) => match.day_is_active);
+    details.className = "match-day-group";
+    details.open = isActiveDay;
+
+    details.innerHTML = `
+      <summary>
+        <div class="match-day-summary">
+          <strong>${escapeHtml(matchDate)}</strong>
+          <span class="queue-slot">${matches.length} 场</span>
+          <span class="winner-badge">${isActiveDay ? "进行中" : "已归档"}</span>
         </div>
-        <div class="queue-actions">
-          <span class="muted">${escapeHtml(formatLocalTime(match.created_at))}</span>
-          <button class="button-danger delete-match-btn" data-match-id="${match.match_id}">删除记录</button>
-        </div>
-      </div>
-      <div class="recent-match-teams">
-        <div class="recent-match-team">
-          <h3>天辉方</h3>
-          <ul>${teamAPlayers.map((player) => `<li>${escapeHtml(player.display_name || "未知选手")}</li>`).join("")}</ul>
-        </div>
-        <div class="recent-match-team">
-          <h3>夜魇方</h3>
-          <ul>${teamBPlayers.map((player) => `<li>${escapeHtml(player.display_name || "未知选手")}</li>`).join("")}</ul>
-        </div>
-      </div>
-      ${match.note ? `<p class="muted">${escapeHtml(match.note)}</p>` : ""}
+        <span class="muted">${isActiveDay ? "点击收起" : "点击展开"}</span>
+      </summary>
+      <div class="match-day-content"></div>
     `;
-    recentMatchesList.appendChild(card);
+
+    const content = details.querySelector(".match-day-content");
+
+    matches.forEach((match) => {
+      const players = parseRecentMatchPlayers(match.players);
+      const teamAPlayers = players.filter((player) => player.team === "A");
+      const teamBPlayers = players.filter((player) => player.team === "B");
+      const winnerLabel = match.winner_team === "A" ? "天辉方获胜" : "夜魇方获胜";
+      const card = document.createElement("article");
+
+      card.className = "recent-match-card";
+      card.innerHTML = `
+        <div class="recent-match-head">
+          <div class="recent-match-title">
+            <strong>${winnerLabel}</strong>
+            <span class="winner-badge">比赛完成</span>
+          </div>
+          <div class="queue-actions">
+            <span class="muted">${escapeHtml(formatLocalTime(match.created_at))}</span>
+            <button class="button-danger delete-match-btn" data-match-id="${match.match_id}">删除记录</button>
+          </div>
+        </div>
+        <div class="recent-match-teams">
+          <div class="recent-match-team">
+            <h3>天辉方</h3>
+            <ul>${teamAPlayers.map((player) => `<li>${escapeHtml(player.display_name || "未知选手")}</li>`).join("")}</ul>
+          </div>
+          <div class="recent-match-team">
+            <h3>夜魇方</h3>
+            <ul>${teamBPlayers.map((player) => `<li>${escapeHtml(player.display_name || "未知选手")}</li>`).join("")}</ul>
+          </div>
+        </div>
+        ${match.note ? `<p class="muted">${escapeHtml(match.note)}</p>` : ""}
+      `;
+      content.appendChild(card);
+    });
+
+    recentMatchesList.appendChild(details);
   });
 }
 
@@ -399,6 +470,32 @@ async function loadActiveSeason() {
 
   activeSeason = data || null;
   updateSeasonInfo();
+}
+
+async function loadActiveMatchDay() {
+  let query = db
+    .from("match_days")
+    .select("id, season_id, match_date, started_at, closed_at, is_active, note")
+    .eq("is_active", true)
+    .order("started_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (activeSeason?.id) {
+    query = query.eq("season_id", activeSeason.id);
+  }
+
+  const { data, error } = await query;
+
+  if (error) {
+    console.error("加载比赛日失败：", error);
+    activeMatchDay = null;
+    renderMatchDayStatus();
+    return;
+  }
+
+  activeMatchDay = data || null;
+  renderMatchDayStatus();
 }
 
 async function loadSeasonPlayers() {
@@ -460,6 +557,7 @@ async function loadTodayPlayers() {
 }
 
 async function refreshPlayerDrivenViews() {
+  await loadActiveMatchDay();
   await loadSeasonPlayers();
   await loadTodayPlayers();
   renderSignupOptions();
@@ -508,10 +606,10 @@ async function loadLeaderboard() {
 
 async function loadRecentMatches() {
   let query = db
-    .from("recent_matches")
-    .select("match_id, winner_team, note, created_at, players")
+    .from("match_day_recent_matches")
+    .select("match_id, match_day_id, match_date, day_is_active, winner_team, note, created_at, players")
     .order("created_at", { ascending: false })
-    .limit(10);
+    .limit(100);
 
   if (activeSeason?.id) {
     query = query.eq("season_id", activeSeason.id);
@@ -524,7 +622,7 @@ async function loadRecentMatches() {
       .from("recent_matches")
       .select("match_id, winner_team, note, created_at, players")
       .order("created_at", { ascending: false })
-      .limit(10));
+      .limit(100));
   }
 
   if (error) {
@@ -587,6 +685,11 @@ async function loadQueue() {
 }
 
 async function signup() {
+  if (!activeMatchDay) {
+    setMessage("请先发起当日比赛，再开启报名。", true);
+    return;
+  }
+
   const playerId = playerSelect.value;
 
   if (!playerId) {
@@ -742,6 +845,50 @@ async function clearSignupQueueForTesting() {
   await loadQueue();
 }
 
+async function clearTodayPlayersForTesting() {
+  const confirmed = window.confirm("确认清空当前赛季的当日选手名单吗？");
+
+  if (!confirmed) {
+    return;
+  }
+
+  clearTodayPlayersBtn.disabled = true;
+  setMessage("正在清空当日选手名单...");
+
+  const { data, error } = await db.rpc("clear_today_players_for_testing", {
+    p_season_id: activeSeason?.id || null,
+  });
+
+  clearTodayPlayersBtn.disabled = false;
+
+  if (error) {
+    setMessage(`清空当日选手名单失败：${error.message}`, true);
+    return;
+  }
+
+  setMessage(`已清空当日选手名单，共删除 ${data ?? 0} 条记录。`);
+  await refreshPlayerDrivenViews();
+}
+
+async function startMatchDay() {
+  startMatchDayBtn.disabled = true;
+  setMessage("正在发起当日比赛...");
+
+  const { error } = await db.rpc("start_match_day", {
+    p_season_id: activeSeason?.id || null,
+    p_note: null,
+  });
+
+  if (error) {
+    startMatchDayBtn.disabled = false;
+    setMessage(`发起当日比赛失败：${error.message}`, true);
+    return;
+  }
+
+  setMessage("当日比赛已发起，可以开始报名和记录比赛。");
+  await refreshPlayerDrivenViews();
+}
+
 async function addTodayPlayer() {
   const playerId = todayAddPlayerSelect.value;
 
@@ -752,7 +899,7 @@ async function addTodayPlayer() {
 
   const payload = {
     player_id: playerId,
-    play_date: new Date().toISOString().slice(0, 10),
+    play_date: getBeijingBusinessDateString(),
     source: "manual",
   };
 
@@ -913,6 +1060,14 @@ function subscribeRealtime() {
     )
     .on(
       "postgres_changes",
+      { event: "*", schema: "public", table: "match_days" },
+      async () => {
+        await refreshPlayerDrivenViews();
+        await loadRecentMatches();
+      }
+    )
+    .on(
+      "postgres_changes",
       { event: "*", schema: "public", table: "daily_player_roster" },
       async () => {
         await refreshPlayerDrivenViews();
@@ -922,9 +1077,11 @@ function subscribeRealtime() {
 }
 
 signupBtn.addEventListener("click", signup);
+startMatchDayBtn.addEventListener("click", startMatchDay);
 confirmQueueBtn.addEventListener("click", confirmQueueToTodayPlayers);
 clearQueueBtn.addEventListener("click", clearSignupQueueForTesting);
 addTodayPlayerBtn.addEventListener("click", addTodayPlayer);
+clearTodayPlayersBtn.addEventListener("click", clearTodayPlayersForTesting);
 recordMatchBtn.addEventListener("click", recordMatch);
 
 openMatchFormBtn.addEventListener("click", () => {
@@ -984,6 +1141,7 @@ async function init() {
   setMatchFormOpen(false);
   renderMatchForm();
   updateSeasonInfo();
+  renderMatchDayStatus();
   await loadActiveSeason();
   await refreshPlayerDrivenViews();
   await loadQueue();

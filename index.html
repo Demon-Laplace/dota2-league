@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Dota2 宁德联赛</title>
-  <link rel="stylesheet" href="style.css?v=20260401-4" />
+  <link rel="stylesheet" href="style.css?v=20260401-5" />
 </head>
 <body>
   <main class="container">
@@ -13,6 +13,17 @@
 
     <div class="layout">
       <div class="layout-left">
+        <section class="card">
+          <div class="section-head">
+            <h2>当日比赛</h2>
+            <span id="matchDayStatus" class="muted">未发起</span>
+          </div>
+          <div class="row">
+            <button id="startMatchDayBtn">发起当日比赛</button>
+          </div>
+          <p id="matchDayInfo" class="muted">发起后，报名与比赛记录会归入本比赛日，至北京时间次日凌晨 2 点自动结束。</p>
+        </section>
+
         <section class="card">
           <h2>报名</h2>
           <div class="row">
@@ -44,6 +55,7 @@
               <option value="">请选择临时添加选手</option>
             </select>
             <button id="addTodayPlayerBtn">临时添加选手</button>
+            <button id="clearTodayPlayersBtn" class="button-danger">测试清空当日选手</button>
           </div>
           <ul id="todayPlayersList" class="today-players-list"></ul>
           <p id="todayPlayersEmpty" class="muted">今日尚未确认到场选手</p>
@@ -110,6 +122,6 @@
   </main>
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="app.js?v=20260401-4"></script>
+  <script src="app.js?v=20260401-5"></script>
 </body>
 </html>

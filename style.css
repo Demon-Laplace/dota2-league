@@ -166,6 +166,14 @@ button:disabled {
   border: 1px solid rgba(99, 102, 241, 0.35);
 }
 
+.day-status-active {
+  color: #bbf7d0;
+}
+
+.day-status-inactive {
+  color: #fca5a5;
+}
+
 .match-form-panel {
   margin-top: 16px;
   padding-top: 16px;
@@ -204,6 +212,42 @@ button:disabled {
   border-radius: 12px;
   padding: 14px;
   background: rgba(17, 24, 39, 0.45);
+}
+
+.match-day-group {
+  border: 1px solid #374151;
+  border-radius: 12px;
+  background: rgba(17, 24, 39, 0.35);
+  overflow: hidden;
+}
+
+.match-day-group summary {
+  list-style: none;
+  cursor: pointer;
+  padding: 14px 16px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  background: rgba(31, 41, 55, 0.55);
+}
+
+.match-day-group summary::-webkit-details-marker {
+  display: none;
+}
+
+.match-day-summary {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.match-day-content {
+  padding: 12px;
+  display: grid;
+  gap: 12px;
 }
 
 .recent-match-head {
