@@ -2,6 +2,13 @@ begin;
 
 create extension if not exists pgcrypto;
 
+-- 统一赛季基线：初始积分 10，默认赞助 20
+alter table public.players
+alter column score set default 10;
+
+alter table public.players
+alter column reward_points set default 20;
+
 -- 1) 赛季主表
 create table if not exists public.seasons (
   id uuid primary key default gen_random_uuid(),
@@ -42,8 +49,8 @@ create table if not exists public.season_player_stats (
   id uuid primary key default gen_random_uuid(),
   season_id uuid not null references public.seasons(id) on delete cascade,
   player_id uuid not null references public.players(id) on delete cascade,
-  score integer not null default 1000,
-  reward_points integer not null default 0,
+  score integer not null default 10,
+  reward_points integer not null default 20,
   games_played integer not null default 0,
   wins integer not null default 0,
   losses integer not null default 0,
@@ -57,6 +64,12 @@ on public.season_player_stats (season_id);
 
 create index if not exists idx_season_player_stats_player_id
 on public.season_player_stats (player_id);
+
+alter table public.season_player_stats
+alter column score set default 10;
+
+alter table public.season_player_stats
+alter column reward_points set default 20;
 
 -- 4) updated_at 自动维护
 create or replace function public.set_updated_at()
@@ -136,11 +149,11 @@ insert into public.season_player_stats (
 select
   s.id,
   p.id,
-  p.score,
-  p.reward_points,
-  p.games_played,
-  p.wins,
-  p.losses
+  10,
+  20,
+  0,
+  0,
+  0
 from public.seasons s
 join public.players p on true
 where s.is_active = true

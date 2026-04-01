@@ -10,8 +10,8 @@ begin
   -- 1) 先把总榜重置到基础值
   update public.players
   set
-    score = 1000,
-    reward_points = 0,
+    score = 10,
+    reward_points = 20,
     games_played = 0,
     wins = 0,
     losses = 0;
@@ -19,8 +19,8 @@ begin
   -- 2) 赛季榜也重置到赛季基础值
   update public.season_player_stats
   set
-    score = 1000,
-    reward_points = 0,
+    score = 10,
+    reward_points = 20,
     games_played = 0,
     wins = 0,
     losses = 0;
@@ -38,8 +38,8 @@ begin
   select distinct
     m.season_id,
     mr.player_id,
-    1000,
-    0,
+    10,
+    20,
     0,
     0,
     0
@@ -60,8 +60,8 @@ begin
   )
   update public.players p
   set
-    score = 1000 + pt.wins - pt.losses,
-    reward_points = pt.wins,
+    score = 10 + pt.wins - pt.losses,
+    reward_points = 20 + pt.wins,
     games_played = pt.games_played,
     wins = pt.wins,
     losses = pt.losses
@@ -83,8 +83,8 @@ begin
   )
   update public.season_player_stats sps
   set
-    score = 1000 + st.wins - st.losses,
-    reward_points = st.wins,
+    score = 10 + st.wins - st.losses,
+    reward_points = 20 + st.wins,
     games_played = st.games_played,
     wins = st.wins,
     losses = st.losses

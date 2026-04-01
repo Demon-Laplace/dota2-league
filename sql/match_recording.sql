@@ -72,11 +72,11 @@ begin
     select
       v_season_id,
       p.id,
-      p.score,
-      p.reward_points,
-      p.games_played,
-      p.wins,
-      p.losses
+      10,
+      20,
+      0,
+      0,
+      0
     from public.players p
     where p.id = any(p_team_a_player_ids || p_team_b_player_ids)
     on conflict (season_id, player_id) do nothing;
