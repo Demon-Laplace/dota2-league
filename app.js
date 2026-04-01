@@ -1406,6 +1406,7 @@ async function refreshPlayerDrivenViews() {
   await loadSeasonPlayers();
   await loadSeasons();
   await loadTodayPlayers();
+  renderQueue(queueEntries);
   renderSignupOptions();
   renderMatchForm();
   if (!backfillSeasonSelect.value && activeSeason?.id) {
