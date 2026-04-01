@@ -131,6 +131,134 @@ const DOTA_HEROES = [
   "Viper", "Visage", "Void Spirit", "Warlock", "Weaver", "Windranger", "Winter Wyvern",
   "Witch Doctor", "Wraith King", "Zeus"
 ];
+const HERO_NAME_ZH = {
+  "Abaddon": "亚巴顿",
+  "Alchemist": "炼金术士",
+  "Ancient Apparition": "远古冰魄",
+  "Anti-Mage": "敌法师",
+  "Arc Warden": "天穹守望者",
+  "Axe": "斧王",
+  "Bane": "祸乱之源",
+  "Batrider": "蝙蝠骑士",
+  "Beastmaster": "兽王",
+  "Bloodseeker": "血魔",
+  "Bounty Hunter": "赏金猎人",
+  "Brewmaster": "酒仙",
+  "Bristleback": "刚背兽",
+  "Broodmother": "育母蜘蛛",
+  "Centaur Warrunner": "半人马战行者",
+  "Chaos Knight": "混沌骑士",
+  "Chen": "陈",
+  "Clinkz": "克林克兹",
+  "Clockwerk": "发条技师",
+  "Crystal Maiden": "水晶室女",
+  "Dark Seer": "黑暗贤者",
+  "Dark Willow": "邪影芳灵",
+  "Dawnbreaker": "破晓辰星",
+  "Dazzle": "戴泽",
+  "Death Prophet": "死亡先知",
+  "Disruptor": "干扰者",
+  "Doom": "末日使者",
+  "Dragon Knight": "龙骑士",
+  "Drow Ranger": "卓尔游侠",
+  "Earth Spirit": "大地之灵",
+  "Earthshaker": "撼地者",
+  "Elder Titan": "上古巨神",
+  "Ember Spirit": "灰烬之灵",
+  "Enchantress": "魅惑魔女",
+  "Enigma": "谜团",
+  "Faceless Void": "虚空假面",
+  "Grimstroke": "天涯墨客",
+  "Gyrocopter": "矮人直升机",
+  "Hoodwink": "森海飞霞",
+  "Huskar": "哈斯卡",
+  "Invoker": "祈求者",
+  "Io": "艾欧",
+  "Jakiro": "杰奇洛",
+  "Juggernaut": "主宰",
+  "Keeper of the Light": "光之守卫",
+  "Kez": "凯",
+  "Kunkka": "昆卡",
+  "Legion Commander": "军团指挥官",
+  "Leshrac": "拉席克",
+  "Lich": "巫妖",
+  "Lifestealer": "噬魂鬼",
+  "Lina": "莉娜",
+  "Lion": "莱恩",
+  "Lone Druid": "德鲁伊",
+  "Luna": "露娜",
+  "Lycan": "狼人",
+  "Magnus": "马格纳斯",
+  "Marci": "玛西",
+  "Mars": "玛尔斯",
+  "Medusa": "美杜莎",
+  "Meepo": "米波",
+  "Mirana": "米拉娜",
+  "Monkey King": "齐天大圣",
+  "Morphling": "变体精灵",
+  "Muerta": "琼英碧灵",
+  "Naga Siren": "娜迦海妖",
+  "Nature's Prophet": "先知",
+  "Necrophos": "瘟疫法师",
+  "Night Stalker": "暗夜魔王",
+  "Nyx Assassin": "司夜刺客",
+  "Ogre Magi": "食人魔魔法师",
+  "Omniknight": "全能骑士",
+  "Oracle": "神谕者",
+  "Outworld Destroyer": "殁境神蚀者",
+  "Pangolier": "石鳞剑士",
+  "Phantom Assassin": "幻影刺客",
+  "Phantom Lancer": "幻影长矛手",
+  "Phoenix": "凤凰",
+  "Primal Beast": "獸",
+  "Puck": "帕克",
+  "Pudge": "帕吉",
+  "Pugna": "帕格纳",
+  "Queen of Pain": "痛苦女王",
+  "Razor": "剃刀",
+  "Riki": "力丸",
+  "Ringmaster": "百戏大王",
+  "Rubick": "拉比克",
+  "Sand King": "沙王",
+  "Shadow Demon": "暗影恶魔",
+  "Shadow Fiend": "影魔",
+  "Shadow Shaman": "暗影萨满",
+  "Silencer": "沉默术士",
+  "Skywrath Mage": "天怒法师",
+  "Slardar": "斯拉达",
+  "Slark": "斯拉克",
+  "Snapfire": "电炎绝手",
+  "Sniper": "狙击手",
+  "Spectre": "幽鬼",
+  "Spirit Breaker": "裂魂人",
+  "Storm Spirit": "风暴之灵",
+  "Sven": "斯温",
+  "Techies": "工程师",
+  "Templar Assassin": "圣堂刺客",
+  "Terrorblade": "恐怖利刃",
+  "Tidehunter": "潮汐猎人",
+  "Timbersaw": "伐木机",
+  "Tinker": "修补匠",
+  "Tiny": "小小",
+  "Treant Protector": "树精卫士",
+  "Troll Warlord": "巨魔战将",
+  "Tusk": "巨牙海民",
+  "Underlord": "孽主",
+  "Undying": "不朽尸王",
+  "Ursa": "熊战士",
+  "Vengeful Spirit": "复仇之魂",
+  "Venomancer": "剧毒术士",
+  "Viper": "冥界亚龙",
+  "Visage": "维萨吉",
+  "Void Spirit": "虚无之灵",
+  "Warlock": "术士",
+  "Weaver": "编织者",
+  "Windranger": "风行者",
+  "Winter Wyvern": "寒冬飞龙",
+  "Witch Doctor": "巫医",
+  "Wraith King": "冥魂大帝",
+  "Zeus": "宙斯"
+};
 const refreshState = {
   seasonContext: false,
   playerDriven: false,
@@ -357,6 +485,11 @@ function formatScore(value) {
   return numericValue.toFixed(2).replace(/\.00$/, "").replace(/(\.\d)0$/, "$1");
 }
 
+function getHeroDisplayName(heroName) {
+  if (!heroName) return "";
+  return HERO_NAME_ZH[heroName] || heroName;
+}
+
 function setMatchFormOpen(isOpen) {
   isMatchFormOpen = isOpen;
   matchFormPanel.hidden = !isOpen;
@@ -511,7 +644,7 @@ function getSelectableBackfillPlayersForField(currentValue) {
 
 function buildHeroBadge(heroName) {
   return heroName
-    ? `<span class="match-picked-hero">${escapeHtml(heroName)}</span>`
+    ? `<span class="match-picked-hero">${escapeHtml(getHeroDisplayName(heroName))}</span>`
     : '<span class="muted">未选英雄</span>';
 }
 
@@ -1308,7 +1441,7 @@ function renderRecentMatches(data) {
             data-hero-name="${escapeHtml(player.hero_name || "")}"
           >
             <span>${escapeHtml(player.display_name || "未知选手")}</span>
-            ${player.hero_name ? `<span class="match-picked-hero">${escapeHtml(player.hero_name)}</span>` : '<span class="muted">未选英雄</span>'}
+            ${player.hero_name ? `<span class="match-picked-hero">${escapeHtml(getHeroDisplayName(player.hero_name))}</span>` : '<span class="muted">未选英雄</span>'}
           </button>
         </li>
       `).join("");
@@ -2279,7 +2412,11 @@ function togglePlayerSelection(formType, teamKey, playerId) {
 
 function renderHeroOptions() {
   heroSelect.innerHTML = ['<option value="">不选择英雄</option>']
-    .concat(DOTA_HEROES.map((hero) => `<option value="${escapeHtml(hero)}">${escapeHtml(hero)}</option>`))
+    .concat(
+      DOTA_HEROES.map((hero) => (
+        `<option value="${escapeHtml(hero)}">${escapeHtml(getHeroDisplayName(hero))}</option>`
+      ))
+    )
     .join("");
 }
 
