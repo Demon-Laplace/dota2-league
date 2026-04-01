@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Dota2 宁德联赛</title>
-  <link rel="stylesheet" href="style.css?v=20260402-8" />
+  <link rel="stylesheet" href="style.css?v=20260402-9" />
 </head>
 <body>
   <div id="loadingScreen" class="loading-screen" aria-live="polite">
@@ -218,6 +218,9 @@
         <button id="closeHeroPickerBtn" class="button-secondary" type="button">关闭</button>
       </div>
       <div class="row">
+        <input id="heroSearchInput" type="text" placeholder="输入英文、中文或拼音首字母搜索英雄" />
+      </div>
+      <div class="row">
         <select id="heroSelect">
           <option value="">不选择英雄</option>
         </select>
@@ -231,6 +234,6 @@
   </div>
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="app.js?v=20260402-8"></script>
+  <script src="app.js?v=20260402-9"></script>
 </body>
 </html>

@@ -73,6 +73,7 @@ const heroPickerBackdrop = document.getElementById("heroPickerBackdrop");
 const closeHeroPickerBtn = document.getElementById("closeHeroPickerBtn");
 const heroPickerTitle = document.getElementById("heroPickerTitle");
 const heroPickerSubtitle = document.getElementById("heroPickerSubtitle");
+const heroSearchInput = document.getElementById("heroSearchInput");
 const heroSelect = document.getElementById("heroSelect");
 const saveHeroBtn = document.getElementById("saveHeroBtn");
 const clearHeroBtn = document.getElementById("clearHeroBtn");
@@ -210,7 +211,7 @@ const HERO_NAME_ZH = {
   "Phantom Assassin": "幻影刺客",
   "Phantom Lancer": "幻影长矛手",
   "Phoenix": "凤凰",
-  "Primal Beast": "獸",
+  "Primal Beast": "原始兽",
   "Puck": "帕克",
   "Pudge": "帕吉",
   "Pugna": "帕格纳",
@@ -258,6 +259,134 @@ const HERO_NAME_ZH = {
   "Witch Doctor": "巫医",
   "Wraith King": "冥魂大帝",
   "Zeus": "宙斯"
+};
+const HERO_PINYIN_INITIALS = {
+  "Abaddon": "ybd",
+  "Alchemist": "ljs",
+  "Ancient Apparition": "ygyp",
+  "Anti-Mage": "dfs",
+  "Arc Warden": "tqswz",
+  "Axe": "fw",
+  "Bane": "hlzy",
+  "Batrider": "bfqs",
+  "Beastmaster": "sw",
+  "Bloodseeker": "xm",
+  "Bounty Hunter": "sjlr",
+  "Brewmaster": "jx",
+  "Bristleback": "gbs",
+  "Broodmother": "ymzz",
+  "Centaur Warrunner": "brmzxz",
+  "Chaos Knight": "hdqs",
+  "Chen": "c",
+  "Clinkz": "klkz",
+  "Clockwerk": "fzjs",
+  "Crystal Maiden": "sjsn",
+  "Dark Seer": "haxs",
+  "Dark Willow": "xyfl",
+  "Dawnbreaker": "pccx",
+  "Dazzle": "dz",
+  "Death Prophet": "swxz",
+  "Disruptor": "grz",
+  "Doom": "mrsz",
+  "Dragon Knight": "lqs",
+  "Drow Ranger": "zeyx",
+  "Earth Spirit": "ddzl",
+  "Earthshaker": "hdz",
+  "Elder Titan": "sgjs",
+  "Ember Spirit": "hjzl",
+  "Enchantress": "hhnv",
+  "Enigma": "mt",
+  "Faceless Void": "kxjm",
+  "Grimstroke": "tymk",
+  "Gyrocopter": "arzsj",
+  "Hoodwink": "shfx",
+  "Huskar": "hsk",
+  "Invoker": "qqz",
+  "Io": "ao",
+  "Jakiro": "jjl",
+  "Juggernaut": "zz",
+  "Keeper of the Light": "gzsws",
+  "Kez": "k",
+  "Kunkka": "kk",
+  "Legion Commander": "jtzhg",
+  "Leshrac": "lxk",
+  "Lich": "wy",
+  "Lifestealer": "shg",
+  "Lina": "ln",
+  "Lion": "le",
+  "Lone Druid": "dlr",
+  "Luna": "ln",
+  "Lycan": "lr",
+  "Magnus": "mgns",
+  "Marci": "mx",
+  "Mars": "mes",
+  "Medusa": "mds",
+  "Meepo": "mp",
+  "Mirana": "mln",
+  "Monkey King": "qtds",
+  "Morphling": "btjl",
+  "Muerta": "qybl",
+  "Naga Siren": "njhy",
+  "Nature's Prophet": "xz",
+  "Necrophos": "wyfs",
+  "Night Stalker": "aymw",
+  "Nyx Assassin": "syck",
+  "Ogre Magi": "srmfs",
+  "Omniknight": "qnqs",
+  "Oracle": "syz",
+  "Outworld Destroyer": "mjsyz",
+  "Pangolier": "slys",
+  "Phantom Assassin": "hyck",
+  "Phantom Lancer": "hycms",
+  "Phoenix": "fh",
+  "Primal Beast": "yss",
+  "Puck": "pk",
+  "Pudge": "pj",
+  "Pugna": "pgn",
+  "Queen of Pain": "tknw",
+  "Razor": "td",
+  "Riki": "lw",
+  "Ringmaster": "bxdw",
+  "Rubick": "lbk",
+  "Sand King": "sw",
+  "Shadow Demon": "ayem",
+  "Shadow Fiend": "ym",
+  "Shadow Shaman": "aysm",
+  "Silencer": "cmss",
+  "Skywrath Mage": "tnfs",
+  "Slardar": "sld",
+  "Slark": "slk",
+  "Snapfire": "dyjsh",
+  "Sniper": "jjs",
+  "Spectre": "yg",
+  "Spirit Breaker": "lhr",
+  "Storm Spirit": "fbzl",
+  "Sven": "sw",
+  "Techies": "gcs",
+  "Templar Assassin": "stck",
+  "Terrorblade": "kbl",
+  "Tidehunter": "cxlr",
+  "Timbersaw": "fmj",
+  "Tinker": "xbj",
+  "Tiny": "xx",
+  "Treant Protector": "sjws",
+  "Troll Warlord": "jmzj",
+  "Tusk": "jyhm",
+  "Underlord": "nz",
+  "Undying": "bxsw",
+  "Ursa": "xzs",
+  "Vengeful Spirit": "fczh",
+  "Venomancer": "jds",
+  "Viper": "mjyl",
+  "Visage": "wsj",
+  "Void Spirit": "xwzl",
+  "Warlock": "ss",
+  "Weaver": "bzz",
+  "Windranger": "fxz",
+  "Winter Wyvern": "hdfl",
+  "Witch Doctor": "wy",
+  "Wraith King": "mhdd",
+  "Zeus": "zs"
 };
 const refreshState = {
   seasonContext: false,
@@ -488,6 +617,28 @@ function formatScore(value) {
 function getHeroDisplayName(heroName) {
   if (!heroName) return "";
   return HERO_NAME_ZH[heroName] || heroName;
+}
+
+function getEnglishInitials(heroName) {
+  return heroName
+    .toLowerCase()
+    .replace(/'/g, "")
+    .split(/[^a-z0-9]+/)
+    .filter(Boolean)
+    .map((part) => part[0])
+    .join("");
+}
+
+function getHeroSearchKeywords(heroName) {
+  const english = heroName.toLowerCase();
+  const chinese = getHeroDisplayName(heroName);
+  return [
+    english,
+    english.replace(/[^a-z0-9]+/g, ""),
+    getEnglishInitials(heroName),
+    chinese,
+    (HERO_PINYIN_INITIALS[heroName] || "").toLowerCase(),
+  ].filter(Boolean);
 }
 
 function setMatchFormOpen(isOpen) {
@@ -2410,14 +2561,34 @@ function togglePlayerSelection(formType, teamKey, playerId) {
   rerenderSelectionsByFormType(formType);
 }
 
-function renderHeroOptions() {
+function renderHeroOptions(searchTerm = "") {
+  const normalizedSearch = String(searchTerm || "").trim().toLowerCase();
+  const filteredHeroes = normalizedSearch
+    ? DOTA_HEROES.filter((hero) =>
+        getHeroSearchKeywords(hero).some((keyword) => keyword.toLowerCase().includes(normalizedSearch))
+      )
+    : DOTA_HEROES;
+
   heroSelect.innerHTML = ['<option value="">不选择英雄</option>']
     .concat(
-      DOTA_HEROES.map((hero) => (
+      filteredHeroes.map((hero) => (
         `<option value="${escapeHtml(hero)}">${escapeHtml(getHeroDisplayName(hero))}</option>`
       ))
     )
     .join("");
+
+  if (heroPickerState?.currentHero && filteredHeroes.includes(heroPickerState.currentHero)) {
+    heroSelect.value = heroPickerState.currentHero;
+  } else if (!filteredHeroes.includes(heroSelect.value)) {
+    heroSelect.value = "";
+  }
+
+  if (normalizedSearch && filteredHeroes.length === 0) {
+    setHeroPickerMessage("没有匹配到英雄，可以换英文、中文或拼音首字母再试。", true);
+    return;
+  }
+
+  setHeroPickerMessage("");
 }
 
 function openHeroPicker(state) {
@@ -2427,13 +2598,16 @@ function openHeroPicker(state) {
   heroPickerSubtitle.textContent = state.isSavedMatch
     ? "可随时补填、修改或清空该选手本场使用的英雄。"
     : "当前为可选项，可先留空，保存比赛后也能再修改。";
+  heroSearchInput.value = "";
+  renderHeroOptions("");
   heroSelect.value = state.currentHero || "";
-  setHeroPickerMessage("");
+  heroSearchInput.focus();
 }
 
 function closeHeroPicker() {
   heroPickerState = null;
   heroPickerModal.hidden = true;
+  heroSearchInput.value = "";
   heroSelect.value = "";
   setHeroPickerMessage("");
 }
@@ -3046,6 +3220,9 @@ rewardLogsList.addEventListener("click", async (event) => {
 
 closeHeroPickerBtn.addEventListener("click", closeHeroPicker);
 heroPickerBackdrop.addEventListener("click", closeHeroPicker);
+heroSearchInput.addEventListener("input", () => {
+  renderHeroOptions(heroSearchInput.value);
+});
 saveHeroBtn.addEventListener("click", async () => {
   await saveHeroSelection(heroSelect.value);
 });

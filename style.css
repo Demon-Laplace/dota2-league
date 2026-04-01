@@ -892,6 +892,11 @@ ol {
   min-width: 0;
 }
 
+#heroSearchInput {
+  width: 100%;
+  min-width: 0;
+}
+
 @media (max-width: 720px) {
   .page-head {
     align-items: stretch;
