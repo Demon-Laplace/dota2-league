@@ -20,8 +20,6 @@ declare
   v_season_id uuid;
   v_score_delta_a integer;
   v_score_delta_b integer;
-  v_reward_a integer;
-  v_reward_b integer;
 begin
   if coalesce(array_length(p_team_a_player_ids, 1), 0) <> 5 then
     raise exception '天辉必须正好 5 名选手';
@@ -85,9 +83,6 @@ begin
   v_score_delta_a := case when p_winner_team = 'A' then 1 else -1 end;
   v_score_delta_b := case when p_winner_team = 'B' then 1 else -1 end;
 
-  v_reward_a := case when p_winner_team = 'A' then 1 else 0 end;
-  v_reward_b := case when p_winner_team = 'B' then 1 else 0 end;
-
   insert into public.matches (winner_team, created_by, note, season_id)
   values (p_winner_team, p_created_by, p_note, v_season_id)
   returning id into v_match_id;
@@ -106,7 +101,7 @@ begin
     'A',
     p_winner_team = 'A',
     v_score_delta_a,
-    v_reward_a
+    0
   from unnest(p_team_a_player_ids) as t(player_id);
 
   insert into public.match_results (
@@ -123,7 +118,7 @@ begin
     'B',
     p_winner_team = 'B',
     v_score_delta_b,
-    v_reward_b
+    0
   from unnest(p_team_b_player_ids) as t(player_id);
 
   update public.players
@@ -131,11 +126,6 @@ begin
     score = score + case
       when id = any(p_team_a_player_ids) then v_score_delta_a
       when id = any(p_team_b_player_ids) then v_score_delta_b
-      else 0
-    end,
-    reward_points = reward_points + case
-      when id = any(p_team_a_player_ids) then v_reward_a
-      when id = any(p_team_b_player_ids) then v_reward_b
       else 0
     end,
     games_played = games_played + case
@@ -160,11 +150,6 @@ begin
       score = score + case
         when player_id = any(p_team_a_player_ids) then v_score_delta_a
         when player_id = any(p_team_b_player_ids) then v_score_delta_b
-        else 0
-      end,
-      reward_points = reward_points + case
-        when player_id = any(p_team_a_player_ids) then v_reward_a
-        when player_id = any(p_team_b_player_ids) then v_reward_b
         else 0
       end,
       games_played = games_played + 1,

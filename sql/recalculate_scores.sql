@@ -61,7 +61,7 @@ begin
   update public.players p
   set
     score = 10 + pt.wins - pt.losses,
-    reward_points = 20 + pt.wins,
+    reward_points = 20,
     games_played = pt.games_played,
     wins = pt.wins,
     losses = pt.losses
@@ -84,7 +84,7 @@ begin
   update public.season_player_stats sps
   set
     score = 10 + st.wins - st.losses,
-    reward_points = 20 + st.wins,
+    reward_points = 20,
     games_played = st.games_played,
     wins = st.wins,
     losses = st.losses
