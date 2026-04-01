@@ -84,7 +84,106 @@ let isMatchFormOpen = false;
 let isBackfillFormOpen = false;
 let isSeasonPanelOpen = false;
 let isRewardPanelOpen = false;
+let realtimeChannel = null;
+let refreshTimer = null;
+let refreshFlushPromise = null;
 const loadingStartedAt = Date.now();
+const REFRESH_DEBOUNCE_MS = 150;
+const refreshState = {
+  seasonContext: false,
+  playerDriven: false,
+  queue: false,
+  leaderboard: false,
+  rewardLogs: false,
+  recentMatches: false,
+};
+
+function hasPendingRefresh() {
+  return Object.values(refreshState).some(Boolean);
+}
+
+function consumeRefreshState() {
+  const snapshot = { ...refreshState };
+  Object.keys(refreshState).forEach((key) => {
+    refreshState[key] = false;
+  });
+  return snapshot;
+}
+
+async function flushRefreshQueue() {
+  if (refreshFlushPromise) {
+    return refreshFlushPromise;
+  }
+
+  if (refreshTimer) {
+    window.clearTimeout(refreshTimer);
+    refreshTimer = null;
+  }
+
+  refreshFlushPromise = (async () => {
+    while (hasPendingRefresh()) {
+      const pending = consumeRefreshState();
+
+      if (pending.seasonContext) {
+        await loadActiveSeason();
+        await refreshPlayerDrivenViews();
+        await loadQueue();
+        await loadLeaderboard();
+        await loadRewardLogs();
+        await loadRecentMatches();
+        continue;
+      }
+
+      if (pending.playerDriven) {
+        await refreshPlayerDrivenViews();
+      }
+
+      if (pending.queue) {
+        await loadQueue();
+      }
+
+      if (pending.leaderboard) {
+        await loadLeaderboard();
+      }
+
+      if (pending.rewardLogs) {
+        await loadRewardLogs();
+      }
+
+      if (pending.recentMatches) {
+        await loadRecentMatches();
+      }
+    }
+  })().finally(() => {
+    refreshFlushPromise = null;
+
+    if (hasPendingRefresh() && !refreshTimer) {
+      refreshTimer = window.setTimeout(() => {
+        refreshTimer = null;
+        flushRefreshQueue();
+      }, REFRESH_DEBOUNCE_MS);
+    }
+  });
+
+  return refreshFlushPromise;
+}
+
+function scheduleRefresh(flags) {
+  Object.entries(flags).forEach(([key, value]) => {
+    if (value && key in refreshState) {
+      refreshState[key] = true;
+    }
+  });
+
+  if (refreshFlushPromise || refreshTimer) {
+    return;
+  }
+
+  refreshTimer = window.setTimeout(() => {
+    refreshTimer = null;
+    flushRefreshQueue();
+  }, REFRESH_DEBOUNCE_MS);
+}
 
 function hideLoadingScreen() {
   if (!loadingScreen) return;
@@ -897,9 +996,6 @@ async function addRewardExtra() {
   rewardOutsideNameInput.value = "";
   rewardPlayerSelect.value = "";
   setRewardMessage(`${selectedPlayer?.display_name || outsideName} 已增加赞助额 ${extraAmount}。`);
-  await loadLeaderboard();
-  await loadSeasonPlayers();
-  await loadRewardLogs();
   updateRewardMinimumHint();
 }
 
@@ -997,9 +1093,6 @@ async function cancelRewardDonation(donationId, playerName, buttonEl) {
   }
 
   setRewardMessage(`${playerName} 的赞助记录已取消。`);
-  await loadLeaderboard();
-  await loadSeasonPlayers();
-  await loadRewardLogs();
 }
 
 function parseRecentMatchPlayers(players) {
@@ -1434,10 +1527,7 @@ async function resetCurrentSeason() {
   setMatchFormOpen(false);
   writeExternalDonationLogs(activeSeason.id, []);
   setMessage(`已重置 ${activeSeason.name}，并从总表同步了 ${data ?? 0} 名选手。`);
-  await refreshPlayerDrivenViews();
-  await loadQueue();
-  await loadLeaderboard();
-  await loadRecentMatches();
+  await loadRewardLogs();
 }
 
 async function toggleSeasonPlayer(playerId, playerName) {
@@ -1462,9 +1552,6 @@ async function toggleSeasonPlayer(playerId, playerName) {
   }
 
   setMessage(data ? `${playerName} 已加入当前赛季。` : `${playerName} 已取消当前赛季参赛。`);
-  await refreshPlayerDrivenViews();
-  await loadQueue();
-  await loadLeaderboard();
 }
 
 async function setSeasonKoi() {
@@ -1500,9 +1587,6 @@ async function setSeasonKoi() {
     return;
   }
 
-  await loadActiveSeason();
-  renderSeasonPlayersPanel();
-  await loadLeaderboard();
   setMessage(
     isCurrentKoi
       ? "已取消赛季锦鲤，并按当前规则重算积分。"
@@ -1597,7 +1681,6 @@ async function signup() {
   }
 
   setMessage("报名成功。");
-  await loadQueue();
 }
 
 async function cancelSignupByEntry(entryId, playerName, buttonEl) {
@@ -1630,7 +1713,6 @@ async function cancelSignupByEntry(entryId, playerName, buttonEl) {
   }
 
   setMessage(`${playerName || "该玩家"} 已取消报名，队列中会保留取消记录。`);
-  await loadQueue();
 }
 
 async function cancelSignupByPlayer(playerId, playerName, buttonEl) {
@@ -1683,7 +1765,6 @@ async function reSignupByEntry(entryId, playerName, buttonEl) {
   }
 
   setMessage(`${playerName || "该玩家"} 已重新进入报名队列。`);
-  await loadQueue();
 }
 
 async function confirmQueueToTodayPlayers() {
@@ -1701,8 +1782,6 @@ async function confirmQueueToTodayPlayers() {
   }
 
   setMessage(`已确认到齐，加入当日名单 ${data ?? 0} 人。`);
-  await loadQueue();
-  await refreshPlayerDrivenViews();
 }
 
 async function clearSignupQueueForTesting() {
@@ -1727,7 +1806,6 @@ async function clearSignupQueueForTesting() {
   }
 
   setMessage(`已清空当前赛季报名队列，共删除 ${data ?? 0} 条记录。`);
-  await loadQueue();
 }
 
 async function clearTodayPlayersForTesting() {
@@ -1752,7 +1830,6 @@ async function clearTodayPlayersForTesting() {
   }
 
   setMessage(`已清空当日选手名单，共删除 ${data ?? 0} 条记录。`);
-  await refreshPlayerDrivenViews();
 }
 
 async function startMatchDay() {
@@ -1788,7 +1865,6 @@ async function startMatchDay() {
     startTime: formatTime24(matchStartTimeInput.value),
   });
   setMessage("当日比赛已发起，可以开始报名和记录比赛。");
-  await refreshPlayerDrivenViews();
 }
 
 async function cancelMatchDay() {
@@ -1814,8 +1890,6 @@ async function cancelMatchDay() {
   clearStoredMatchDayStartTime();
   matchStartTimeInput.value = "";
   setMessage("已取消当日比赛发起。");
-  await refreshPlayerDrivenViews();
-  await loadQueue();
 }
 
 async function addTodayPlayer() {
@@ -1848,7 +1922,6 @@ async function addTodayPlayer() {
   }
 
   setMessage("已加入当日选手名单。");
-  await refreshPlayerDrivenViews();
 }
 
 async function markQueuePlayerReady(playerId, playerName, buttonEl) {
@@ -1895,8 +1968,6 @@ async function markQueuePlayerReady(playerId, playerName, buttonEl) {
   }
 
   setMessage(`${playerName || "该玩家"} 已开机入场。`);
-  await refreshPlayerDrivenViews();
-  await loadQueue();
 }
 
 async function removeTodayPlayer(entryId, buttonEl) {
@@ -1919,7 +1990,6 @@ async function removeTodayPlayer(entryId, buttonEl) {
   }
 
   setMessage("已移出当日名单。");
-  await refreshPlayerDrivenViews();
 }
 
 function getSelectedTeamIds(prefix) {
@@ -2018,8 +2088,6 @@ async function recordMatch() {
   setMatchFormOpen(false);
   renderMatchForm();
   setMatchMessage("比赛记录成功，积分榜已刷新。");
-  await loadLeaderboard();
-  await loadRecentMatches();
 }
 
 async function recordBackfillMatch() {
@@ -2056,8 +2124,6 @@ async function recordBackfillMatch() {
   setBackfillFormOpen(false);
   renderBackfillForm();
   setMessage("历史比赛补登成功。");
-  await loadLeaderboard();
-  await loadRecentMatches();
 }
 
 async function deleteMatch(matchId, buttonEl) {
@@ -2091,32 +2157,108 @@ async function deleteMatch(matchId, buttonEl) {
 
   setMessage("比赛记录已删除，积分已按全部比赛记录重算。");
   setMatchMessage("比赛记录已删除，积分已按全部比赛记录重算。");
-  await loadLeaderboard();
-  await loadRecentMatches();
 }
 
 function subscribeRealtime() {
-  db.channel("app-realtime")
+  if (realtimeChannel) {
+    db.removeChannel(realtimeChannel);
+  }
+
+  realtimeChannel = db
+    .channel("app-realtime")
+    .on(
+      "postgres_changes",
+      { event: "*", schema: "public", table: "seasons" },
+      () => {
+        scheduleRefresh({ seasonContext: true });
+      }
+    )
+    .on(
+      "postgres_changes",
+      { event: "*", schema: "public", table: "players" },
+      () => {
+        scheduleRefresh({
+          playerDriven: true,
+          queue: true,
+          leaderboard: true,
+          rewardLogs: true,
+          recentMatches: true,
+        });
+      }
+    )
+    .on(
+      "postgres_changes",
+      { event: "*", schema: "public", table: "season_players" },
+      () => {
+        scheduleRefresh({ playerDriven: true });
+      }
+    )
+    .on(
+      "postgres_changes",
+      { event: "*", schema: "public", table: "season_player_stats" },
+      () => {
+        scheduleRefresh({
+          playerDriven: true,
+          leaderboard: true,
+        });
+      }
+    )
     .on(
       "postgres_changes",
       { event: "*", schema: "public", table: "signup_queue" },
-      async () => {
-        await loadQueue();
+      () => {
+        scheduleRefresh({ queue: true });
       }
     )
     .on(
       "postgres_changes",
       { event: "*", schema: "public", table: "match_days" },
-      async () => {
-        await refreshPlayerDrivenViews();
-        await loadRecentMatches();
+      () => {
+        scheduleRefresh({
+          playerDriven: true,
+          recentMatches: true,
+        });
       }
     )
     .on(
       "postgres_changes",
       { event: "*", schema: "public", table: "daily_player_roster" },
-      async () => {
-        await refreshPlayerDrivenViews();
+      () => {
+        scheduleRefresh({
+          playerDriven: true,
+          queue: true,
+        });
+      }
+    )
+    .on(
+      "postgres_changes",
+      { event: "*", schema: "public", table: "matches" },
+      () => {
+        scheduleRefresh({
+          leaderboard: true,
+          recentMatches: true,
+        });
+      }
+    )
+    .on(
+      "postgres_changes",
+      { event: "*", schema: "public", table: "match_results" },
+      () => {
+        scheduleRefresh({
+          leaderboard: true,
+          recentMatches: true,
+        });
+      }
+    )
+    .on(
+      "postgres_changes",
+      { event: "*", schema: "public", table: "reward_donations" },
+      () => {
+        scheduleRefresh({
+          playerDriven: true,
+          leaderboard: true,
+          rewardLogs: true,
+        });
       }
     )
     .subscribe();
