@@ -63,6 +63,7 @@ begin
     player_id,
     score,
     reward_points,
+    reward_floor_bonus,
     games_played,
     wins,
     losses
@@ -70,8 +71,9 @@ begin
   select
     v_season_id,
     p.id,
-    10,
-    20,
+    10.00,
+    greatest(20, 20 + coalesce(p.reward_floor_bonus, 0)),
+    coalesce(p.reward_floor_bonus, 0),
     0,
     0,
     0

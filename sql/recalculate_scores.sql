@@ -11,7 +11,7 @@ begin
   update public.players
   set
     score = 10.00,
-    reward_points = 20,
+    reward_points = greatest(coalesce(reward_points, 20), 20 + coalesce(reward_floor_bonus, 0)),
     games_played = 0,
     wins = 0,
     losses = 0
@@ -21,7 +21,7 @@ begin
   update public.season_player_stats
   set
     score = 10.00,
-    reward_points = 20,
+    reward_points = greatest(coalesce(reward_points, 20), 20 + coalesce(reward_floor_bonus, 0)),
     games_played = 0,
     wins = 0,
     losses = 0
@@ -33,6 +33,7 @@ begin
     player_id,
     score,
     reward_points,
+    reward_floor_bonus,
     games_played,
     wins,
     losses
@@ -41,12 +42,14 @@ begin
     m.season_id,
     mr.player_id,
     10.00,
-    20,
+    greatest(20, 20 + coalesce(p.reward_floor_bonus, 0)),
+    coalesce(p.reward_floor_bonus, 0),
     0,
     0,
     0
   from public.match_results mr
   join public.matches m on m.id = mr.match_id
+  join public.players p on p.id = mr.player_id
   where m.season_id is not null
   on conflict (season_id, player_id) do nothing;
 
@@ -83,7 +86,7 @@ begin
   update public.players p
   set
     score = 10.00 + pt.score_delta,
-    reward_points = 20,
+    reward_points = greatest(coalesce(p.reward_points, 20), 20 + coalesce(p.reward_floor_bonus, 0)),
     games_played = pt.games_played,
     wins = pt.wins,
     losses = pt.losses
@@ -125,7 +128,7 @@ begin
   update public.season_player_stats sps
   set
     score = 10.00 + st.score_delta,
-    reward_points = 20,
+    reward_points = greatest(coalesce(sps.reward_points, 20), 20 + coalesce(sps.reward_floor_bonus, 0)),
     games_played = st.games_played,
     wins = st.wins,
     losses = st.losses

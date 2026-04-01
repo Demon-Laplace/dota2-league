@@ -579,12 +579,14 @@ function renderLeaderboard(data) {
           <input
             class="reward-input"
             type="number"
-            min="0"
+            min="${Number(player.reward_minimum ?? 20)}"
             step="1"
             value="${Number(player.reward_points ?? 0)}"
             data-player-id="${player.player_id || player.id}"
             data-player-name="${escapeHtml(player.display_name)}"
             data-initial-value="${Number(player.reward_points ?? 0)}"
+            data-reward-minimum="${Number(player.reward_minimum ?? 20)}"
+            title="最低赞助额：${Number(player.reward_minimum ?? 20)}"
           />
         </div>
       </td>
@@ -597,10 +599,12 @@ async function updateRewardPoints(inputEl) {
   const playerId = inputEl?.dataset.playerId;
   const playerName = inputEl?.dataset.playerName || "该选手";
   const nextValue = inputEl?.value;
+  const rewardMinimum = Number.parseInt(inputEl?.dataset.rewardMinimum || "20", 10);
   const parsedValue = Number.parseInt(nextValue, 10);
 
-  if (!Number.isInteger(parsedValue) || parsedValue < 0) {
-    setMessage(`请为 ${playerName} 输入大于等于 0 的整数赞助额。`, true);
+  if (!Number.isInteger(parsedValue) || parsedValue < rewardMinimum) {
+    inputEl.value = inputEl.dataset.initialValue || String(rewardMinimum);
+    setMessage(`请为 ${playerName} 输入不低于 ${rewardMinimum} 的整数赞助额。`, true);
     return;
   }
 
@@ -904,7 +908,7 @@ async function refreshPlayerDrivenViews() {
 async function loadLeaderboard() {
   let result = await db
     .from("current_season_leaderboard")
-    .select("player_id, display_name, score, games_played, reward_points")
+    .select("player_id, display_name, score, games_played, reward_points, reward_minimum")
     .order("score", { ascending: false })
     .order("reward_points", { ascending: false })
     .order("display_name", { ascending: true });
@@ -921,7 +925,7 @@ async function loadLeaderboard() {
   if (result.error) {
     result = await db
       .from("players")
-      .select("id, display_name, score, games_played, reward_points")
+      .select("id, display_name, score, games_played, reward_points, reward_floor_bonus")
       .order("score", { ascending: false })
       .order("reward_points", { ascending: false })
       .order("display_name", { ascending: true });
@@ -935,7 +939,11 @@ async function loadLeaderboard() {
     return;
   }
 
-  renderLeaderboard(result.data || []);
+  const leaderboardData = (result.data || []).map((player) => ({
+    ...player,
+    reward_minimum: player.reward_minimum ?? (20 + Number(player.reward_floor_bonus ?? 0)),
+  }));
+  renderLeaderboard(leaderboardData);
 }
 
 async function loadRecentMatches() {

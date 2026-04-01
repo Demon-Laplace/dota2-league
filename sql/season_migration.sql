@@ -9,6 +9,9 @@ alter column score set default 10;
 alter table public.players
 alter column reward_points set default 20;
 
+alter table public.players
+add column if not exists reward_floor_bonus integer not null default 0;
+
 -- 1) 赛季主表
 create table if not exists public.seasons (
   id uuid primary key default gen_random_uuid(),
@@ -51,6 +54,7 @@ create table if not exists public.season_player_stats (
   player_id uuid not null references public.players(id) on delete cascade,
   score integer not null default 10,
   reward_points integer not null default 20,
+  reward_floor_bonus integer not null default 0,
   games_played integer not null default 0,
   wins integer not null default 0,
   losses integer not null default 0,
@@ -70,6 +74,9 @@ alter column score set default 10;
 
 alter table public.season_player_stats
 alter column reward_points set default 20;
+
+alter table public.season_player_stats
+add column if not exists reward_floor_bonus integer not null default 0;
 
 -- 4) updated_at 自动维护
 create or replace function public.set_updated_at()
@@ -149,6 +156,7 @@ insert into public.season_player_stats (
   player_id,
   score,
   reward_points,
+  reward_floor_bonus,
   games_played,
   wins,
   losses
@@ -157,7 +165,8 @@ select
   s.id,
   p.id,
   10,
-  20,
+  greatest(20, 20 + coalesce(p.reward_floor_bonus, 0)),
+  coalesce(p.reward_floor_bonus, 0),
   0,
   0,
   0
@@ -208,6 +217,8 @@ select
   p.display_name,
   sps.score,
   sps.reward_points,
+  sps.reward_floor_bonus,
+  (20 + coalesce(sps.reward_floor_bonus, 0)) as reward_minimum,
   sps.games_played,
   sps.wins,
   sps.losses,
