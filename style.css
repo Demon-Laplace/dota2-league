@@ -5,7 +5,9 @@
 body {
   margin: 0;
   font-family: Arial, "Microsoft YaHei", sans-serif;
-  background: #111827;
+  background:
+    linear-gradient(rgba(6, 10, 18, 0.78), rgba(10, 14, 24, 0.88)),
+    url("./assets/dota-bg.jpg") center / cover no-repeat fixed;
   color: #f3f4f6;
 }
 
