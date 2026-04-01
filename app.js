@@ -193,14 +193,16 @@ function clearMatchForm() {
 
 function renderQueue(data) {
   queueList.innerHTML = "";
+  const allRows = data || [];
+  const activeRows = allRows.filter((row) => row.is_active === true);
+  confirmQueueBtn.disabled = activeRows.length < 10;
 
-  const visibleRows = (data || []).filter((row) =>
+  const visibleRows = allRows.filter((row) =>
     row.is_active === true || row.status === "cancelled"
   );
 
   if (visibleRows.length === 0) {
     queueEmpty.style.display = "block";
-    confirmQueueBtn.disabled = true;
     return;
   }
 
@@ -225,7 +227,7 @@ function renderQueue(data) {
         ? `报名于 ${time}`
         : "";
     const actionHtml = isCancelled
-      ? ""
+      ? `<button class="button-secondary queue-resignup-btn" data-entry-id="${row.id}" data-player-name="${escapeHtml(playerName)}">重新报名</button>`
       : `<button class="button-danger queue-cancel-btn" data-entry-id="${row.id}" data-player-name="${escapeHtml(playerName)}">取消报名</button>`;
     let laneLabel = "";
 
@@ -254,8 +256,6 @@ function renderQueue(data) {
     `;
     queueList.appendChild(li);
   });
-
-  confirmQueueBtn.disabled = activeCount < 10;
 }
 
 function renderTodayPlayers() {
@@ -642,6 +642,46 @@ async function cancelSignupByEntry(entryId, playerName, buttonEl) {
   await loadQueue();
 }
 
+async function reSignupByEntry(entryId, playerName, buttonEl) {
+  if (!entryId) {
+    setMessage("缺少报名记录，无法重新报名。", true);
+    return;
+  }
+
+  if (buttonEl) {
+    buttonEl.disabled = true;
+  }
+
+  setMessage(`正在为 ${playerName || "该玩家"} 重新报名...`);
+
+  const { error } = await db
+    .from("signup_queue")
+    .update({
+      is_active: true,
+      status: "active",
+      cancelled_at: null,
+      created_at: new Date().toISOString(),
+    })
+    .eq("id", entryId);
+
+  if (error) {
+    if (buttonEl) {
+      buttonEl.disabled = false;
+    }
+
+    if (error.message.includes("signup_queue_one_active_per_player")) {
+      setMessage("该玩家已经在报名队列中。", true);
+      return;
+    }
+
+    setMessage(`重新报名失败：${error.message}`, true);
+    return;
+  }
+
+  setMessage(`${playerName || "该玩家"} 已重新进入报名队列。`);
+  await loadQueue();
+}
+
 async function confirmQueueToTodayPlayers() {
   confirmQueueBtn.disabled = true;
   setMessage("正在将报名队列加入当日名单...");
@@ -855,14 +895,24 @@ matchFormPanel.addEventListener("change", (event) => {
 });
 
 queueList.addEventListener("click", async (event) => {
-  const button = event.target.closest(".queue-cancel-btn");
-  if (!button) return;
+  const cancelButton = event.target.closest(".queue-cancel-btn");
+  if (cancelButton) {
+    await cancelSignupByEntry(
+      cancelButton.dataset.entryId,
+      cancelButton.dataset.playerName,
+      cancelButton
+    );
+    return;
+  }
 
-  await cancelSignupByEntry(
-    button.dataset.entryId,
-    button.dataset.playerName,
-    button
-  );
+  const reSignupButton = event.target.closest(".queue-resignup-btn");
+  if (reSignupButton) {
+    await reSignupByEntry(
+      reSignupButton.dataset.entryId,
+      reSignupButton.dataset.playerName,
+      reSignupButton
+    );
+  }
 });
 
 todayPlayersList.addEventListener("click", async (event) => {
