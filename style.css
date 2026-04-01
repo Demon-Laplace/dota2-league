@@ -865,6 +865,10 @@ ol {
   padding: 20px;
 }
 
+.hero-picker-modal[hidden] {
+  display: none !important;
+}
+
 .hero-picker-backdrop {
   position: absolute;
   inset: 0;
