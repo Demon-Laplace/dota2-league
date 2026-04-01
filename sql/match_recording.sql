@@ -18,10 +18,6 @@ as $$
 declare
   v_match_id uuid;
   v_season_id uuid;
-  v_team_a_avg numeric;
-  v_team_b_avg numeric;
-  v_expected_a numeric;
-  v_expected_b numeric;
   v_score_delta_a integer;
   v_score_delta_b integer;
   v_reward_a integer;
@@ -84,47 +80,10 @@ begin
     from public.players p
     where p.id = any(p_team_a_player_ids || p_team_b_player_ids)
     on conflict (season_id, player_id) do nothing;
-
-    select avg(score)::numeric
-    into v_team_a_avg
-    from public.season_player_stats
-    where season_id = v_season_id
-      and player_id = any(p_team_a_player_ids);
-
-    select avg(score)::numeric
-    into v_team_b_avg
-    from public.season_player_stats
-    where season_id = v_season_id
-      and player_id = any(p_team_b_player_ids);
-  else
-    select avg(score)::numeric
-    into v_team_a_avg
-    from public.players
-    where id = any(p_team_a_player_ids);
-
-    select avg(score)::numeric
-    into v_team_b_avg
-    from public.players
-    where id = any(p_team_b_player_ids);
   end if;
 
-  v_expected_a := 1 / (1 + power(10, (v_team_b_avg - v_team_a_avg) / 400.0));
-  v_expected_b := 1 / (1 + power(10, (v_team_a_avg - v_team_b_avg) / 400.0));
-
-  v_score_delta_a := round(32 * ((case when p_winner_team = 'A' then 1 else 0 end) - v_expected_a));
-  v_score_delta_b := round(32 * ((case when p_winner_team = 'B' then 1 else 0 end) - v_expected_b));
-
-  if p_winner_team = 'A' and v_score_delta_a <= 0 then
-    v_score_delta_a := 1;
-  elsif p_winner_team = 'B' and v_score_delta_a >= 0 then
-    v_score_delta_a := -1;
-  end if;
-
-  if p_winner_team = 'B' and v_score_delta_b <= 0 then
-    v_score_delta_b := 1;
-  elsif p_winner_team = 'A' and v_score_delta_b >= 0 then
-    v_score_delta_b := -1;
-  end if;
+  v_score_delta_a := case when p_winner_team = 'A' then 1 else -1 end;
+  v_score_delta_b := case when p_winner_team = 'B' then 1 else -1 end;
 
   v_reward_a := case when p_winner_team = 'A' then 1 else 0 end;
   v_reward_b := case when p_winner_team = 'B' then 1 else 0 end;
@@ -229,5 +188,7 @@ $$;
 
 grant execute on function public.record_match_result(uuid[], uuid[], text, text, uuid, uuid)
 to anon, authenticated;
+
+grant select on public.recent_matches to anon, authenticated;
 
 commit;

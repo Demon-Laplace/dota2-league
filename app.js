@@ -20,6 +20,8 @@ const recordMatchBtn = document.getElementById("recordMatchBtn");
 const queueList = document.getElementById("queueList");
 const queueEmpty = document.getElementById("queueEmpty");
 const leaderboardBody = document.getElementById("leaderboardBody");
+const recentMatchesList = document.getElementById("recentMatchesList");
+const recentMatchesEmpty = document.getElementById("recentMatchesEmpty");
 
 let availablePlayers = [];
 let activeSeason = null;
@@ -223,7 +225,7 @@ function renderLeaderboard(data) {
 
   if (!data || data.length === 0) {
     const tr = document.createElement("tr");
-    tr.innerHTML = '<td colspan="4" class="muted">暂无排行榜数据</td>';
+    tr.innerHTML = '<td colspan="5" class="muted">暂无排行榜数据</td>';
     leaderboardBody.appendChild(tr);
     return;
   }
@@ -234,9 +236,75 @@ function renderLeaderboard(data) {
       <td>${idx + 1}</td>
       <td>${escapeHtml(player.display_name)}</td>
       <td>${player.score ?? 0}</td>
+      <td>${player.games_played ?? 0}</td>
       <td>${player.reward_points ?? 0}</td>
     `;
     leaderboardBody.appendChild(tr);
+  });
+}
+
+function parseRecentMatchPlayers(players) {
+  if (!players) {
+    return [];
+  }
+
+  if (Array.isArray(players)) {
+    return players;
+  }
+
+  if (typeof players === "string") {
+    try {
+      return JSON.parse(players);
+    } catch {
+      return [];
+    }
+  }
+
+  return [];
+}
+
+function renderRecentMatches(data) {
+  recentMatchesList.innerHTML = "";
+
+  if (!data || data.length === 0) {
+    recentMatchesEmpty.style.display = "block";
+    return;
+  }
+
+  recentMatchesEmpty.style.display = "none";
+
+  data.forEach((match) => {
+    const players = parseRecentMatchPlayers(match.players);
+    const teamAPlayers = players.filter((player) => player.team === "A");
+    const teamBPlayers = players.filter((player) => player.team === "B");
+    const winnerLabel = match.winner_team === "A" ? "天辉方获胜" : "夜魇方获胜";
+    const card = document.createElement("article");
+
+    card.className = "recent-match-card";
+    card.innerHTML = `
+      <div class="recent-match-head">
+        <div class="recent-match-title">
+          <strong>${winnerLabel}</strong>
+          <span class="winner-badge">比赛完成</span>
+        </div>
+        <div class="queue-actions">
+          <span class="muted">${escapeHtml(formatLocalTime(match.created_at))}</span>
+          <button class="button-danger delete-match-btn" data-match-id="${match.match_id}">删除记录</button>
+        </div>
+      </div>
+      <div class="recent-match-teams">
+        <div class="recent-match-team">
+          <h3>天辉方</h3>
+          <ul>${teamAPlayers.map((player) => `<li>${escapeHtml(player.display_name || player.name || "未知选手")}</li>`).join("")}</ul>
+        </div>
+        <div class="recent-match-team">
+          <h3>夜魇方</h3>
+          <ul>${teamBPlayers.map((player) => `<li>${escapeHtml(player.display_name || player.name || "未知选手")}</li>`).join("")}</ul>
+        </div>
+      </div>
+      ${match.note ? `<p class="muted">${escapeHtml(match.note)}</p>` : ""}
+    `;
+    recentMatchesList.appendChild(card);
   });
 }
 
@@ -295,7 +363,7 @@ async function loadPlayers() {
 async function loadLeaderboard() {
   let result = await db
     .from("current_season_leaderboard")
-    .select("player_id, display_name, score, reward_points")
+    .select("player_id, display_name, score, games_played, reward_points")
     .order("score", { ascending: false })
     .order("reward_points", { ascending: false })
     .order("display_name", { ascending: true });
@@ -303,7 +371,7 @@ async function loadLeaderboard() {
   if (result.error) {
     result = await db
       .from("leaderboard")
-      .select("id, display_name, score, reward_points")
+      .select("id, display_name, score, games_played, reward_points")
       .order("score", { ascending: false })
       .order("reward_points", { ascending: false })
       .order("display_name", { ascending: true });
@@ -312,7 +380,7 @@ async function loadLeaderboard() {
   if (result.error) {
     result = await db
       .from("players")
-      .select("id, display_name, score, reward_points")
+      .select("id, display_name, score, games_played, reward_points")
       .order("score", { ascending: false })
       .order("reward_points", { ascending: false })
       .order("display_name", { ascending: true });
@@ -326,6 +394,36 @@ async function loadLeaderboard() {
   }
 
   renderLeaderboard(result.data || []);
+}
+
+async function loadRecentMatches() {
+  let query = db
+    .from("recent_matches")
+    .select("match_id, winner_team, note, created_at, players")
+    .order("created_at", { ascending: false })
+    .limit(10);
+
+  if (activeSeason?.id) {
+    query = query.eq("season_id", activeSeason.id);
+  }
+
+  let { data, error } = await query;
+
+  if (error && error.message.includes("season_id")) {
+    ({ data, error } = await db
+      .from("recent_matches")
+      .select("match_id, winner_team, note, created_at, players")
+      .order("created_at", { ascending: false })
+      .limit(10));
+  }
+
+  if (error) {
+    console.error("加载最近比赛失败：", error);
+    renderRecentMatches([]);
+    return;
+  }
+
+  renderRecentMatches(data || []);
 }
 
 async function loadQueue() {
@@ -507,6 +605,35 @@ async function recordMatch() {
   renderMatchForm();
   setMatchMessage("比赛记录成功，积分榜已刷新。");
   await loadLeaderboard();
+  await loadRecentMatches();
+}
+
+async function deleteMatch(matchId, buttonEl) {
+  if (!matchId) {
+    return;
+  }
+
+  if (buttonEl) {
+    buttonEl.disabled = true;
+  }
+
+  setMatchMessage("正在删除比赛记录并重算积分...");
+
+  const { error } = await db.rpc("delete_match_and_recalculate", {
+    p_match_id: matchId,
+  });
+
+  if (error) {
+    if (buttonEl) {
+      buttonEl.disabled = false;
+    }
+    setMatchMessage(`删除比赛失败：${error.message}`, true);
+    return;
+  }
+
+  setMatchMessage("比赛记录已删除，积分已按全部比赛记录重算。");
+  await loadLeaderboard();
+  await loadRecentMatches();
 }
 
 function subscribeQueueChanges() {
@@ -552,6 +679,16 @@ queueList.addEventListener("click", async (event) => {
   );
 });
 
+recentMatchesList.addEventListener("click", async (event) => {
+  const button = event.target.closest(".delete-match-btn");
+
+  if (!button) {
+    return;
+  }
+
+  await deleteMatch(button.dataset.matchId, button);
+});
+
 async function init() {
   setMatchFormOpen(false);
   renderMatchForm();
@@ -560,6 +697,7 @@ async function init() {
   await loadPlayers();
   await loadQueue();
   await loadLeaderboard();
+  await loadRecentMatches();
   subscribeQueueChanges();
 }
 
