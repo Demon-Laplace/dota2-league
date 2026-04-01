@@ -185,6 +185,11 @@ function scheduleRefresh(flags) {
   }, REFRESH_DEBOUNCE_MS);
 }
 
+function requestImmediateRefresh(flags) {
+  scheduleRefresh(flags);
+  flushRefreshQueue();
+}
+
 function hideLoadingScreen() {
   if (!loadingScreen) return;
 
@@ -1007,6 +1012,11 @@ async function addRewardExtra() {
   rewardPlayerSelect.value = "";
   setRewardMessage(`${selectedPlayer?.display_name || outsideName} 已增加赞助额 ${extraAmount}。`);
   updateRewardMinimumHint();
+  requestImmediateRefresh({
+    playerDriven: true,
+    leaderboard: true,
+    rewardLogs: true,
+  });
 }
 
 async function loadRewardLogs() {
@@ -1103,6 +1113,11 @@ async function cancelRewardDonation(donationId, playerName, buttonEl) {
   }
 
   setRewardMessage(`${playerName} 的赞助记录已取消。`);
+  requestImmediateRefresh({
+    playerDriven: true,
+    leaderboard: true,
+    rewardLogs: true,
+  });
 }
 
 function parseRecentMatchPlayers(players) {
@@ -1538,6 +1553,9 @@ async function resetCurrentSeason() {
   writeExternalDonationLogs(activeSeason.id, []);
   setMessage(`已重置 ${activeSeason.name}，并从总表同步了 ${data ?? 0} 名选手。`);
   await loadRewardLogs();
+  requestImmediateRefresh({
+    seasonContext: true,
+  });
 }
 
 async function toggleSeasonPlayer(playerId, playerName) {
@@ -1562,6 +1580,11 @@ async function toggleSeasonPlayer(playerId, playerName) {
   }
 
   setMessage(data ? `${playerName} 已加入当前赛季。` : `${playerName} 已取消当前赛季参赛。`);
+  requestImmediateRefresh({
+    playerDriven: true,
+    queue: true,
+    leaderboard: true,
+  });
 }
 
 async function setSeasonKoi() {
@@ -1602,6 +1625,9 @@ async function setSeasonKoi() {
       ? "已取消赛季锦鲤，并按当前规则重算积分。"
       : `${playerName} 已设为赛季锦鲤，并按当前规则重算积分。`
   );
+  requestImmediateRefresh({
+    seasonContext: true,
+  });
 }
 
 async function loadQueue() {
@@ -1691,6 +1717,7 @@ async function signup() {
   }
 
   setMessage("报名成功。");
+  requestImmediateRefresh({ queue: true });
 }
 
 async function cancelSignupByEntry(entryId, playerName, buttonEl) {
@@ -1723,6 +1750,7 @@ async function cancelSignupByEntry(entryId, playerName, buttonEl) {
   }
 
   setMessage(`${playerName || "该玩家"} 已取消报名，队列中会保留取消记录。`);
+  requestImmediateRefresh({ queue: true });
 }
 
 async function cancelSignupByPlayer(playerId, playerName, buttonEl) {
@@ -1775,6 +1803,7 @@ async function reSignupByEntry(entryId, playerName, buttonEl) {
   }
 
   setMessage(`${playerName || "该玩家"} 已重新进入报名队列。`);
+  requestImmediateRefresh({ queue: true });
 }
 
 async function confirmQueueToTodayPlayers() {
@@ -1792,6 +1821,10 @@ async function confirmQueueToTodayPlayers() {
   }
 
   setMessage(`已确认已就位选手 ${data ?? 0} 人，未就位的报名选手仍保留在队列中。`);
+  requestImmediateRefresh({
+    playerDriven: true,
+    queue: true,
+  });
 }
 
 async function clearSignupQueueForTesting() {
@@ -1816,6 +1849,7 @@ async function clearSignupQueueForTesting() {
   }
 
   setMessage(`已清空当前赛季报名队列，共删除 ${data ?? 0} 条记录。`);
+  requestImmediateRefresh({ queue: true });
 }
 
 async function clearTodayPlayersForTesting() {
@@ -1840,6 +1874,10 @@ async function clearTodayPlayersForTesting() {
   }
 
   setMessage(`已清空当日选手名单，共删除 ${data ?? 0} 条记录。`);
+  requestImmediateRefresh({
+    playerDriven: true,
+    queue: true,
+  });
 }
 
 async function startMatchDay() {
@@ -1875,6 +1913,10 @@ async function startMatchDay() {
     startTime: formatTime24(matchStartTimeInput.value),
   });
   setMessage("当日比赛已发起，可以开始报名和记录比赛。");
+  requestImmediateRefresh({
+    playerDriven: true,
+    recentMatches: true,
+  });
 }
 
 async function cancelMatchDay() {
@@ -1900,6 +1942,11 @@ async function cancelMatchDay() {
   clearStoredMatchDayStartTime();
   matchStartTimeInput.value = "";
   setMessage("已取消当日比赛发起。");
+  requestImmediateRefresh({
+    playerDriven: true,
+    queue: true,
+    recentMatches: true,
+  });
 }
 
 async function addTodayPlayer() {
@@ -1932,6 +1979,10 @@ async function addTodayPlayer() {
   }
 
   setMessage("已加入当日选手名单。");
+  requestImmediateRefresh({
+    playerDriven: true,
+    queue: true,
+  });
 }
 
 async function markQueuePlayerReady(playerId, playerName, buttonEl) {
@@ -1978,6 +2029,10 @@ async function markQueuePlayerReady(playerId, playerName, buttonEl) {
   }
 
   setMessage(`${playerName || "该玩家"} 已开机入场。`);
+  requestImmediateRefresh({
+    playerDriven: true,
+    queue: true,
+  });
 }
 
 async function cancelQueuePlayerReady(entryId, playerName, buttonEl) {
@@ -2003,6 +2058,10 @@ async function cancelQueuePlayerReady(entryId, playerName, buttonEl) {
   }
 
   setMessage(`${playerName || "该玩家"} 已取消就位。`);
+  requestImmediateRefresh({
+    playerDriven: true,
+    queue: true,
+  });
 }
 
 async function removeTodayPlayer(entryId, buttonEl) {
@@ -2025,6 +2084,10 @@ async function removeTodayPlayer(entryId, buttonEl) {
   }
 
   setMessage("已移出当日名单。");
+  requestImmediateRefresh({
+    playerDriven: true,
+    queue: true,
+  });
 }
 
 function getSelectedTeamIds(prefix) {
@@ -2123,6 +2186,10 @@ async function recordMatch() {
   setMatchFormOpen(false);
   renderMatchForm();
   setMatchMessage("比赛记录成功，积分榜已刷新。");
+  requestImmediateRefresh({
+    leaderboard: true,
+    recentMatches: true,
+  });
 }
 
 async function recordBackfillMatch() {
@@ -2159,6 +2226,10 @@ async function recordBackfillMatch() {
   setBackfillFormOpen(false);
   renderBackfillForm();
   setMessage("历史比赛补登成功。");
+  requestImmediateRefresh({
+    leaderboard: true,
+    recentMatches: true,
+  });
 }
 
 async function deleteMatch(matchId, buttonEl) {
@@ -2192,6 +2263,10 @@ async function deleteMatch(matchId, buttonEl) {
 
   setMessage("比赛记录已删除，积分已按全部比赛记录重算。");
   setMatchMessage("比赛记录已删除，积分已按全部比赛记录重算。");
+  requestImmediateRefresh({
+    leaderboard: true,
+    recentMatches: true,
+  });
 }
 
 function subscribeRealtime() {
@@ -2296,7 +2371,9 @@ function subscribeRealtime() {
         });
       }
     )
-    .subscribe();
+    .subscribe((status) => {
+      console.info("[realtime] app-realtime status:", status);
+    });
 }
 
 seasonToggleBtn.addEventListener("click", () => {
