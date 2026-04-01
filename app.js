@@ -83,6 +83,48 @@ let isBackfillFormOpen = false;
 let isSeasonPanelOpen = false;
 let isRewardPanelOpen = false;
 
+function getExternalDonationStorageKey(seasonId) {
+  return `dota2sys_external_reward_logs_${seasonId || "global"}`;
+}
+
+function readExternalDonationLogs(seasonId) {
+  try {
+    const raw = window.localStorage.getItem(getExternalDonationStorageKey(seasonId));
+    const parsed = raw ? JSON.parse(raw) : [];
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
+function writeExternalDonationLogs(seasonId, logs) {
+  window.localStorage.setItem(
+    getExternalDonationStorageKey(seasonId),
+    JSON.stringify(logs)
+  );
+}
+
+function formatTime24(value) {
+  if (!value) return "";
+  const match = String(value).match(/^(\d{1,2}):(\d{2})/);
+  if (!match) return String(value);
+  const hours = String(Math.max(0, Math.min(23, Number(match[1])))).padStart(2, "0");
+  const minutes = String(Math.max(0, Math.min(59, Number(match[2])))).padStart(2, "0");
+  return `${hours}:${minutes}`;
+}
+
+function downloadTextFile(filename, content) {
+  const blob = new Blob([content], { type: "text/plain;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(url);
+}
+
 function getMatchDayStartTimeKey() {
   return "dota2sys_match_day_start_time";
 }
@@ -472,7 +514,7 @@ function renderMatchDayStatus() {
       storedStartTime.matchDate === activeMatchDay.match_date &&
       storedStartTime.startTime
     ) {
-      matchStartTimeDisplay.textContent = `开始时间：${storedStartTime.startTime}`;
+      matchStartTimeDisplay.textContent = `开始时间：${formatTime24(storedStartTime.startTime)}`;
     } else {
       matchStartTimeDisplay.textContent = "";
     }
@@ -769,11 +811,35 @@ async function addRewardExtra() {
   addRewardBtn.disabled = true;
   setRewardMessage(`正在添加赞助记录...`);
 
+  if (outsideName && !playerId) {
+    const localLogs = readExternalDonationLogs(activeSeason?.id || null);
+    localLogs.unshift({
+      id: `local-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+      season_id: activeSeason?.id || null,
+      player_id: null,
+      donor_name: outsideName,
+      amount: extraAmount,
+      is_cancelled: false,
+      cancelled_at: null,
+      created_at: new Date().toISOString(),
+      is_local: true,
+    });
+    writeExternalDonationLogs(activeSeason?.id || null, localLogs);
+    addRewardBtn.disabled = false;
+    rewardExtraInput.value = "";
+    rewardOutsideNameInput.value = "";
+    rewardPlayerSelect.value = "";
+    setRewardMessage(`${outsideName} 的场外赞助已记录在本地。`);
+    await loadRewardLogs();
+    updateRewardMinimumHint();
+    return;
+  }
+
   const { error } = await db.rpc("add_player_reward_extra", {
     p_player_id: playerId || null,
     p_extra_amount: extraAmount,
     p_season_id: activeSeason?.id || null,
-    p_donor_name: outsideName || null,
+    p_donor_name: null,
   });
 
   addRewardBtn.disabled = false;
@@ -818,16 +884,22 @@ async function loadRewardLogs() {
 
   const { data, error } = await query;
 
+  const localExternalLogs = readExternalDonationLogs(activeSeason?.id || null);
+
   if (error) {
     console.error("加载赞助记录失败：", error);
-    rewardLogs = [];
-    externalRewardTotal = 0;
+    rewardLogs = [...localExternalLogs];
+    externalRewardTotal = localExternalLogs
+      .filter((log) => !log.is_cancelled)
+      .reduce((sum, log) => sum + Number(log.amount ?? 0), 0);
     refreshSeasonRewardTotal();
     renderRewardLogs();
     return;
   }
 
-  rewardLogs = data || [];
+  rewardLogs = [...localExternalLogs, ...(data || [])].sort(
+    (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+  );
   externalRewardTotal = rewardLogs
     .filter((log) => !log.is_cancelled && !log.player_id)
     .reduce((sum, log) => sum + Number(log.amount ?? 0), 0);
@@ -847,6 +919,24 @@ async function cancelRewardDonation(donationId, playerName, buttonEl) {
   }
 
   setRewardMessage(`正在取消 ${playerName} 的赞助记录...`);
+
+  const localLogs = readExternalDonationLogs(activeSeason?.id || null);
+  const localIndex = localLogs.findIndex((log) => log.id === donationId);
+
+  if (localIndex >= 0) {
+    localLogs[localIndex] = {
+      ...localLogs[localIndex],
+      is_cancelled: true,
+      cancelled_at: new Date().toISOString(),
+    };
+    writeExternalDonationLogs(activeSeason?.id || null, localLogs);
+    if (buttonEl) {
+      buttonEl.disabled = false;
+    }
+    setRewardMessage(`${playerName} 的场外赞助记录已取消。`);
+    await loadRewardLogs();
+    return;
+  }
 
   const { error } = await db.rpc("cancel_reward_donation", {
     p_donation_id: donationId,
@@ -1263,6 +1353,24 @@ async function resetCurrentSeason() {
     return;
   }
 
+  const localExternalLogs = readExternalDonationLogs(activeSeason.id)
+    .filter((log) => !log.is_cancelled);
+
+  if (localExternalLogs.length) {
+    const lines = [
+      `${activeSeason.name} 场外赞助备忘`,
+      `导出时间：${formatLocalTime(new Date().toISOString())}`,
+      "",
+      ...localExternalLogs.map((log) =>
+        `${formatLocalTime(log.created_at)}  ${log.donor_name || "场外赞助"}  +${Number(log.amount ?? 0)}`
+      ),
+    ];
+    downloadTextFile(
+      `${activeSeason.name}-场外赞助备忘.txt`,
+      lines.join("\n")
+    );
+  }
+
   resetSeasonBtn.disabled = true;
   setMessage(`正在重置 ${activeSeason.name}...`);
 
@@ -1280,6 +1388,7 @@ async function resetCurrentSeason() {
   setMatchMessage("");
   clearMatchForm();
   setMatchFormOpen(false);
+  writeExternalDonationLogs(activeSeason.id, []);
   setMessage(`已重置 ${activeSeason.name}，并从总表同步了 ${data ?? 0} 名选手。`);
   await refreshPlayerDrivenViews();
   await loadQueue();
@@ -1625,7 +1734,7 @@ async function startMatchDay() {
   writeStoredMatchDayStartTime({
     seasonId: activeSeason?.id || null,
     matchDate: getBeijingBusinessDateString(),
-    startTime: matchStartTimeInput.value,
+    startTime: formatTime24(matchStartTimeInput.value),
   });
   setMessage("当日比赛已发起，可以开始报名和记录比赛。");
   await refreshPlayerDrivenViews();
@@ -2152,7 +2261,7 @@ async function init() {
   setBackfillFormOpen(false);
   setSeasonPanelOpen(false);
   setRewardPanelOpen(false);
-  matchStartTimeInput.value = readStoredMatchDayStartTime()?.startTime || "";
+  matchStartTimeInput.value = formatTime24(readStoredMatchDayStartTime()?.startTime || "");
   backfillDateInput.value = getBeijingBusinessDateString();
   renderMatchForm();
   renderBackfillForm();
