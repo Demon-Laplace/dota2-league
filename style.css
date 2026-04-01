@@ -10,9 +10,27 @@ body {
 }
 
 .container {
-  max-width: 900px;
+  max-width: 1440px;
   margin: 32px auto;
   padding: 0 16px;
+}
+
+.layout {
+  display: grid;
+  grid-template-columns: minmax(320px, 430px) minmax(0, 1fr);
+  gap: 24px;
+  align-items: start;
+}
+
+.layout-left,
+.layout-right {
+  display: grid;
+  gap: 20px;
+}
+
+.layout-left {
+  position: sticky;
+  top: 24px;
 }
 
 h1 {
@@ -29,7 +47,6 @@ h1 {
   border: 1px solid #374151;
   border-radius: 12px;
   padding: 16px;
-  margin-bottom: 20px;
 }
 
 .row {
@@ -325,6 +342,14 @@ ol {
 }
 
 @media (max-width: 720px) {
+  .layout {
+    grid-template-columns: 1fr;
+  }
+
+  .layout-left {
+    position: static;
+  }
+
   .match-grid {
     grid-template-columns: 1fr;
   }

@@ -11,96 +11,102 @@
     <h1>Dota2 宁德联赛</h1>
     <p class="sub">测试版：报名队列 + 积分榜</p>
 
-    <section class="card">
-      <h2>报名</h2>
-      <div class="row">
-        <select id="playerSelect">
-          <option value="">加载中...</option>
-        </select>
-        <button id="signupBtn">报名</button>
-      </div>
-      <p id="message" class="message"></p>
-    </section>
-
-    <section class="card">
-      <h2>当前报名队列</h2>
-      <div class="row">
-        <button id="confirmQueueBtn" class="button-secondary" disabled>全部到齐</button>
-        <button id="clearQueueBtn" class="button-danger">测试清空报名队列</button>
-      </div>
-      <ol id="queueList"></ol>
-      <p id="queueEmpty" class="muted">当前无人报名</p>
-    </section>
-
-    <section class="card">
-      <div class="section-head">
-        <h2>当日选手名单</h2>
-        <span id="todayPlayersCount" class="muted">0 人</span>
-      </div>
-      <div class="row">
-        <select id="todayAddPlayerSelect">
-          <option value="">请选择临时添加选手</option>
-        </select>
-        <button id="addTodayPlayerBtn">临时添加选手</button>
-      </div>
-      <ul id="todayPlayersList" class="today-players-list"></ul>
-      <p id="todayPlayersEmpty" class="muted">今日尚未确认到场选手</p>
-    </section>
-
-    <section class="card">
-      <h2>积分榜</h2>
-      <table>
-        <thead>
-          <tr>
-            <th>排名</th>
-            <th>玩家</th>
-            <th>积分</th>
-            <th>场次</th>
-            <th>赞助</th>
-          </tr>
-        </thead>
-        <tbody id="leaderboardBody"></tbody>
-      </table>
-    </section>
-
-    <section class="card">
-      <div class="section-head">
-        <h2>比赛记录</h2>
-        <button id="openMatchFormBtn">添加一场比赛记录</button>
-      </div>
-      <div id="matchFormPanel" class="match-form-panel" hidden>
-        <p id="seasonInfo" class="muted"></p>
-        <div class="match-grid">
-          <div class="team-panel">
-            <h3>天辉方</h3>
-            <div id="teamAFields" class="team-fields"></div>
+    <div class="layout">
+      <div class="layout-left">
+        <section class="card">
+          <h2>报名</h2>
+          <div class="row">
+            <select id="playerSelect">
+              <option value="">加载中...</option>
+            </select>
+            <button id="signupBtn">报名</button>
           </div>
-          <div class="team-panel">
-            <h3>夜魇方</h3>
-            <div id="teamBFields" class="team-fields"></div>
-          </div>
-        </div>
-        <div class="row">
-          <select id="winnerSelect">
-            <option value="">请选择胜方</option>
-            <option value="A">天辉方获胜</option>
-            <option value="B">夜魇方获胜</option>
-          </select>
-          <input id="matchNote" type="text" placeholder="备注，可选" />
-        </div>
-        <div class="row">
-          <button id="recordMatchBtn">保存比赛记录</button>
-          <button id="closeMatchFormBtn" class="button-secondary">收起</button>
-        </div>
-        <p id="matchMessage" class="message"></p>
-      </div>
-    </section>
+          <p id="message" class="message"></p>
+        </section>
 
-    <section class="card">
-      <h2>最近比赛记录</h2>
-      <div id="recentMatchesList" class="recent-matches"></div>
-      <p id="recentMatchesEmpty" class="muted">暂无比赛记录</p>
-    </section>
+        <section class="card">
+          <h2>当前报名队列</h2>
+          <div class="row">
+            <button id="confirmQueueBtn" class="button-secondary" disabled>全部到齐</button>
+            <button id="clearQueueBtn" class="button-danger">测试清空报名队列</button>
+          </div>
+          <ol id="queueList"></ol>
+          <p id="queueEmpty" class="muted">当前无人报名</p>
+        </section>
+
+        <section class="card">
+          <div class="section-head">
+            <h2>当日选手名单</h2>
+            <span id="todayPlayersCount" class="muted">0 人</span>
+          </div>
+          <div class="row">
+            <select id="todayAddPlayerSelect">
+              <option value="">请选择临时添加选手</option>
+            </select>
+            <button id="addTodayPlayerBtn">临时添加选手</button>
+          </div>
+          <ul id="todayPlayersList" class="today-players-list"></ul>
+          <p id="todayPlayersEmpty" class="muted">今日尚未确认到场选手</p>
+        </section>
+      </div>
+
+      <div class="layout-right">
+        <section class="card">
+          <h2>积分榜</h2>
+          <table>
+            <thead>
+              <tr>
+                <th>排名</th>
+                <th>玩家</th>
+                <th>积分</th>
+                <th>场次</th>
+                <th>赞助</th>
+              </tr>
+            </thead>
+            <tbody id="leaderboardBody"></tbody>
+          </table>
+        </section>
+
+        <section class="card">
+          <div class="section-head">
+            <h2>比赛记录</h2>
+            <button id="openMatchFormBtn">添加一场比赛记录</button>
+          </div>
+          <div id="matchFormPanel" class="match-form-panel" hidden>
+            <p id="seasonInfo" class="muted"></p>
+            <div class="match-grid">
+              <div class="team-panel">
+                <h3>天辉方</h3>
+                <div id="teamAFields" class="team-fields"></div>
+              </div>
+              <div class="team-panel">
+                <h3>夜魇方</h3>
+                <div id="teamBFields" class="team-fields"></div>
+              </div>
+            </div>
+            <div class="row">
+              <select id="winnerSelect">
+                <option value="">请选择胜方</option>
+                <option value="A">天辉方获胜</option>
+                <option value="B">夜魇方获胜</option>
+              </select>
+              <input id="matchNote" type="text" placeholder="备注，可选" />
+            </div>
+            <div class="row">
+              <button id="recordMatchBtn">保存比赛记录</button>
+              <button id="closeMatchFormBtn" class="button-secondary">收起</button>
+            </div>
+            <p id="matchMessage" class="message"></p>
+          </div>
+        </section>
+
+        <section class="card">
+          <h2>最近比赛记录</h2>
+          <div id="recentMatchesList" class="recent-matches"></div>
+          <p id="recentMatchesEmpty" class="muted">暂无比赛记录</p>
+        </section>
+      </div>
+    </div>
   </main>
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
