@@ -870,10 +870,17 @@ async function recordMatch() {
 async function deleteMatch(matchId, buttonEl) {
   if (!matchId) return;
 
+  const confirmed = window.confirm("确认删除这场比赛记录吗？删除后会按全部比赛记录重新计算积分。");
+
+  if (!confirmed) {
+    return;
+  }
+
   if (buttonEl) {
     buttonEl.disabled = true;
   }
 
+  setMessage("正在删除比赛记录并重算积分...");
   setMatchMessage("正在删除比赛记录并重算积分...");
 
   const { error } = await db.rpc("delete_match_and_recalculate", {
@@ -884,10 +891,12 @@ async function deleteMatch(matchId, buttonEl) {
     if (buttonEl) {
       buttonEl.disabled = false;
     }
+    setMessage(`删除比赛失败：${error.message}`, true);
     setMatchMessage(`删除比赛失败：${error.message}`, true);
     return;
   }
 
+  setMessage("比赛记录已删除，积分已按全部比赛记录重算。");
   setMatchMessage("比赛记录已删除，积分已按全部比赛记录重算。");
   await loadLeaderboard();
   await loadRecentMatches();
