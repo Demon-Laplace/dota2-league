@@ -14,6 +14,13 @@ const seasonPlayersCount = document.getElementById("seasonPlayersCount");
 const seasonPlayersList = document.getElementById("seasonPlayersList");
 const seasonPlayersEmpty = document.getElementById("seasonPlayersEmpty");
 const seasonRewardTotal = document.getElementById("seasonRewardTotal");
+const rewardPanel = document.getElementById("rewardPanel");
+const closeRewardPanelBtn = document.getElementById("closeRewardPanelBtn");
+const rewardPlayerSelect = document.getElementById("rewardPlayerSelect");
+const rewardExtraInput = document.getElementById("rewardExtraInput");
+const addRewardBtn = document.getElementById("addRewardBtn");
+const rewardMinimumHint = document.getElementById("rewardMinimumHint");
+const rewardMessageEl = document.getElementById("rewardMessage");
 const resetSeasonBtn = document.getElementById("resetSeasonBtn");
 const startMatchDayBtn = document.getElementById("startMatchDayBtn");
 const matchStartTimeInput = document.getElementById("matchStartTimeInput");
@@ -62,9 +69,11 @@ let activeSeason = null;
 let activeMatchDay = null;
 let allSeasons = [];
 let backfillPlayers = [];
+let leaderboardPlayers = [];
 let isMatchFormOpen = false;
 let isBackfillFormOpen = false;
 let isSeasonPanelOpen = false;
+let isRewardPanelOpen = false;
 
 function getMatchDayStartTimeKey() {
   return "dota2sys_match_day_start_time";
@@ -102,6 +111,11 @@ function setBackfillMessage(text, isError = false) {
   backfillMessageEl.className = isError ? "message error" : "message";
 }
 
+function setRewardMessage(text, isError = false) {
+  rewardMessageEl.textContent = text;
+  rewardMessageEl.className = isError ? "message error" : "message";
+}
+
 function formatScore(value) {
   const numericValue = Number(value ?? 0);
   if (Number.isNaN(numericValue)) return "0";
@@ -125,6 +139,12 @@ function setSeasonPanelOpen(isOpen) {
   isSeasonPanelOpen = isOpen;
   seasonPlayersPanel.hidden = !isOpen;
   seasonToggleBtn.setAttribute("aria-expanded", String(isOpen));
+}
+
+function setRewardPanelOpen(isOpen) {
+  isRewardPanelOpen = isOpen;
+  rewardPanel.hidden = !isOpen;
+  seasonRewardTotal.setAttribute("aria-expanded", String(isOpen));
 }
 
 function escapeHtml(str) {
@@ -303,6 +323,34 @@ function updateSeasonRewardTotal(total) {
   }
 
   seasonRewardTotal.textContent = `本赛季赞助总额：${formatScore(total)}`;
+}
+
+function renderRewardPlayerOptions() {
+  const options = ['<option value="">请选择选手</option>'];
+  const sortedPlayers = [...leaderboardPlayers].sort((a, b) =>
+    a.display_name.localeCompare(b.display_name, "zh-CN")
+  );
+
+  sortedPlayers.forEach((player) => {
+    options.push(
+      `<option value="${player.player_id || player.id}">${escapeHtml(player.display_name)}</option>`
+    );
+  });
+
+  rewardPlayerSelect.innerHTML = options.join("");
+}
+
+function updateRewardMinimumHint() {
+  const selectedPlayer = leaderboardPlayers.find(
+    (player) => (player.player_id || player.id) === rewardPlayerSelect.value
+  );
+
+  if (!selectedPlayer) {
+    rewardMinimumHint.textContent = "请选择选手后添加额外赞助额。";
+    return;
+  }
+
+  rewardMinimumHint.textContent = `${selectedPlayer.display_name} 当前最低值 ${Number(selectedPlayer.reward_minimum ?? 20)}，当前额外赞助额 ${Number(selectedPlayer.reward_extra_points ?? 0)}。`;
 }
 
 function renderSeasonPlayersPanel() {
@@ -544,9 +592,12 @@ function renderTodayPlayers() {
 
 function renderLeaderboard(data) {
   leaderboardBody.innerHTML = "";
+  leaderboardPlayers = data || [];
 
   if (!data || data.length === 0) {
     updateSeasonRewardTotal(0);
+    renderRewardPlayerOptions();
+    updateRewardMinimumHint();
     const tr = document.createElement("tr");
     tr.innerHTML = '<td colspan="5" class="muted">暂无排行榜数据</td>';
     leaderboardBody.appendChild(tr);
@@ -558,6 +609,8 @@ function renderLeaderboard(data) {
     0
   );
   updateSeasonRewardTotal(rewardTotal);
+  renderRewardPlayerOptions();
+  updateRewardMinimumHint();
 
   data.forEach((player, idx) => {
     const tr = document.createElement("tr");
@@ -574,63 +627,47 @@ function renderLeaderboard(data) {
       <td>${escapeHtml(player.display_name)}</td>
       <td>${formatScore(player.score)}</td>
       <td>${player.games_played ?? 0}</td>
-      <td>
-        <div class="reward-editor">
-          <input
-            class="reward-input"
-            type="number"
-            min="${Number(player.reward_minimum ?? 20)}"
-            step="1"
-            value="${Number(player.reward_points ?? 0)}"
-            data-player-id="${player.player_id || player.id}"
-            data-player-name="${escapeHtml(player.display_name)}"
-            data-initial-value="${Number(player.reward_points ?? 0)}"
-            data-reward-minimum="${Number(player.reward_minimum ?? 20)}"
-            title="最低赞助额：${Number(player.reward_minimum ?? 20)}"
-          />
-        </div>
-      </td>
+      <td>${Number(player.reward_points ?? 0)}</td>
     `;
     leaderboardBody.appendChild(tr);
   });
 }
 
-async function updateRewardPoints(inputEl) {
-  const playerId = inputEl?.dataset.playerId;
-  const playerName = inputEl?.dataset.playerName || "该选手";
-  const nextValue = inputEl?.value;
-  const rewardMinimum = Number.parseInt(inputEl?.dataset.rewardMinimum || "20", 10);
-  const parsedValue = Number.parseInt(nextValue, 10);
+async function addRewardExtra() {
+  const playerId = rewardPlayerSelect.value;
+  const selectedPlayer = leaderboardPlayers.find(
+    (player) => (player.player_id || player.id) === playerId
+  );
+  const extraAmount = Number.parseInt(rewardExtraInput.value, 10);
 
-  if (!Number.isInteger(parsedValue) || parsedValue < rewardMinimum) {
-    inputEl.value = inputEl.dataset.initialValue || String(rewardMinimum);
-    setMessage(`请为 ${playerName} 输入不低于 ${rewardMinimum} 的整数赞助额。`, true);
+  if (!playerId || !selectedPlayer) {
+    setRewardMessage("请先选择选手。", true);
     return;
   }
 
-  if (String(parsedValue) === String(inputEl.dataset.initialValue)) {
+  if (!Number.isInteger(extraAmount) || extraAmount < 0) {
+    setRewardMessage("额外赞助额必须是大于等于 0 的整数。", true);
     return;
   }
 
-  inputEl.disabled = true;
-  setMessage(`正在更新 ${playerName} 的赞助额...`);
+  addRewardBtn.disabled = true;
+  setRewardMessage(`正在为 ${selectedPlayer.display_name} 添加额外赞助额...`);
 
-  const { error } = await db.rpc("update_player_reward_points", {
+  const { error } = await db.rpc("add_player_reward_extra", {
     p_player_id: playerId,
-    p_reward_points: parsedValue,
+    p_extra_amount: extraAmount,
     p_season_id: activeSeason?.id || null,
   });
 
-  inputEl.disabled = false;
+  addRewardBtn.disabled = false;
 
   if (error) {
-    inputEl.value = inputEl.dataset.initialValue || "0";
-    setMessage(`更新赞助额失败：${error.message}。请先在 Supabase 执行对应 SQL。`, true);
+    setRewardMessage(`添加赞助失败：${error.message}。请先在 Supabase 执行对应 SQL。`, true);
     return;
   }
 
-  inputEl.dataset.initialValue = String(parsedValue);
-  setMessage(`${playerName} 的赞助额已更新为 ${parsedValue}。`);
+  rewardExtraInput.value = "";
+  setRewardMessage(`${selectedPlayer.display_name} 已增加额外赞助额 ${extraAmount}。`);
   await loadLeaderboard();
 }
 
@@ -850,6 +887,9 @@ async function loadSeasonPlayers() {
   seasonPlayers = (result.data || []).map((player) => ({
     id: player.player_id || player.id,
     display_name: player.display_name,
+    reward_points: player.reward_points,
+    reward_minimum: player.reward_minimum,
+    reward_extra_points: player.reward_extra_points,
   }));
   renderSeasonPlayersPanel();
 }
@@ -908,7 +948,7 @@ async function refreshPlayerDrivenViews() {
 async function loadLeaderboard() {
   let result = await db
     .from("current_season_leaderboard")
-    .select("player_id, display_name, score, games_played, reward_points, reward_minimum")
+    .select("player_id, display_name, score, games_played, reward_points, reward_minimum, reward_extra_points")
     .order("score", { ascending: false })
     .order("reward_points", { ascending: false })
     .order("display_name", { ascending: true });
@@ -925,7 +965,7 @@ async function loadLeaderboard() {
   if (result.error) {
     result = await db
       .from("players")
-      .select("id, display_name, score, games_played, reward_points, reward_floor_bonus")
+      .select("id, display_name, score, games_played, reward_points, reward_floor_bonus, reward_extra_points")
       .order("score", { ascending: false })
       .order("reward_points", { ascending: false })
       .order("display_name", { ascending: true });
@@ -942,6 +982,7 @@ async function loadLeaderboard() {
   const leaderboardData = (result.data || []).map((player) => ({
     ...player,
     reward_minimum: player.reward_minimum ?? (20 + Number(player.reward_floor_bonus ?? 0)),
+    reward_extra_points: player.reward_extra_points ?? 0,
   }));
   renderLeaderboard(leaderboardData);
 }
@@ -1714,24 +1755,6 @@ recentMatchesList.addEventListener("click", async (event) => {
   await deleteMatch(button.dataset.matchId, button);
 });
 
-leaderboardBody.addEventListener("keydown", async (event) => {
-  if (!event.target.matches(".reward-input") || event.key !== "Enter") {
-    return;
-  }
-
-  event.preventDefault();
-  const input = event.target;
-  await updateRewardPoints(input);
-});
-
-leaderboardBody.addEventListener("change", async (event) => {
-  if (!event.target.matches(".reward-input")) {
-    return;
-  }
-
-  await updateRewardPoints(event.target);
-});
-
 seasonPlayersList.addEventListener("click", async (event) => {
   const button = event.target.closest(".season-player-button");
   if (!button) return;
@@ -1739,10 +1762,33 @@ seasonPlayersList.addEventListener("click", async (event) => {
   await setSeasonKoi(button.dataset.playerId, button.dataset.playerName);
 });
 
+seasonRewardTotal.addEventListener("click", () => {
+  setRewardPanelOpen(!isRewardPanelOpen);
+  renderRewardPlayerOptions();
+  updateRewardMinimumHint();
+});
+
+closeRewardPanelBtn.addEventListener("click", () => {
+  setRewardPanelOpen(false);
+});
+
+rewardPlayerSelect.addEventListener("change", () => {
+  updateRewardMinimumHint();
+});
+
+addRewardBtn.addEventListener("click", addRewardExtra);
+
+rewardExtraInput.addEventListener("keydown", async (event) => {
+  if (event.key !== "Enter") return;
+  event.preventDefault();
+  await addRewardExtra();
+});
+
 async function init() {
   setMatchFormOpen(false);
   setBackfillFormOpen(false);
   setSeasonPanelOpen(false);
+  setRewardPanelOpen(false);
   matchStartTimeInput.value = readStoredMatchDayStartTime()?.startTime || "";
   backfillDateInput.value = getBeijingBusinessDateString();
   renderMatchForm();

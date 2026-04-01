@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Dota2 宁德联赛</title>
-  <link rel="stylesheet" href="style.css?v=20260401-15" />
+  <link rel="stylesheet" href="style.css?v=20260401-16" />
 </head>
 <body>
   <main class="container">
@@ -14,10 +14,28 @@
         <button id="seasonToggleBtn" class="season-chip" type="button" aria-expanded="false">
           当前赛季：加载中...
         </button>
-        <span id="seasonRewardTotal" class="season-total">本赛季赞助总额：--</span>
+        <button id="seasonRewardTotal" class="season-total" type="button" aria-expanded="false">本赛季赞助总额：--</button>
       </div>
     </div>
     <p class="sub">测试版：报名队列 + 积分榜</p>
+    <section id="rewardPanel" class="season-panel" hidden>
+      <div class="section-head">
+        <div>
+          <h2>自愿赞助</h2>
+          <p class="muted">选择选手并添加额外赞助额，积分榜显示为最低值加额外赞助额。</p>
+        </div>
+        <button id="closeRewardPanelBtn" class="button-secondary" type="button">收起</button>
+      </div>
+      <div class="row">
+        <select id="rewardPlayerSelect">
+          <option value="">请选择选手</option>
+        </select>
+        <input id="rewardExtraInput" type="number" min="0" step="1" placeholder="额外赞助额" />
+        <button id="addRewardBtn" type="button">添加赞助</button>
+      </div>
+      <p id="rewardMinimumHint" class="muted">请选择选手后添加额外赞助额。</p>
+      <p id="rewardMessage" class="message"></p>
+    </section>
     <section id="seasonPlayersPanel" class="season-panel" hidden>
       <div class="section-head">
         <div>
@@ -178,6 +196,6 @@
   </main>
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="app.js?v=20260401-15"></script>
+  <script src="app.js?v=20260401-16"></script>
 </body>
 </html>

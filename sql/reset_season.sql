@@ -64,6 +64,7 @@ begin
     score,
     reward_points,
     reward_floor_bonus,
+    reward_extra_points,
     games_played,
     wins,
     losses
@@ -72,8 +73,9 @@ begin
     v_season_id,
     p.id,
     10.00,
-    greatest(20, 20 + coalesce(p.reward_floor_bonus, 0)),
+    greatest(20, 20 + coalesce(p.reward_floor_bonus, 0)) + coalesce(p.reward_extra_points, 0),
     coalesce(p.reward_floor_bonus, 0),
+    coalesce(p.reward_extra_points, 0),
     0,
     0,
     0

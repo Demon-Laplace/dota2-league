@@ -69,11 +69,22 @@ h1 {
 }
 
 .season-total {
+  cursor: pointer;
   display: inline-block;
   padding: 9px 12px;
   border-radius: 999px;
   color: #d1fae5;
   background: rgba(6, 95, 70, 0.28);
+  border: 1px solid rgba(16, 185, 129, 0.35);
+}
+
+.season-total:hover {
+  background: rgba(6, 95, 70, 0.4);
+}
+
+button.season-total {
+  background: rgba(6, 95, 70, 0.28);
+  color: #d1fae5;
   border: 1px solid rgba(16, 185, 129, 0.35);
 }
 
@@ -459,16 +470,6 @@ td {
   color: #fef3c7;
   background: linear-gradient(135deg, #a16207, #713f12);
   border-color: rgba(245, 158, 11, 0.35);
-}
-
-.reward-editor {
-  display: block;
-}
-
-.reward-input {
-  min-width: 0;
-  width: 90px;
-  padding: 8px 10px;
 }
 
 ol {

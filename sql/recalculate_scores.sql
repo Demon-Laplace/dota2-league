@@ -11,7 +11,7 @@ begin
   update public.players
   set
     score = 10.00,
-    reward_points = greatest(coalesce(reward_points, 20), 20 + coalesce(reward_floor_bonus, 0)),
+    reward_points = (20 + coalesce(reward_floor_bonus, 0)) + coalesce(reward_extra_points, 0),
     games_played = 0,
     wins = 0,
     losses = 0
@@ -21,7 +21,7 @@ begin
   update public.season_player_stats
   set
     score = 10.00,
-    reward_points = greatest(coalesce(reward_points, 20), 20 + coalesce(reward_floor_bonus, 0)),
+    reward_points = (20 + coalesce(reward_floor_bonus, 0)) + coalesce(reward_extra_points, 0),
     games_played = 0,
     wins = 0,
     losses = 0
@@ -34,6 +34,7 @@ begin
     score,
     reward_points,
     reward_floor_bonus,
+    reward_extra_points,
     games_played,
     wins,
     losses
@@ -42,8 +43,9 @@ begin
     m.season_id,
     mr.player_id,
     10.00,
-    greatest(20, 20 + coalesce(p.reward_floor_bonus, 0)),
+    (20 + coalesce(p.reward_floor_bonus, 0)) + coalesce(p.reward_extra_points, 0),
     coalesce(p.reward_floor_bonus, 0),
+    coalesce(p.reward_extra_points, 0),
     0,
     0,
     0
@@ -86,7 +88,7 @@ begin
   update public.players p
   set
     score = 10.00 + pt.score_delta,
-    reward_points = greatest(coalesce(p.reward_points, 20), 20 + coalesce(p.reward_floor_bonus, 0)),
+    reward_points = (20 + coalesce(p.reward_floor_bonus, 0)) + coalesce(p.reward_extra_points, 0),
     games_played = pt.games_played,
     wins = pt.wins,
     losses = pt.losses
@@ -128,7 +130,7 @@ begin
   update public.season_player_stats sps
   set
     score = 10.00 + st.score_delta,
-    reward_points = greatest(coalesce(sps.reward_points, 20), 20 + coalesce(sps.reward_floor_bonus, 0)),
+    reward_points = (20 + coalesce(sps.reward_floor_bonus, 0)) + coalesce(sps.reward_extra_points, 0),
     games_played = st.games_played,
     wins = st.wins,
     losses = st.losses
