@@ -451,36 +451,36 @@ button:disabled {
 
 .today-players-list {
   list-style: none;
-  margin: 14px 0 0;
+  margin: 12px 0 0;
   padding: 0;
   display: grid;
-  gap: 10px;
+  gap: 8px;
 }
 
 .today-player-item {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  gap: 12px;
+  gap: 10px;
   flex-wrap: wrap;
-  padding: 12px 14px;
+  padding: 9px 12px;
   border: 1px solid var(--border);
-  border-radius: 12px;
+  border-radius: 10px;
   background: var(--panel-soft);
 }
 
 .today-player-main {
   display: flex;
-  gap: 10px;
+  gap: 8px;
   align-items: center;
   flex-wrap: wrap;
 }
 
 .today-player-source {
   display: inline-block;
-  padding: 2px 8px;
+  padding: 1px 7px;
   border-radius: 999px;
-  font-size: 12px;
+  font-size: 11px;
   line-height: 1.5;
   color: #d6e6ff;
   background: rgba(47, 95, 174, 0.22);
@@ -740,7 +740,7 @@ ol {
 .queue-actions {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 8px;
   flex-wrap: wrap;
 }
 
