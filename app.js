@@ -68,6 +68,15 @@ const recordMatchBtn = document.getElementById("recordMatchBtn");
 const recordBackfillBtn = document.getElementById("recordBackfillBtn");
 const recentMatchesList = document.getElementById("recentMatchesList");
 const recentMatchesEmpty = document.getElementById("recentMatchesEmpty");
+const heroPickerModal = document.getElementById("heroPickerModal");
+const heroPickerBackdrop = document.getElementById("heroPickerBackdrop");
+const closeHeroPickerBtn = document.getElementById("closeHeroPickerBtn");
+const heroPickerTitle = document.getElementById("heroPickerTitle");
+const heroPickerSubtitle = document.getElementById("heroPickerSubtitle");
+const heroSelect = document.getElementById("heroSelect");
+const saveHeroBtn = document.getElementById("saveHeroBtn");
+const clearHeroBtn = document.getElementById("clearHeroBtn");
+const heroPickerMessage = document.getElementById("heroPickerMessage");
 
 let seasonPlayers = [];
 let todayPlayers = [];
@@ -88,11 +97,40 @@ let matchTeamSelections = {
   teamA: [],
   teamB: [],
 };
+let backfillTeamSelections = {
+  teamA: [],
+  teamB: [],
+};
+let matchHeroAssignments = {};
+let backfillHeroAssignments = {};
+let heroPickerState = null;
 let realtimeChannel = null;
 let refreshTimer = null;
 let refreshFlushPromise = null;
 const loadingStartedAt = Date.now();
 const REFRESH_DEBOUNCE_MS = 150;
+const DOTA_HEROES = [
+  "Abaddon", "Alchemist", "Ancient Apparition", "Anti-Mage", "Arc Warden", "Axe",
+  "Bane", "Batrider", "Beastmaster", "Bloodseeker", "Bounty Hunter", "Brewmaster",
+  "Bristleback", "Broodmother", "Centaur Warrunner", "Chaos Knight", "Chen", "Clinkz",
+  "Clockwerk", "Crystal Maiden", "Dark Seer", "Dark Willow", "Dawnbreaker", "Dazzle",
+  "Death Prophet", "Disruptor", "Doom", "Dragon Knight", "Drow Ranger", "Earth Spirit",
+  "Earthshaker", "Elder Titan", "Ember Spirit", "Enchantress", "Enigma", "Faceless Void",
+  "Grimstroke", "Gyrocopter", "Hoodwink", "Huskar", "Invoker", "Io", "Jakiro",
+  "Juggernaut", "Keeper of the Light", "Kez", "Kunkka", "Legion Commander", "Leshrac",
+  "Lich", "Lifestealer", "Lina", "Lion", "Lone Druid", "Luna", "Lycan", "Magnus",
+  "Marci", "Mars", "Medusa", "Meepo", "Mirana", "Monkey King", "Morphling", "Muerta",
+  "Naga Siren", "Nature's Prophet", "Necrophos", "Night Stalker", "Nyx Assassin",
+  "Ogre Magi", "Omniknight", "Oracle", "Outworld Destroyer", "Pangolier", "Phantom Assassin",
+  "Phantom Lancer", "Phoenix", "Primal Beast", "Puck", "Pudge", "Pugna", "Queen of Pain",
+  "Razor", "Riki", "Ringmaster", "Rubick", "Sand King", "Shadow Demon", "Shadow Fiend",
+  "Shadow Shaman", "Silencer", "Skywrath Mage", "Slardar", "Slark", "Snapfire", "Sniper",
+  "Spectre", "Spirit Breaker", "Storm Spirit", "Sven", "Techies", "Templar Assassin",
+  "Terrorblade", "Tidehunter", "Timbersaw", "Tinker", "Tiny", "Treant Protector",
+  "Troll Warlord", "Tusk", "Underlord", "Undying", "Ursa", "Vengeful Spirit", "Venomancer",
+  "Viper", "Visage", "Void Spirit", "Warlock", "Weaver", "Windranger", "Winter Wyvern",
+  "Witch Doctor", "Wraith King", "Zeus"
+];
 const refreshState = {
   seasonContext: false,
   playerDriven: false,
@@ -303,6 +341,11 @@ function setBackfillMessage(text, isError = false) {
   backfillMessageEl.className = isError ? "message error" : "message";
 }
 
+function setHeroPickerMessage(text, isError = false) {
+  heroPickerMessage.textContent = text;
+  heroPickerMessage.className = isError ? "message error" : "message";
+}
+
 function setRewardMessage(text, isError = false) {
   rewardMessageEl.textContent = text;
   rewardMessageEl.className = isError ? "message error" : "message";
@@ -433,11 +476,7 @@ function getSelectedMatchPlayerIds() {
 }
 
 function getSelectedBackfillPlayerIds() {
-  return Array.from(
-    document.querySelectorAll("#backfillTeamAFields select, #backfillTeamBFields select")
-  )
-    .map((select) => select.value)
-    .filter(Boolean);
+  return [...backfillTeamSelections.teamA, ...backfillTeamSelections.teamB];
 }
 
 function getTodayMatchPlayers() {
@@ -447,12 +486,18 @@ function getTodayMatchPlayers() {
   }));
 }
 
-function syncMatchTeamSelections() {
-  const todayPlayerIds = new Set(getTodayMatchPlayers().map((player) => player.id));
-  matchTeamSelections.teamA = matchTeamSelections.teamA.filter((playerId) => todayPlayerIds.has(playerId));
-  matchTeamSelections.teamB = matchTeamSelections.teamB.filter(
-    (playerId) => todayPlayerIds.has(playerId) && !matchTeamSelections.teamA.includes(playerId)
+function syncTeamSelections(state, players, assignments = {}) {
+  const playerIds = new Set(players.map((player) => player.id));
+  state.teamA = state.teamA.filter((playerId) => playerIds.has(playerId));
+  state.teamB = state.teamB.filter(
+    (playerId) => playerIds.has(playerId) && !state.teamA.includes(playerId)
   );
+
+  Object.keys(assignments).forEach((playerId) => {
+    if (!state.teamA.includes(playerId) && !state.teamB.includes(playerId)) {
+      delete assignments[playerId];
+    }
+  });
 }
 
 function getSelectableBackfillPlayersForField(currentValue) {
@@ -464,19 +509,44 @@ function getSelectableBackfillPlayersForField(currentValue) {
   return backfillPlayers.filter((player) => !selected.has(player.id) || player.id === currentValue);
 }
 
-function refreshMatchSelectOptions() {
-  syncMatchTeamSelections();
+function buildHeroBadge(heroName) {
+  return heroName
+    ? `<span class="match-picked-hero">${escapeHtml(heroName)}</span>`
+    : '<span class="muted">未选英雄</span>';
+}
 
+function renderTeamSelectionUI({
+  players,
+  selections,
+  assignments,
+  teamAContainer,
+  teamBContainer,
+  formType,
+}) {
+  syncTeamSelections(selections, players, assignments);
   [
-    { container: teamAFields, teamKey: "teamA", title: "天辉方已选" },
-    { container: teamBFields, teamKey: "teamB", title: "夜魇方已选" },
+    { container: teamAContainer, teamKey: "teamA", title: "天辉方已选" },
+    { container: teamBContainer, teamKey: "teamB", title: "夜魇方已选" },
   ].forEach(({ container, teamKey, title }) => {
     const oppositeTeamKey = teamKey === "teamA" ? "teamB" : "teamA";
-    const selectedIds = new Set(matchTeamSelections[teamKey]);
-    const oppositeIds = new Set(matchTeamSelections[oppositeTeamKey]);
-    const selectedPlayers = getTodayMatchPlayers().filter((player) => selectedIds.has(player.id));
+    const selectedIds = new Set(selections[teamKey]);
+    const oppositeIds = new Set(selections[oppositeTeamKey]);
+    const selectedPlayers = players.filter((player) => selectedIds.has(player.id));
     const summaryHtml = selectedPlayers.length
-      ? selectedPlayers.map((player) => `<span class="match-picked-player">${escapeHtml(player.display_name)}</span>`).join("")
+      ? selectedPlayers.map((player) => `
+        <button
+          type="button"
+          class="match-picked-player"
+          data-role="hero-picker"
+          data-form-type="${formType}"
+          data-team="${teamKey}"
+          data-player-id="${player.id}"
+          data-player-name="${escapeHtml(player.display_name)}"
+        >
+          <span>${escapeHtml(player.display_name)}</span>
+          ${buildHeroBadge(assignments[player.id] || "")}
+        </button>
+      `).join("")
       : '<span class="muted">尚未选择队员</span>';
 
     container.innerHTML = `
@@ -488,11 +558,12 @@ function refreshMatchSelectOptions() {
     `;
 
     const pool = container.querySelector(".match-player-pool");
-    getTodayMatchPlayers().forEach((player) => {
+    players.forEach((player) => {
       const chip = document.createElement("button");
       chip.type = "button";
       chip.className = "match-player-chip";
       chip.dataset.team = teamKey;
+      chip.dataset.formType = formType;
       chip.dataset.playerId = player.id;
       chip.textContent = player.display_name;
 
@@ -501,7 +572,7 @@ function refreshMatchSelectOptions() {
       } else if (oppositeIds.has(player.id)) {
         chip.classList.add("match-player-chip-disabled");
         chip.disabled = true;
-      } else if (matchTeamSelections[teamKey].length >= TEAM_SIZE) {
+      } else if (selections[teamKey].length >= TEAM_SIZE) {
         chip.classList.add("match-player-chip-disabled");
         chip.disabled = true;
       }
@@ -511,14 +582,26 @@ function refreshMatchSelectOptions() {
   });
 }
 
+function refreshMatchSelectOptions() {
+  renderTeamSelectionUI({
+    players: getTodayMatchPlayers(),
+    selections: matchTeamSelections,
+    assignments: matchHeroAssignments,
+    teamAContainer: teamAFields,
+    teamBContainer: teamBFields,
+    formType: "match",
+  });
+}
+
 function refreshBackfillSelectOptions() {
-  document
-    .querySelectorAll("#backfillTeamAFields select, #backfillTeamBFields select")
-    .forEach((select) => {
-      const currentValue = select.value;
-      const selectablePlayers = getSelectableBackfillPlayersForField(currentValue);
-      select.innerHTML = buildOptionsFromPlayers(selectablePlayers, currentValue);
-    });
+  renderTeamSelectionUI({
+    players: backfillPlayers,
+    selections: backfillTeamSelections,
+    assignments: backfillHeroAssignments,
+    teamAContainer: backfillTeamAFields,
+    teamBContainer: backfillTeamBFields,
+    formType: "backfill",
+  });
 }
 
 function renderMatchPlayerFields(container, prefix) {
@@ -784,7 +867,6 @@ function renderSignupOptions() {
 }
 
 function renderMatchForm() {
-  syncMatchTeamSelections();
   refreshMatchSelectOptions();
 
   const hasEnoughPlayers = Boolean(activeMatchDay) && todayPlayers.length >= TEAM_SIZE * 2;
@@ -796,7 +878,6 @@ function renderMatchForm() {
 }
 
 function renderBackfillForm() {
-  renderBackfillPlayerFields();
   refreshBackfillSelectOptions();
   backfillSeasonSelect.innerHTML = buildSeasonOptions(allSeasons, backfillSeasonSelect.value);
   const hasEnoughPlayers = backfillPlayers.length >= TEAM_SIZE * 2;
@@ -812,6 +893,7 @@ function clearMatchForm() {
     teamA: [],
     teamB: [],
   };
+  matchHeroAssignments = {};
   winnerSelect.value = "";
   matchNoteInput.value = "";
   refreshMatchSelectOptions();
@@ -819,11 +901,11 @@ function clearMatchForm() {
 }
 
 function clearBackfillForm() {
-  document
-    .querySelectorAll("#backfillTeamAFields select, #backfillTeamBFields select")
-    .forEach((select) => {
-      select.value = "";
-    });
+  backfillTeamSelections = {
+    teamA: [],
+    teamB: [],
+  };
+  backfillHeroAssignments = {};
   backfillWinnerSelect.value = "";
   backfillMatchNoteInput.value = "";
   refreshBackfillSelectOptions();
@@ -1214,6 +1296,22 @@ function renderRecentMatches(data) {
       const teamAPlayers = players.filter((player) => player.team === "A");
       const teamBPlayers = players.filter((player) => player.team === "B");
       const winnerLabel = match.winner_team === "A" ? "天辉方获胜" : "夜魇方获胜";
+      const renderPlayerList = (teamPlayers) => teamPlayers.map((player) => `
+        <li>
+          <button
+            type="button"
+            class="recent-match-player"
+            data-role="saved-hero-picker"
+            data-match-id="${match.match_id}"
+            data-player-id="${player.player_id}"
+            data-player-name="${escapeHtml(player.display_name || "未知选手")}"
+            data-hero-name="${escapeHtml(player.hero_name || "")}"
+          >
+            <span>${escapeHtml(player.display_name || "未知选手")}</span>
+            ${player.hero_name ? `<span class="match-picked-hero">${escapeHtml(player.hero_name)}</span>` : '<span class="muted">未选英雄</span>'}
+          </button>
+        </li>
+      `).join("");
       const card = document.createElement("article");
 
       card.className = "recent-match-card";
@@ -1231,11 +1329,11 @@ function renderRecentMatches(data) {
         <div class="recent-match-teams">
           <div class="recent-match-team">
             <h3>天辉方</h3>
-            <ul>${teamAPlayers.map((player) => `<li>${escapeHtml(player.display_name || "未知选手")}</li>`).join("")}</ul>
+            <ul>${renderPlayerList(teamAPlayers)}</ul>
           </div>
           <div class="recent-match-team">
             <h3>夜魇方</h3>
-            <ul>${teamBPlayers.map((player) => `<li>${escapeHtml(player.display_name || "未知选手")}</li>`).join("")}</ul>
+            <ul>${renderPlayerList(teamBPlayers)}</ul>
           </div>
         </div>
         ${match.note ? `<p class="muted">${escapeHtml(match.note)}</p>` : ""}
@@ -2127,31 +2225,131 @@ async function removeTodayPlayer(entryId, buttonEl) {
   });
 }
 
-function toggleMatchPlayerSelection(teamKey, playerId) {
+function getSelectionStateByFormType(formType) {
+  return formType === "backfill"
+    ? { selections: backfillTeamSelections, assignments: backfillHeroAssignments }
+    : { selections: matchTeamSelections, assignments: matchHeroAssignments };
+}
+
+function rerenderSelectionsByFormType(formType) {
+  if (formType === "backfill") {
+    refreshBackfillSelectOptions();
+    return;
+  }
+
+  refreshMatchSelectOptions();
+}
+
+function togglePlayerSelection(formType, teamKey, playerId) {
   if (!["teamA", "teamB"].includes(teamKey) || !playerId) {
     return;
   }
 
+  const { selections, assignments } = getSelectionStateByFormType(formType);
   const oppositeTeamKey = teamKey === "teamA" ? "teamB" : "teamA";
 
-  if (matchTeamSelections[teamKey].includes(playerId)) {
-    matchTeamSelections[teamKey] = matchTeamSelections[teamKey].filter((id) => id !== playerId);
+  if (selections[teamKey].includes(playerId)) {
+    selections[teamKey] = selections[teamKey].filter((id) => id !== playerId);
+    delete assignments[playerId];
+    rerenderSelectionsByFormType(formType);
+    return;
+  }
+
+  if (selections[oppositeTeamKey].includes(playerId)) {
+    return;
+  }
+
+  if (selections[teamKey].length >= TEAM_SIZE) {
+    if (formType === "backfill") {
+      setBackfillMessage(`每边最多选择 ${TEAM_SIZE} 名选手。`, true);
+    } else {
+      setMatchMessage(`每边最多选择 ${TEAM_SIZE} 名选手。`, true);
+    }
+    return;
+  }
+
+  selections[teamKey] = [...selections[teamKey], playerId];
+  if (formType === "backfill") {
+    setBackfillMessage("");
+  } else {
+    setMatchMessage("");
+  }
+  rerenderSelectionsByFormType(formType);
+}
+
+function renderHeroOptions() {
+  heroSelect.innerHTML = ['<option value="">不选择英雄</option>']
+    .concat(DOTA_HEROES.map((hero) => `<option value="${escapeHtml(hero)}">${escapeHtml(hero)}</option>`))
+    .join("");
+}
+
+function openHeroPicker(state) {
+  heroPickerState = state;
+  heroPickerModal.hidden = false;
+  heroPickerTitle.textContent = `${state.playerName} 的英雄`;
+  heroPickerSubtitle.textContent = state.isSavedMatch
+    ? "可随时补填、修改或清空该选手本场使用的英雄。"
+    : "当前为可选项，可先留空，保存比赛后也能再修改。";
+  heroSelect.value = state.currentHero || "";
+  setHeroPickerMessage("");
+}
+
+function closeHeroPicker() {
+  heroPickerState = null;
+  heroPickerModal.hidden = true;
+  heroSelect.value = "";
+  setHeroPickerMessage("");
+}
+
+async function saveHeroSelection(heroName) {
+  if (!heroPickerState) return;
+
+  const normalizedHero = heroName || null;
+
+  if (heroPickerState.isSavedMatch) {
+    saveHeroBtn.disabled = true;
+    clearHeroBtn.disabled = true;
+    setHeroPickerMessage("正在保存英雄...");
+
+    const { error } = await db.rpc("update_match_result_hero", {
+      p_match_id: heroPickerState.matchId,
+      p_player_id: heroPickerState.playerId,
+      p_hero_name: normalizedHero,
+    });
+
+    saveHeroBtn.disabled = false;
+    clearHeroBtn.disabled = false;
+
+    if (error) {
+      setHeroPickerMessage(`保存英雄失败：${error.message}。请先在 Supabase 执行对应 SQL。`, true);
+      return;
+    }
+
+    closeHeroPicker();
+    requestImmediateRefresh({ recentMatches: true });
+    return;
+  }
+
+  const targetAssignments = heroPickerState.formType === "backfill"
+    ? backfillHeroAssignments
+    : matchHeroAssignments;
+
+  if (normalizedHero) {
+    targetAssignments[heroPickerState.playerId] = normalizedHero;
+  } else {
+    delete targetAssignments[heroPickerState.playerId];
+  }
+
+  if (heroPickerState.formType === "backfill") {
+    refreshBackfillSelectOptions();
+  } else {
     refreshMatchSelectOptions();
-    return;
   }
+  closeHeroPicker();
+}
 
-  if (matchTeamSelections[oppositeTeamKey].includes(playerId)) {
-    return;
-  }
-
-  if (matchTeamSelections[teamKey].length >= TEAM_SIZE) {
-    setMatchMessage(`每边最多选择 ${TEAM_SIZE} 名选手。`, true);
-    return;
-  }
-
-  matchTeamSelections[teamKey] = [...matchTeamSelections[teamKey], playerId];
-  setMatchMessage("");
-  refreshMatchSelectOptions();
+function getHeroAssignmentsForSelectedPlayers(teamIds, assignments) {
+  return teamIds.map((playerId) => assignments[playerId] || null);
 }
 
 function getSelectedTeamIds(prefix) {
@@ -2226,7 +2424,7 @@ async function recordMatch() {
   recordMatchBtn.disabled = true;
   setMatchMessage("正在记录比赛...");
 
-  const { error } = await db.rpc("record_match_result", {
+  const { data: matchId, error } = await db.rpc("record_match_result", {
     p_team_a_player_ids: teamAIds,
     p_team_b_player_ids: teamBIds,
     p_winner_team: winner,
@@ -2245,6 +2443,22 @@ async function recordMatch() {
     return;
   }
 
+  const matchHeroRows = [
+    ...teamAIds.map((playerId) => ({ player_id: playerId, hero_name: matchHeroAssignments[playerId] || null })),
+    ...teamBIds.map((playerId) => ({ player_id: playerId, hero_name: matchHeroAssignments[playerId] || null })),
+  ].filter((item) => item.hero_name);
+
+  if (matchHeroRows.length) {
+    const { error: heroError } = await db.rpc("update_match_result_heroes", {
+      p_match_id: matchId,
+      p_assignments: matchHeroRows,
+    });
+
+    if (heroError) {
+      setMatchMessage(`比赛已保存，但英雄信息保存失败：${heroError.message}。请先在 Supabase 执行对应 SQL。`, true);
+    }
+  }
+
   clearMatchForm();
   setMatchFormOpen(false);
   renderMatchForm();
@@ -2256,8 +2470,8 @@ async function recordMatch() {
 }
 
 async function recordBackfillMatch() {
-  const teamAIds = Array.from(document.querySelectorAll('select[data-team="backfillTeamA"]')).map((select) => select.value);
-  const teamBIds = Array.from(document.querySelectorAll('select[data-team="backfillTeamB"]')).map((select) => select.value);
+  const teamAIds = [...backfillTeamSelections.teamA];
+  const teamBIds = [...backfillTeamSelections.teamB];
   const validationError = validateBackfillPlayers(teamAIds, teamBIds);
 
   if (validationError) {
@@ -2268,7 +2482,7 @@ async function recordBackfillMatch() {
   recordBackfillBtn.disabled = true;
   setBackfillMessage("正在补录比赛...");
 
-  const { error } = await db.rpc("record_match_result_backfill", {
+  const { data: matchId, error } = await db.rpc("record_match_result_backfill", {
     p_team_a_player_ids: teamAIds,
     p_team_b_player_ids: teamBIds,
     p_winner_team: backfillWinnerSelect.value,
@@ -2283,6 +2497,22 @@ async function recordBackfillMatch() {
   if (error) {
     setBackfillMessage(`补录比赛失败：${error.message}。请先在 Supabase 执行对应 SQL。`, true);
     return;
+  }
+
+  const backfillHeroRows = [
+    ...teamAIds.map((playerId) => ({ player_id: playerId, hero_name: backfillHeroAssignments[playerId] || null })),
+    ...teamBIds.map((playerId) => ({ player_id: playerId, hero_name: backfillHeroAssignments[playerId] || null })),
+  ].filter((item) => item.hero_name);
+
+  if (backfillHeroRows.length) {
+    const { error: heroError } = await db.rpc("update_match_result_heroes", {
+      p_match_id: matchId,
+      p_assignments: backfillHeroRows,
+    });
+
+    if (heroError) {
+      setBackfillMessage(`补录比赛已保存，但英雄信息保存失败：${heroError.message}。请先在 Supabase 执行对应 SQL。`, true);
+    }
   }
 
   clearBackfillForm();
@@ -2490,22 +2720,48 @@ closeBackfillFormBtn.addEventListener("click", () => {
 });
 
 matchFormPanel.addEventListener("click", (event) => {
+  const heroButton = event.target.closest('[data-role="hero-picker"]');
+  if (heroButton) {
+    openHeroPicker({
+      formType: "match",
+      playerId: heroButton.dataset.playerId,
+      playerName: heroButton.dataset.playerName,
+      currentHero: matchHeroAssignments[heroButton.dataset.playerId] || "",
+      isSavedMatch: false,
+    });
+    return;
+  }
+
   const chip = event.target.closest(".match-player-chip");
   if (!chip || chip.disabled) return;
 
-  toggleMatchPlayerSelection(chip.dataset.team, chip.dataset.playerId);
+  togglePlayerSelection(chip.dataset.formType || "match", chip.dataset.team, chip.dataset.playerId);
 });
 
 backfillFormPanel.addEventListener("change", async (event) => {
   if (event.target === backfillSeasonSelect) {
     clearBackfillForm();
     await loadPlayersForSeason(backfillSeasonSelect.value);
+  }
+});
+
+backfillFormPanel.addEventListener("click", (event) => {
+  const heroButton = event.target.closest('[data-role="hero-picker"]');
+  if (heroButton) {
+    openHeroPicker({
+      formType: "backfill",
+      playerId: heroButton.dataset.playerId,
+      playerName: heroButton.dataset.playerName,
+      currentHero: backfillHeroAssignments[heroButton.dataset.playerId] || "",
+      isSavedMatch: false,
+    });
     return;
   }
 
-  if (event.target.matches("#backfillTeamAFields select, #backfillTeamBFields select")) {
-    refreshBackfillSelectOptions();
-  }
+  const chip = event.target.closest(".match-player-chip");
+  if (!chip || chip.disabled) return;
+
+  togglePlayerSelection(chip.dataset.formType || "backfill", chip.dataset.team, chip.dataset.playerId);
 });
 
 queueList.addEventListener("click", async (event) => {
@@ -2574,6 +2830,18 @@ todayPlayersList.addEventListener("click", async (event) => {
 });
 
 recentMatchesList.addEventListener("click", async (event) => {
+  const playerButton = event.target.closest('[data-role="saved-hero-picker"]');
+  if (playerButton) {
+    openHeroPicker({
+      matchId: playerButton.dataset.matchId,
+      playerId: playerButton.dataset.playerId,
+      playerName: playerButton.dataset.playerName,
+      currentHero: playerButton.dataset.heroName || "",
+      isSavedMatch: true,
+    });
+    return;
+  }
+
   const button = event.target.closest(".delete-match-btn");
   if (!button) return;
 
@@ -2639,12 +2907,29 @@ rewardLogsList.addEventListener("click", async (event) => {
   );
 });
 
+closeHeroPickerBtn.addEventListener("click", closeHeroPicker);
+heroPickerBackdrop.addEventListener("click", closeHeroPicker);
+saveHeroBtn.addEventListener("click", async () => {
+  await saveHeroSelection(heroSelect.value);
+});
+clearHeroBtn.addEventListener("click", async () => {
+  heroSelect.value = "";
+  await saveHeroSelection("");
+});
+
+document.addEventListener("keydown", (event) => {
+  if (event.key === "Escape" && !heroPickerModal.hidden) {
+    closeHeroPicker();
+  }
+});
+
 async function init() {
   try {
     setMatchFormOpen(false);
     setBackfillFormOpen(false);
     setSeasonPanelOpen(false);
     setRewardPanelOpen(false);
+    renderHeroOptions();
     matchStartTimeInput.value = formatTime24(readStoredMatchDayStartTime()?.startTime || "");
     backfillDateInput.value = getBeijingBusinessDateString();
     renderMatchForm();

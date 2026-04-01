@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Dota2 宁德联赛</title>
-  <link rel="stylesheet" href="style.css?v=20260402-5" />
+  <link rel="stylesheet" href="style.css?v=20260402-6" />
 </head>
 <body>
   <div id="loadingScreen" class="loading-screen" aria-live="polite">
@@ -207,7 +207,30 @@
     </div>
   </main>
 
+  <div id="heroPickerModal" class="hero-picker-modal" hidden>
+    <div id="heroPickerBackdrop" class="hero-picker-backdrop"></div>
+    <div class="hero-picker-dialog" role="dialog" aria-modal="true" aria-labelledby="heroPickerTitle">
+      <div class="section-head">
+        <div>
+          <h2 id="heroPickerTitle">选择英雄</h2>
+          <p id="heroPickerSubtitle" class="muted">可直接留空，后续也能补填。</p>
+        </div>
+        <button id="closeHeroPickerBtn" class="button-secondary" type="button">关闭</button>
+      </div>
+      <div class="row">
+        <select id="heroSelect">
+          <option value="">不选择英雄</option>
+        </select>
+      </div>
+      <div class="row">
+        <button id="saveHeroBtn" type="button">保存英雄</button>
+        <button id="clearHeroBtn" class="button-secondary" type="button">清空英雄</button>
+      </div>
+      <p id="heroPickerMessage" class="message"></p>
+    </div>
+  </div>
+
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="app.js?v=20260402-5"></script>
+  <script src="app.js?v=20260402-6"></script>
 </body>
 </html>

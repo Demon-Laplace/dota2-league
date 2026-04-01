@@ -533,12 +533,14 @@ button:disabled {
 .match-picked-player {
   display: inline-flex;
   align-items: center;
-  padding: 2px 8px;
+  gap: 6px;
+  padding: 4px 9px;
   border-radius: 999px;
   font-size: 12px;
   color: #dff0ff;
   background: rgba(47, 95, 174, 0.24);
   border: 1px solid rgba(86, 166, 255, 0.28);
+  box-shadow: none;
 }
 
 .match-player-pool {
@@ -569,6 +571,17 @@ button:disabled {
 
 .match-player-chip-disabled {
   opacity: 0.34;
+}
+
+.match-picked-hero {
+  display: inline-flex;
+  align-items: center;
+  padding: 1px 6px;
+  border-radius: 999px;
+  font-size: 11px;
+  color: #fff2d2;
+  background: rgba(104, 73, 27, 0.36);
+  border: 1px solid rgba(240, 195, 106, 0.34);
 }
 
 .team-fields select {
@@ -662,6 +675,24 @@ button:disabled {
 .recent-match-team ul {
   margin: 0;
   padding-left: 18px;
+}
+
+.recent-match-player {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0;
+  color: var(--text);
+  background: transparent;
+  border: 0;
+  box-shadow: none;
+}
+
+.recent-match-player:hover:not(:disabled) {
+  transform: none;
+  filter: none;
+  text-decoration: underline;
+  text-decoration-color: rgba(150, 206, 255, 0.5);
 }
 
 .winner-badge {
@@ -823,6 +854,38 @@ ol {
   color: #d8fbf3;
   background: var(--teal-soft);
   border-color: rgba(99, 213, 208, 0.3);
+}
+
+.hero-picker-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 1100;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+}
+
+.hero-picker-backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(3, 11, 22, 0.72);
+  backdrop-filter: blur(8px);
+}
+
+.hero-picker-dialog {
+  position: relative;
+  z-index: 1;
+  width: min(480px, 100%);
+  padding: 20px;
+  border-radius: 18px;
+  background: linear-gradient(180deg, rgba(13, 30, 52, 0.96), rgba(8, 22, 40, 0.92));
+  border: 1px solid var(--border-strong);
+  box-shadow: var(--shadow);
+}
+
+.hero-picker-dialog select {
+  width: 100%;
+  min-width: 0;
 }
 
 @media (max-width: 720px) {

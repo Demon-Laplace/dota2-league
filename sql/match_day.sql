@@ -240,7 +240,8 @@ select
       'player_id', mr.player_id,
       'team', mr.team,
       'is_winner', mr.is_winner,
-      'display_name', p.display_name
+      'display_name', p.display_name,
+      'hero_name', mr.hero_name
     )
     order by mr.team, p.display_name
   ) as players

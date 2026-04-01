@@ -2,6 +2,9 @@ begin;
 
 create extension if not exists pgcrypto;
 
+alter table public.match_results
+add column if not exists hero_name text;
+
 create or replace function public.record_match_result(
   p_team_a_player_ids uuid[],
   p_team_b_player_ids uuid[],
@@ -399,6 +402,60 @@ $$;
 grant execute on function public.record_match_result_backfill(uuid[], uuid[], text, uuid, date, text, uuid)
 to anon, authenticated;
 
+create or replace function public.update_match_result_hero(
+  p_match_id uuid,
+  p_player_id uuid,
+  p_hero_name text default null
+)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  update public.match_results
+  set hero_name = nullif(trim(coalesce(p_hero_name, '')), '')
+  where match_id = p_match_id
+    and player_id = p_player_id;
+
+  if not found then
+    raise exception '未找到对应的比赛选手记录';
+  end if;
+end;
+$$;
+
+create or replace function public.update_match_result_heroes(
+  p_match_id uuid,
+  p_assignments jsonb default '[]'::jsonb
+)
+returns integer
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_updated_count integer := 0;
+begin
+  with payload as (
+    select
+      (value ->> 'player_id')::uuid as player_id,
+      nullif(trim(coalesce(value ->> 'hero_name', '')), '') as hero_name
+    from jsonb_array_elements(coalesce(p_assignments, '[]'::jsonb))
+  )
+  update public.match_results mr
+  set hero_name = payload.hero_name
+  from payload
+  where mr.match_id = p_match_id
+    and mr.player_id = payload.player_id;
+
+  get diagnostics v_updated_count = row_count;
+
+  return v_updated_count;
+end;
+$$;
+
 grant select on public.recent_matches to anon, authenticated;
+grant execute on function public.update_match_result_hero(uuid, uuid, text) to anon, authenticated;
+grant execute on function public.update_match_result_heroes(uuid, jsonb) to anon, authenticated;
 
 commit;
