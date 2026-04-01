@@ -7,6 +7,12 @@ const db = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 const playerSelect = document.getElementById("playerSelect");
 const signupBtn = document.getElementById("signupBtn");
 const messageEl = document.getElementById("message");
+const seasonToggleBtn = document.getElementById("seasonToggleBtn");
+const seasonPlayersPanel = document.getElementById("seasonPlayersPanel");
+const seasonPanelTitle = document.getElementById("seasonPanelTitle");
+const seasonPlayersCount = document.getElementById("seasonPlayersCount");
+const seasonPlayersList = document.getElementById("seasonPlayersList");
+const seasonPlayersEmpty = document.getElementById("seasonPlayersEmpty");
 const startMatchDayBtn = document.getElementById("startMatchDayBtn");
 const matchDayStatus = document.getElementById("matchDayStatus");
 const matchDayInfo = document.getElementById("matchDayInfo");
@@ -40,6 +46,7 @@ let queueEntries = [];
 let activeSeason = null;
 let activeMatchDay = null;
 let isMatchFormOpen = false;
+let isSeasonPanelOpen = false;
 
 function setMessage(text, isError = false) {
   messageEl.textContent = text;
@@ -56,6 +63,12 @@ function setMatchFormOpen(isOpen) {
   matchFormPanel.hidden = !isOpen;
   openMatchFormBtn.textContent = isOpen ? "正在录入比赛" : "添加一场比赛记录";
   openMatchFormBtn.disabled = isOpen || !activeMatchDay || todayPlayers.length < TEAM_SIZE * 2;
+}
+
+function setSeasonPanelOpen(isOpen) {
+  isSeasonPanelOpen = isOpen;
+  seasonPlayersPanel.hidden = !isOpen;
+  seasonToggleBtn.setAttribute("aria-expanded", String(isOpen));
 }
 
 function escapeHtml(str) {
@@ -169,12 +182,35 @@ function renderMatchPlayerFields(container, prefix) {
 }
 
 function updateSeasonInfo() {
+  const seasonName = activeSeason?.name || "未识别";
+
   if (activeSeason?.name) {
     seasonInfoEl.textContent = `当前赛季：${activeSeason.name}`;
+  } else {
+    seasonInfoEl.textContent = "当前未识别到赛季，将使用全局玩家名单。";
+  }
+
+  seasonToggleBtn.textContent = `当前赛季：${seasonName}`;
+  seasonPanelTitle.textContent = `${seasonName} 选手名单`;
+}
+
+function renderSeasonPlayersPanel() {
+  seasonPlayersList.innerHTML = "";
+  seasonPlayersCount.textContent = `${seasonPlayers.length} 人`;
+
+  if (seasonPlayers.length === 0) {
+    seasonPlayersEmpty.style.display = "block";
     return;
   }
 
-  seasonInfoEl.textContent = "当前未识别到赛季，将使用全局玩家名单。";
+  seasonPlayersEmpty.style.display = "none";
+
+  seasonPlayers.forEach((player) => {
+    const item = document.createElement("div");
+    item.className = "season-player-item";
+    item.innerHTML = `<strong>${escapeHtml(player.display_name)}</strong>`;
+    seasonPlayersList.appendChild(item);
+  });
 }
 
 function renderMatchDayStatus() {
@@ -513,6 +549,7 @@ async function loadSeasonPlayers() {
 
   if (result.error) {
     seasonPlayers = [];
+    renderSeasonPlayersPanel();
     playerSelect.innerHTML = '<option value="">加载失败</option>';
     renderSignupOptions();
     renderMatchForm();
@@ -524,6 +561,7 @@ async function loadSeasonPlayers() {
     id: player.player_id || player.id,
     display_name: player.display_name,
   }));
+  renderSeasonPlayersPanel();
 }
 
 async function loadTodayPlayers() {
@@ -1077,6 +1115,9 @@ function subscribeRealtime() {
 }
 
 signupBtn.addEventListener("click", signup);
+seasonToggleBtn.addEventListener("click", () => {
+  setSeasonPanelOpen(!isSeasonPanelOpen);
+});
 startMatchDayBtn.addEventListener("click", startMatchDay);
 confirmQueueBtn.addEventListener("click", confirmQueueToTodayPlayers);
 clearQueueBtn.addEventListener("click", clearSignupQueueForTesting);
@@ -1139,7 +1180,9 @@ recentMatchesList.addEventListener("click", async (event) => {
 
 async function init() {
   setMatchFormOpen(false);
+  setSeasonPanelOpen(false);
   renderMatchForm();
+  renderSeasonPlayersPanel();
   updateSeasonInfo();
   renderMatchDayStatus();
   await loadActiveSeason();
