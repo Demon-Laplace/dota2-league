@@ -23,6 +23,13 @@ body {
   flex-wrap: wrap;
 }
 
+.page-head-meta {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
 .layout {
   display: grid;
   grid-template-columns: minmax(320px, 430px) minmax(0, 1fr);
@@ -59,6 +66,15 @@ h1 {
 
 .season-chip:hover {
   background: rgba(37, 99, 235, 0.22);
+}
+
+.season-total {
+  display: inline-block;
+  padding: 9px 12px;
+  border-radius: 999px;
+  color: #d1fae5;
+  background: rgba(6, 95, 70, 0.28);
+  border: 1px solid rgba(16, 185, 129, 0.35);
 }
 
 .season-panel {

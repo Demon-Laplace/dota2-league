@@ -13,6 +13,7 @@ const seasonPanelTitle = document.getElementById("seasonPanelTitle");
 const seasonPlayersCount = document.getElementById("seasonPlayersCount");
 const seasonPlayersList = document.getElementById("seasonPlayersList");
 const seasonPlayersEmpty = document.getElementById("seasonPlayersEmpty");
+const seasonRewardTotal = document.getElementById("seasonRewardTotal");
 const resetSeasonBtn = document.getElementById("resetSeasonBtn");
 const startMatchDayBtn = document.getElementById("startMatchDayBtn");
 const matchStartTimeInput = document.getElementById("matchStartTimeInput");
@@ -295,6 +296,15 @@ function updateSeasonInfo() {
   seasonPanelTitle.textContent = `${seasonName} 选手名单`;
 }
 
+function updateSeasonRewardTotal(total) {
+  if (total == null) {
+    seasonRewardTotal.textContent = "本赛季赞助总额：--";
+    return;
+  }
+
+  seasonRewardTotal.textContent = `本赛季赞助总额：${formatScore(total)}`;
+}
+
 function renderSeasonPlayersPanel() {
   seasonPlayersList.innerHTML = "";
   seasonPlayersCount.textContent = `${seasonPlayers.length} 人`;
@@ -536,11 +546,18 @@ function renderLeaderboard(data) {
   leaderboardBody.innerHTML = "";
 
   if (!data || data.length === 0) {
+    updateSeasonRewardTotal(0);
     const tr = document.createElement("tr");
     tr.innerHTML = '<td colspan="5" class="muted">暂无排行榜数据</td>';
     leaderboardBody.appendChild(tr);
     return;
   }
+
+  const rewardTotal = data.reduce(
+    (sum, player) => sum + Number(player.reward_points ?? 0),
+    0
+  );
+  updateSeasonRewardTotal(rewardTotal);
 
   data.forEach((player, idx) => {
     const tr = document.createElement("tr");
@@ -855,6 +872,7 @@ async function loadLeaderboard() {
   if (result.error) {
     console.error("加载排行榜失败：", result.error);
     setMessage(`加载排行榜失败：${result.error.message}`, true);
+    updateSeasonRewardTotal(null);
     renderLeaderboard([]);
     return;
   }

@@ -4,15 +4,18 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Dota2 宁德联赛</title>
-  <link rel="stylesheet" href="style.css?v=20260401-11" />
+  <link rel="stylesheet" href="style.css?v=20260401-12" />
 </head>
 <body>
   <main class="container">
     <div class="page-head">
       <h1>Dota2 宁德联赛</h1>
-      <button id="seasonToggleBtn" class="season-chip" type="button" aria-expanded="false">
-        当前赛季：加载中...
-      </button>
+      <div class="page-head-meta">
+        <button id="seasonToggleBtn" class="season-chip" type="button" aria-expanded="false">
+          当前赛季：加载中...
+        </button>
+        <span id="seasonRewardTotal" class="season-total">本赛季赞助总额：--</span>
+      </div>
     </div>
     <p class="sub">测试版：报名队列 + 积分榜</p>
     <section id="seasonPlayersPanel" class="season-panel" hidden>
@@ -175,6 +178,6 @@
   </main>
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="app.js?v=20260401-11"></script>
+  <script src="app.js?v=20260401-12"></script>
 </body>
 </html>
