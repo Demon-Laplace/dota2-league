@@ -7,6 +7,9 @@ const db = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 const playerSelect = document.getElementById("playerSelect");
 const signupBtn = document.getElementById("signupBtn");
 const messageEl = document.getElementById("message");
+const openMatchFormBtn = document.getElementById("openMatchFormBtn");
+const closeMatchFormBtn = document.getElementById("closeMatchFormBtn");
+const matchFormPanel = document.getElementById("matchFormPanel");
 const matchMessageEl = document.getElementById("matchMessage");
 const seasonInfoEl = document.getElementById("seasonInfo");
 const teamAFields = document.getElementById("teamAFields");
@@ -20,6 +23,7 @@ const leaderboardBody = document.getElementById("leaderboardBody");
 
 let availablePlayers = [];
 let activeSeason = null;
+let isMatchFormOpen = false;
 
 function setMessage(text, isError = false) {
   messageEl.textContent = text;
@@ -29,6 +33,13 @@ function setMessage(text, isError = false) {
 function setMatchMessage(text, isError = false) {
   matchMessageEl.textContent = text;
   matchMessageEl.className = isError ? "message error" : "message";
+}
+
+function setMatchFormOpen(isOpen) {
+  isMatchFormOpen = isOpen;
+  matchFormPanel.hidden = !isOpen;
+  openMatchFormBtn.textContent = isOpen ? "正在录入比赛" : "添加一场比赛记录";
+  openMatchFormBtn.disabled = isOpen || availablePlayers.length === 0;
 }
 
 function escapeHtml(str) {
@@ -126,6 +137,8 @@ function renderMatchForm() {
   winnerSelect.disabled = !hasPlayers;
   matchNoteInput.disabled = !hasPlayers;
   recordMatchBtn.disabled = !hasPlayers;
+  closeMatchFormBtn.disabled = !hasPlayers;
+  openMatchFormBtn.disabled = isMatchFormOpen || !hasPlayers;
 }
 
 function getSelectedTeamIds(prefix) {
@@ -140,8 +153,9 @@ function clearMatchForm() {
     .forEach((select) => {
       select.value = "";
     });
-  winnerSelect.value = "A";
+  winnerSelect.value = "";
   matchNoteInput.value = "";
+  setMatchMessage("");
 }
 
 function renderQueue(data) {
@@ -437,6 +451,10 @@ async function cancelSignupByEntry(entryId, playerName, buttonEl) {
 }
 
 function validateMatchPlayers(teamAIds, teamBIds) {
+  if (!winnerSelect.value) {
+    return "请选择胜方。";
+  }
+
   if (teamAIds.some((id) => !id) || teamBIds.some((id) => !id)) {
     return "请为两队各选择 5 名选手。";
   }
@@ -485,6 +503,8 @@ async function recordMatch() {
   }
 
   clearMatchForm();
+  setMatchFormOpen(false);
+  renderMatchForm();
   setMatchMessage("比赛记录成功，积分榜已刷新。");
   await loadLeaderboard();
 }
@@ -507,6 +527,16 @@ function subscribeQueueChanges() {
 
 signupBtn.addEventListener("click", signup);
 recordMatchBtn.addEventListener("click", recordMatch);
+openMatchFormBtn.addEventListener("click", () => {
+  clearMatchForm();
+  setMatchFormOpen(true);
+  renderMatchForm();
+});
+closeMatchFormBtn.addEventListener("click", () => {
+  clearMatchForm();
+  setMatchFormOpen(false);
+  renderMatchForm();
+});
 
 queueList.addEventListener("click", async (event) => {
   const button = event.target.closest(".queue-cancel-btn");
@@ -523,6 +553,7 @@ queueList.addEventListener("click", async (event) => {
 });
 
 async function init() {
+  setMatchFormOpen(false);
   renderMatchForm();
   updateSeasonInfo();
   await loadActiveSeason();
