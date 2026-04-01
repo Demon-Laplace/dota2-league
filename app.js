@@ -789,11 +789,19 @@ function clearBackfillForm() {
   setBackfillMessage("");
 }
 
+function getQueueReadyEntries() {
+  return todayPlayers.filter((player) => player.source === "queue");
+}
+
+function getQueueReadyEntryByPlayerId(playerId) {
+  return getQueueReadyEntries().find((player) => (player.player_id || player.id) === playerId) || null;
+}
+
 function renderQueue(data) {
   queueList.innerHTML = "";
   const allRows = data || [];
-  const activeRows = allRows.filter((row) => row.is_active === true);
-  confirmQueueBtn.disabled = activeRows.length < 10;
+  const readyEntries = getQueueReadyEntries();
+  confirmQueueBtn.disabled = readyEntries.length < 10;
 
   const visibleRows = allRows.filter((row) =>
     row.is_active === true || row.status === "cancelled"
@@ -808,7 +816,6 @@ function renderQueue(data) {
 
   const sortedData = sortQueueEntries(visibleRows);
   let activeCount = 0;
-  const todayPlayerIds = new Set(todayPlayers.map((player) => player.player_id || player.id));
 
   sortedData.forEach((row) => {
     const li = document.createElement("li");
@@ -825,10 +832,13 @@ function renderQueue(data) {
       : time
         ? `报名于 ${time}`
         : "";
-    const hasArrived = todayPlayerIds.has(row.player_id);
+    const readyEntry = getQueueReadyEntryByPlayerId(row.player_id);
+    const hasArrived = Boolean(readyEntry);
     const actionHtml = isCancelled
       ? `<button class="button-secondary queue-resignup-btn" data-entry-id="${row.id}" data-player-name="${escapeHtml(playerName)}">重新报名</button>`
-      : `<button class="button-secondary queue-ready-btn" data-entry-id="${row.id}" data-player-id="${row.player_id}" data-player-name="${escapeHtml(playerName)}" ${hasArrived ? "disabled" : ""}>${hasArrived ? "已就位" : "就位"}</button>`;
+      : hasArrived
+        ? `<button class="button-danger queue-unready-btn" data-roster-entry-id="${readyEntry.id}" data-player-name="${escapeHtml(playerName)}">取消就位</button>`
+        : `<button class="button-secondary queue-ready-btn" data-entry-id="${row.id}" data-player-id="${row.player_id}" data-player-name="${escapeHtml(playerName)}">就位</button>`;
     let laneLabel = "";
 
     if (!isCancelled) {
@@ -1970,6 +1980,31 @@ async function markQueuePlayerReady(playerId, playerName, buttonEl) {
   setMessage(`${playerName || "该玩家"} 已开机入场。`);
 }
 
+async function cancelQueuePlayerReady(entryId, playerName, buttonEl) {
+  if (!entryId) {
+    setMessage("缺少就位记录，无法取消。", true);
+    return;
+  }
+
+  if (buttonEl) {
+    buttonEl.disabled = true;
+  }
+
+  setMessage(`正在取消 ${playerName || "该玩家"} 的就位状态...`);
+
+  const { error } = await db.from("daily_player_roster").delete().eq("id", entryId);
+
+  if (error) {
+    if (buttonEl) {
+      buttonEl.disabled = false;
+    }
+    setMessage(`取消就位失败：${error.message}`, true);
+    return;
+  }
+
+  setMessage(`${playerName || "该玩家"} 已取消就位。`);
+}
+
 async function removeTodayPlayer(entryId, buttonEl) {
   if (!entryId) return;
 
@@ -2339,6 +2374,16 @@ queueList.addEventListener("click", async (event) => {
       reSignupButton.dataset.entryId,
       reSignupButton.dataset.playerName,
       reSignupButton
+    );
+    return;
+  }
+
+  const unreadyButton = event.target.closest(".queue-unready-btn");
+  if (unreadyButton) {
+    await cancelQueuePlayerReady(
+      unreadyButton.dataset.rosterEntryId,
+      unreadyButton.dataset.playerName,
+      unreadyButton
     );
     return;
   }
