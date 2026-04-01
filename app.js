@@ -233,6 +233,16 @@ function formatLocalTime(value) {
   return date.toLocaleString("zh-CN", { hour12: false });
 }
 
+function formatArchiveDate(value) {
+  if (!value) return "";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
 function getBeijingBusinessDateString() {
   const now = new Date();
   const beijing = new Date(
@@ -1004,7 +1014,7 @@ function renderRecentMatches(data) {
   const groups = new Map();
 
   data.forEach((match) => {
-    const key = match.match_date || "未分组";
+    const key = match.match_date || formatArchiveDate(match.created_at) || "历史比赛";
     if (!groups.has(key)) {
       groups.set(key, []);
     }
