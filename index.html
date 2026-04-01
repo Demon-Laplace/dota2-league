@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Dota2 宁德联赛</title>
-  <link rel="stylesheet" href="style.css?v=20260401-7" />
+  <link rel="stylesheet" href="style.css?v=20260401-8" />
 </head>
 <body>
   <main class="container">
@@ -98,7 +98,10 @@
         <section class="card">
           <div class="section-head">
             <h2>比赛记录</h2>
-            <button id="openMatchFormBtn">添加一场比赛记录</button>
+            <div class="row">
+              <button id="openMatchFormBtn">添加一场比赛记录</button>
+              <button id="openBackfillFormBtn" class="button-secondary">比赛补登</button>
+            </div>
           </div>
           <div id="matchFormPanel" class="match-form-panel" hidden>
             <p id="seasonInfo" class="muted"></p>
@@ -126,6 +129,38 @@
             </div>
             <p id="matchMessage" class="message"></p>
           </div>
+          <div id="backfillFormPanel" class="match-form-panel" hidden>
+            <p class="muted">用于补录漏记的历史比赛，可选择赛季和日期。</p>
+            <div class="row">
+              <select id="backfillSeasonSelect">
+                <option value="">请选择赛季</option>
+              </select>
+              <input id="backfillDateInput" type="date" />
+            </div>
+            <div class="match-grid">
+              <div class="team-panel">
+                <h3>天辉方</h3>
+                <div id="backfillTeamAFields" class="team-fields"></div>
+              </div>
+              <div class="team-panel">
+                <h3>夜魇方</h3>
+                <div id="backfillTeamBFields" class="team-fields"></div>
+              </div>
+            </div>
+            <div class="row">
+              <select id="backfillWinnerSelect">
+                <option value="">请选择胜方</option>
+                <option value="A">天辉方获胜</option>
+                <option value="B">夜魇方获胜</option>
+              </select>
+              <input id="backfillMatchNote" type="text" placeholder="补登备注，可选" />
+            </div>
+            <div class="row">
+              <button id="recordBackfillBtn">保存补登比赛</button>
+              <button id="closeBackfillFormBtn" class="button-secondary">收起</button>
+            </div>
+            <p id="backfillMessage" class="message"></p>
+          </div>
         </section>
 
         <section class="card">
@@ -138,6 +173,6 @@
   </main>
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="app.js?v=20260401-7"></script>
+  <script src="app.js?v=20260401-8"></script>
 </body>
 </html>

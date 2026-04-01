@@ -29,15 +29,26 @@ const todayPlayersEmpty = document.getElementById("todayPlayersEmpty");
 const todayPlayersCount = document.getElementById("todayPlayersCount");
 const leaderboardBody = document.getElementById("leaderboardBody");
 const openMatchFormBtn = document.getElementById("openMatchFormBtn");
+const openBackfillFormBtn = document.getElementById("openBackfillFormBtn");
 const closeMatchFormBtn = document.getElementById("closeMatchFormBtn");
+const closeBackfillFormBtn = document.getElementById("closeBackfillFormBtn");
 const matchFormPanel = document.getElementById("matchFormPanel");
+const backfillFormPanel = document.getElementById("backfillFormPanel");
 const matchMessageEl = document.getElementById("matchMessage");
+const backfillMessageEl = document.getElementById("backfillMessage");
 const seasonInfoEl = document.getElementById("seasonInfo");
 const teamAFields = document.getElementById("teamAFields");
 const teamBFields = document.getElementById("teamBFields");
+const backfillTeamAFields = document.getElementById("backfillTeamAFields");
+const backfillTeamBFields = document.getElementById("backfillTeamBFields");
 const winnerSelect = document.getElementById("winnerSelect");
+const backfillWinnerSelect = document.getElementById("backfillWinnerSelect");
 const matchNoteInput = document.getElementById("matchNote");
+const backfillSeasonSelect = document.getElementById("backfillSeasonSelect");
+const backfillDateInput = document.getElementById("backfillDateInput");
+const backfillMatchNoteInput = document.getElementById("backfillMatchNote");
 const recordMatchBtn = document.getElementById("recordMatchBtn");
+const recordBackfillBtn = document.getElementById("recordBackfillBtn");
 const recentMatchesList = document.getElementById("recentMatchesList");
 const recentMatchesEmpty = document.getElementById("recentMatchesEmpty");
 
@@ -46,7 +57,10 @@ let todayPlayers = [];
 let queueEntries = [];
 let activeSeason = null;
 let activeMatchDay = null;
+let allSeasons = [];
+let backfillPlayers = [];
 let isMatchFormOpen = false;
+let isBackfillFormOpen = false;
 let isSeasonPanelOpen = false;
 
 function setMessage(text, isError = false) {
@@ -59,11 +73,22 @@ function setMatchMessage(text, isError = false) {
   matchMessageEl.className = isError ? "message error" : "message";
 }
 
+function setBackfillMessage(text, isError = false) {
+  backfillMessageEl.textContent = text;
+  backfillMessageEl.className = isError ? "message error" : "message";
+}
+
 function setMatchFormOpen(isOpen) {
   isMatchFormOpen = isOpen;
   matchFormPanel.hidden = !isOpen;
   openMatchFormBtn.textContent = isOpen ? "正在录入比赛" : "添加一场比赛记录";
   openMatchFormBtn.disabled = isOpen || !activeMatchDay || todayPlayers.length < TEAM_SIZE * 2;
+}
+
+function setBackfillFormOpen(isOpen) {
+  isBackfillFormOpen = isOpen;
+  backfillFormPanel.hidden = !isOpen;
+  openBackfillFormBtn.disabled = isOpen;
 }
 
 function setSeasonPanelOpen(isOpen) {
@@ -138,9 +163,30 @@ function buildOptionsFromPlayers(players, currentValue = "") {
   return options.join("");
 }
 
+function buildSeasonOptions(seasons, currentValue = "") {
+  const options = ['<option value="">请选择赛季</option>'];
+
+  seasons.forEach((season) => {
+    const selected = season.id === currentValue ? " selected" : "";
+    options.push(
+      `<option value="${season.id}"${selected}>${escapeHtml(season.name)}</option>`
+    );
+  });
+
+  return options.join("");
+}
+
 function getSelectedMatchPlayerIds() {
   return Array.from(
     document.querySelectorAll("#teamAFields select, #teamBFields select")
+  )
+    .map((select) => select.value)
+    .filter(Boolean);
+}
+
+function getSelectedBackfillPlayerIds() {
+  return Array.from(
+    document.querySelectorAll("#backfillTeamAFields select, #backfillTeamBFields select")
   )
     .map((select) => select.value)
     .filter(Boolean);
@@ -160,12 +206,31 @@ function getSelectablePlayersForField(currentValue) {
     .filter((player) => !selected.has(player.id) || player.id === currentValue);
 }
 
+function getSelectableBackfillPlayersForField(currentValue) {
+  const selected = new Set(getSelectedBackfillPlayerIds());
+  if (currentValue) {
+    selected.delete(currentValue);
+  }
+
+  return backfillPlayers.filter((player) => !selected.has(player.id) || player.id === currentValue);
+}
+
 function refreshMatchSelectOptions() {
   document
     .querySelectorAll("#teamAFields select, #teamBFields select")
     .forEach((select) => {
       const currentValue = select.value;
       const selectablePlayers = getSelectablePlayersForField(currentValue);
+      select.innerHTML = buildOptionsFromPlayers(selectablePlayers, currentValue);
+    });
+}
+
+function refreshBackfillSelectOptions() {
+  document
+    .querySelectorAll("#backfillTeamAFields select, #backfillTeamBFields select")
+    .forEach((select) => {
+      const currentValue = select.value;
+      const selectablePlayers = getSelectableBackfillPlayersForField(currentValue);
       select.innerHTML = buildOptionsFromPlayers(selectablePlayers, currentValue);
     });
 }
@@ -180,6 +245,11 @@ function renderMatchPlayerFields(container, prefix) {
     select.dataset.slot = String(i + 1);
     container.appendChild(select);
   }
+}
+
+function renderBackfillPlayerFields() {
+  renderMatchPlayerFields(backfillTeamAFields, "backfillTeamA");
+  renderMatchPlayerFields(backfillTeamBFields, "backfillTeamB");
 }
 
 function updateSeasonInfo() {
@@ -268,6 +338,18 @@ function renderMatchForm() {
   openMatchFormBtn.disabled = isMatchFormOpen || !hasEnoughPlayers;
 }
 
+function renderBackfillForm() {
+  renderBackfillPlayerFields();
+  refreshBackfillSelectOptions();
+  backfillSeasonSelect.innerHTML = buildSeasonOptions(allSeasons, backfillSeasonSelect.value);
+  const hasEnoughPlayers = backfillPlayers.length >= TEAM_SIZE * 2;
+  const hasSeason = Boolean(backfillSeasonSelect.value);
+  backfillWinnerSelect.disabled = !hasSeason || !hasEnoughPlayers;
+  backfillDateInput.disabled = !hasSeason;
+  backfillMatchNoteInput.disabled = !hasSeason || !hasEnoughPlayers;
+  recordBackfillBtn.disabled = !hasSeason || !hasEnoughPlayers || !backfillDateInput.value;
+}
+
 function clearMatchForm() {
   document
     .querySelectorAll("#teamAFields select, #teamBFields select")
@@ -278,6 +360,18 @@ function clearMatchForm() {
   matchNoteInput.value = "";
   refreshMatchSelectOptions();
   setMatchMessage("");
+}
+
+function clearBackfillForm() {
+  document
+    .querySelectorAll("#backfillTeamAFields select, #backfillTeamBFields select")
+    .forEach((select) => {
+      select.value = "";
+    });
+  backfillWinnerSelect.value = "";
+  backfillMatchNoteInput.value = "";
+  refreshBackfillSelectOptions();
+  setBackfillMessage("");
 }
 
 function renderQueue(data) {
@@ -509,6 +603,61 @@ async function loadActiveSeason() {
   updateSeasonInfo();
 }
 
+async function loadSeasons() {
+  const { data, error } = await db
+    .from("seasons")
+    .select("id, name, start_date, is_active")
+    .gte("start_date", "2026-04-01")
+    .order("start_date", { ascending: false });
+
+  if (error) {
+    console.error("加载赛季列表失败：", error);
+    allSeasons = activeSeason ? [{ id: activeSeason.id, name: activeSeason.name }] : [];
+    renderBackfillForm();
+    return;
+  }
+
+  allSeasons = data || [];
+
+  if (!backfillSeasonSelect.value && activeSeason?.id) {
+    backfillSeasonSelect.value = activeSeason.id;
+  }
+}
+
+async function loadPlayersForSeason(seasonId) {
+  if (!seasonId) {
+    backfillPlayers = [];
+    renderBackfillForm();
+    return;
+  }
+
+  const { data, error } = await db
+    .from("season_players")
+    .select(`
+      player_id,
+      players (
+        display_name
+      )
+    `)
+    .eq("season_id", seasonId)
+    .order("player_id", { ascending: true });
+
+  if (error) {
+    console.error("加载补登赛季选手失败：", error);
+    backfillPlayers = [];
+    renderBackfillForm();
+    setBackfillMessage(`加载赛季选手失败：${error.message}`, true);
+    return;
+  }
+
+  backfillPlayers = (data || []).map((row) => ({
+    id: row.player_id,
+    display_name: row.players?.display_name || "未知选手",
+  })).sort((a, b) => a.display_name.localeCompare(b.display_name, "zh-CN"));
+
+  renderBackfillForm();
+}
+
 async function loadActiveMatchDay() {
   let query = db
     .from("match_days")
@@ -598,13 +747,22 @@ async function loadTodayPlayers() {
 async function refreshPlayerDrivenViews() {
   await loadActiveMatchDay();
   await loadSeasonPlayers();
+  await loadSeasons();
   await loadTodayPlayers();
   renderSignupOptions();
   renderMatchForm();
+  if (!backfillSeasonSelect.value && activeSeason?.id) {
+    backfillSeasonSelect.value = activeSeason.id;
+  }
+  await loadPlayersForSeason(backfillSeasonSelect.value);
   if (isMatchFormOpen) {
     refreshMatchSelectOptions();
   }
+  if (isBackfillFormOpen) {
+    refreshBackfillSelectOptions();
+  }
   setMatchFormOpen(isMatchFormOpen);
+  setBackfillFormOpen(isBackfillFormOpen);
 }
 
 async function loadLeaderboard() {
@@ -1057,6 +1215,37 @@ function validateMatchPlayers(teamAIds, teamBIds) {
   return "";
 }
 
+function validateBackfillPlayers(teamAIds, teamBIds) {
+  if (!backfillSeasonSelect.value) {
+    return "请选择赛季。";
+  }
+
+  if (!backfillDateInput.value) {
+    return "请选择补登日期。";
+  }
+
+  if (!backfillWinnerSelect.value) {
+    return "请选择胜方。";
+  }
+
+  if (backfillPlayers.length < TEAM_SIZE * 2) {
+    return "该赛季选手不足 10 人，无法补登比赛。";
+  }
+
+  if (teamAIds.some((id) => !id) || teamBIds.some((id) => !id)) {
+    return "请为两队各选择 5 名选手。";
+  }
+
+  const allIds = [...teamAIds, ...teamBIds];
+  const uniqueIds = new Set(allIds);
+
+  if (uniqueIds.size !== allIds.length) {
+    return "同一名选手不能在一场比赛中重复出现。";
+  }
+
+  return "";
+}
+
 async function recordMatch() {
   const teamAIds = getSelectedTeamIds("teamA");
   const teamBIds = getSelectedTeamIds("teamB");
@@ -1094,6 +1283,44 @@ async function recordMatch() {
   setMatchFormOpen(false);
   renderMatchForm();
   setMatchMessage("比赛记录成功，积分榜已刷新。");
+  await loadLeaderboard();
+  await loadRecentMatches();
+}
+
+async function recordBackfillMatch() {
+  const teamAIds = Array.from(document.querySelectorAll('select[data-team="backfillTeamA"]')).map((select) => select.value);
+  const teamBIds = Array.from(document.querySelectorAll('select[data-team="backfillTeamB"]')).map((select) => select.value);
+  const validationError = validateBackfillPlayers(teamAIds, teamBIds);
+
+  if (validationError) {
+    setBackfillMessage(validationError, true);
+    return;
+  }
+
+  recordBackfillBtn.disabled = true;
+  setBackfillMessage("正在补登比赛...");
+
+  const { error } = await db.rpc("record_match_result_backfill", {
+    p_team_a_player_ids: teamAIds,
+    p_team_b_player_ids: teamBIds,
+    p_winner_team: backfillWinnerSelect.value,
+    p_note: backfillMatchNoteInput.value.trim() || null,
+    p_created_by: null,
+    p_season_id: backfillSeasonSelect.value,
+    p_match_date: backfillDateInput.value,
+  });
+
+  recordBackfillBtn.disabled = false;
+
+  if (error) {
+    setBackfillMessage(`补登比赛失败：${error.message}。请先在 Supabase 执行对应 SQL。`, true);
+    return;
+  }
+
+  clearBackfillForm();
+  setBackfillFormOpen(false);
+  renderBackfillForm();
+  setMessage("历史比赛补登成功。");
   await loadLeaderboard();
   await loadRecentMatches();
 }
@@ -1171,11 +1398,25 @@ clearQueueBtn.addEventListener("click", clearSignupQueueForTesting);
 addTodayPlayerBtn.addEventListener("click", addTodayPlayer);
 clearTodayPlayersBtn.addEventListener("click", clearTodayPlayersForTesting);
 recordMatchBtn.addEventListener("click", recordMatch);
+recordBackfillBtn.addEventListener("click", recordBackfillMatch);
 
 openMatchFormBtn.addEventListener("click", () => {
   clearMatchForm();
   setMatchFormOpen(true);
+  setBackfillFormOpen(false);
   renderMatchForm();
+});
+
+openBackfillFormBtn.addEventListener("click", async () => {
+  if (!backfillSeasonSelect.value && activeSeason?.id) {
+    backfillSeasonSelect.value = activeSeason.id;
+  }
+  backfillDateInput.value = backfillDateInput.value || getBeijingBusinessDateString();
+  await loadPlayersForSeason(backfillSeasonSelect.value);
+  clearBackfillForm();
+  setBackfillFormOpen(true);
+  setMatchFormOpen(false);
+  renderBackfillForm();
 });
 
 closeMatchFormBtn.addEventListener("click", () => {
@@ -1184,9 +1425,27 @@ closeMatchFormBtn.addEventListener("click", () => {
   renderMatchForm();
 });
 
+closeBackfillFormBtn.addEventListener("click", () => {
+  clearBackfillForm();
+  setBackfillFormOpen(false);
+  renderBackfillForm();
+});
+
 matchFormPanel.addEventListener("change", (event) => {
   if (event.target.matches("#teamAFields select, #teamBFields select")) {
     refreshMatchSelectOptions();
+  }
+});
+
+backfillFormPanel.addEventListener("change", async (event) => {
+  if (event.target === backfillSeasonSelect) {
+    clearBackfillForm();
+    await loadPlayersForSeason(backfillSeasonSelect.value);
+    return;
+  }
+
+  if (event.target.matches("#backfillTeamAFields select, #backfillTeamBFields select")) {
+    refreshBackfillSelectOptions();
   }
 });
 
@@ -1227,8 +1486,11 @@ recentMatchesList.addEventListener("click", async (event) => {
 
 async function init() {
   setMatchFormOpen(false);
+  setBackfillFormOpen(false);
   setSeasonPanelOpen(false);
+  backfillDateInput.value = getBeijingBusinessDateString();
   renderMatchForm();
+  renderBackfillForm();
   renderSeasonPlayersPanel();
   updateSeasonInfo();
   renderMatchDayStatus();
