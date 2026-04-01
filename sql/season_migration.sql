@@ -273,4 +273,105 @@ using (true);
 grant select on public.current_season_players to anon, authenticated;
 grant select on public.current_season_leaderboard to anon, authenticated;
 
+create or replace function public.toggle_season_player(
+  p_player_id uuid,
+  p_season_id uuid default null
+)
+returns boolean
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_season_id uuid;
+  v_exists boolean := false;
+begin
+  if p_player_id is null then
+    raise exception '缺少选手 id';
+  end if;
+
+  v_season_id := p_season_id;
+
+  if v_season_id is null then
+    select id
+    into v_season_id
+    from public.seasons
+    where is_active = true
+    limit 1;
+  end if;
+
+  if v_season_id is null then
+    raise exception '未找到当前赛季';
+  end if;
+
+  select exists (
+    select 1
+    from public.season_players
+    where season_id = v_season_id
+      and player_id = p_player_id
+  )
+  into v_exists;
+
+  if v_exists then
+    if exists (
+      select 1
+      from public.match_results mr
+      join public.matches m on m.id = mr.match_id
+      where m.season_id = v_season_id
+        and mr.player_id = p_player_id
+    ) then
+      raise exception '该选手已有本赛季比赛记录，不能取消参赛';
+    end if;
+
+    update public.seasons
+    set koi_player_id = null
+    where id = v_season_id
+      and koi_player_id = p_player_id;
+
+    delete from public.season_player_stats
+    where season_id = v_season_id
+      and player_id = p_player_id;
+
+    delete from public.season_players
+    where season_id = v_season_id
+      and player_id = p_player_id;
+
+    return false;
+  end if;
+
+  insert into public.season_players (season_id, player_id)
+  values (v_season_id, p_player_id)
+  on conflict (season_id, player_id) do nothing;
+
+  insert into public.season_player_stats (
+    season_id,
+    player_id,
+    score,
+    reward_points,
+    reward_floor_bonus,
+    reward_extra_points,
+    games_played,
+    wins,
+    losses
+  )
+  select
+    v_season_id,
+    p.id,
+    10.00,
+    (20 + coalesce(p.reward_floor_bonus, 0)) + coalesce(p.reward_extra_points, 0),
+    coalesce(p.reward_floor_bonus, 0),
+    coalesce(p.reward_extra_points, 0),
+    0,
+    0,
+    0
+  from public.players p
+  where p.id = p_player_id
+  on conflict (season_id, player_id) do nothing;
+
+  return true;
+end;
+$$;
+
+grant execute on function public.toggle_season_player(uuid, uuid) to anon, authenticated;
+
 commit;

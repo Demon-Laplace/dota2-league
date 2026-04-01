@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Dota2 宁德联赛</title>
-  <link rel="stylesheet" href="style.css?v=20260401-17" />
+  <link rel="stylesheet" href="style.css?v=20260401-18" />
 </head>
 <body>
   <main class="container">
@@ -30,6 +30,7 @@
         <select id="rewardPlayerSelect">
           <option value="">请选择选手</option>
         </select>
+        <input id="rewardOutsideNameInput" type="text" placeholder="场外赞助姓名" />
         <input id="rewardExtraInput" type="number" min="0" step="1" placeholder="额外赞助额" />
         <button id="addRewardBtn" type="button">添加赞助</button>
       </div>
@@ -44,7 +45,13 @@
           <h2 id="seasonPanelTitle">当前赛季选手</h2>
           <p id="seasonPlayersCount" class="muted">0 人</p>
         </div>
-        <button id="resetSeasonBtn" class="button-danger" type="button">重置当前赛季</button>
+        <div class="row">
+          <select id="koiPlayerSelect">
+            <option value="">不设置锦鲤</option>
+          </select>
+          <button id="setKoiBtn" class="button-secondary" type="button">设置锦鲤</button>
+          <button id="resetSeasonBtn" class="button-danger" type="button">重置当前赛季</button>
+        </div>
       </div>
       <div id="seasonPlayersList" class="season-players-list"></div>
       <p id="seasonPlayersEmpty" class="muted">当前赛季暂无选手</p>
@@ -198,6 +205,6 @@
   </main>
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="app.js?v=20260401-17"></script>
+  <script src="app.js?v=20260401-18"></script>
 </body>
 </html>

@@ -130,6 +130,11 @@ button.season-total {
   border-color: rgba(248, 113, 113, 0.35);
 }
 
+.reward-log-outside {
+  border-color: rgba(245, 158, 11, 0.32);
+  background: linear-gradient(135deg, rgba(120, 53, 15, 0.28), rgba(17, 24, 39, 0.52));
+}
+
 .season-panel {
   margin-bottom: 24px;
   background: #172033;
@@ -156,6 +161,11 @@ button.season-total {
   background: rgba(17, 24, 39, 0.55);
 }
 
+.season-player-item-active {
+  border-color: rgba(59, 130, 246, 0.45);
+  background: linear-gradient(135deg, rgba(30, 64, 175, 0.22), rgba(17, 24, 39, 0.6));
+}
+
 .season-player-button {
   width: 100%;
   background: transparent;
@@ -171,6 +181,10 @@ button.season-total {
 
 .season-player-button:hover {
   background: rgba(37, 99, 235, 0.14);
+}
+
+.season-player-button-active {
+  background: rgba(37, 99, 235, 0.12);
 }
 
 .koi-badge {

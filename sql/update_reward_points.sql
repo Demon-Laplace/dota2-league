@@ -15,12 +15,19 @@ add column if not exists reward_extra_points integer not null default 0;
 create table if not exists public.reward_donations (
   id uuid primary key default gen_random_uuid(),
   season_id uuid not null references public.seasons(id) on delete cascade,
-  player_id uuid not null references public.players(id) on delete cascade,
+  player_id uuid references public.players(id) on delete cascade,
+  donor_name text,
   amount integer not null check (amount >= 0),
   is_cancelled boolean not null default false,
   cancelled_at timestamptz,
   created_at timestamptz not null default now()
 );
+
+alter table public.reward_donations
+alter column player_id drop not null;
+
+alter table public.reward_donations
+add column if not exists donor_name text;
 
 create index if not exists idx_reward_donations_season_created_at
 on public.reward_donations (season_id, created_at desc);
@@ -51,6 +58,16 @@ for update
 to anon, authenticated
 using (true)
 with check (true);
+
+alter table public.reward_donations
+drop constraint if exists reward_donations_player_or_name_check;
+
+alter table public.reward_donations
+add constraint reward_donations_player_or_name_check
+check (
+  player_id is not null
+  or (donor_name is not null and btrim(donor_name) <> '')
+);
 
 update public.players
 set
@@ -246,7 +263,8 @@ grant execute on function public.update_player_reward_points(uuid, integer, uuid
 create or replace function public.add_player_reward_extra(
   p_player_id uuid,
   p_extra_amount integer,
-  p_season_id uuid default null
+  p_season_id uuid default null,
+  p_donor_name text default null
 )
 returns integer
 language plpgsql
@@ -266,6 +284,10 @@ begin
     raise exception '额外赞助额必须是大于等于 0 的整数';
   end if;
 
+  if p_player_id is null and (p_donor_name is null or btrim(p_donor_name) = '') then
+    raise exception '请选择赛季选手或填写场外赞助姓名';
+  end if;
+
   v_season_id := p_season_id;
 
   if v_season_id is null then
@@ -280,8 +302,12 @@ begin
     raise exception '未找到当前赛季';
   end if;
 
-  insert into public.reward_donations (season_id, player_id, amount)
-  values (v_season_id, p_player_id, p_extra_amount);
+  insert into public.reward_donations (season_id, player_id, donor_name, amount)
+  values (v_season_id, p_player_id, nullif(btrim(p_donor_name), ''), p_extra_amount);
+
+  if p_player_id is null then
+    return p_extra_amount;
+  end if;
 
   select public.sync_player_reward_totals(p_player_id, v_season_id)
   into v_total;
@@ -290,7 +316,7 @@ begin
 end;
 $$;
 
-grant execute on function public.add_player_reward_extra(uuid, integer, uuid) to anon, authenticated;
+grant execute on function public.add_player_reward_extra(uuid, integer, uuid, text) to anon, authenticated;
 
 create or replace function public.cancel_reward_donation(
   p_donation_id uuid,
