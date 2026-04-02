@@ -2412,6 +2412,7 @@ function renderMatchDayStatus() {
     matchDayStatus.className = "muted day-status-active";
     matchDayInfo.textContent = "当前比赛日已发起。北京时间次日凌晨 2 点会自动结束并清空报名队列与当日选手。";
     startMatchDayBtn.textContent = "取消发起";
+    startMatchDayBtn.classList.add("button-cancel-state");
     startMatchDayBtn.disabled = false;
     matchStartTimeInput.disabled = true;
 
@@ -2432,6 +2433,7 @@ function renderMatchDayStatus() {
   matchDayStatus.className = "muted day-status-inactive";
   matchDayInfo.textContent = "请输入开始时间，留空默认19:30";
   startMatchDayBtn.textContent = "发起当日比赛";
+  startMatchDayBtn.classList.remove("button-cancel-state");
   startMatchDayBtn.disabled = false;
   matchStartTimeInput.disabled = false;
   matchStartTimeDisplay.textContent = "";
