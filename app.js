@@ -1159,7 +1159,13 @@ function renderSeasonPlayersPanel() {
 
   seasonPlayersEmpty.style.display = "none";
 
-  seasonPlayers.forEach((player) => {
+  const groups = {
+    core: seasonPlayers.filter((player) => player.player_rank === "core"),
+    support: seasonPlayers.filter((player) => player.player_rank === "support"),
+    idle: seasonPlayers.filter((player) => !player.player_rank),
+  };
+
+  const renderPlayerCard = (player) => {
     const item = document.createElement("div");
     item.className = `season-player-item${player.is_in_season ? " season-player-item-active" : ""}`;
     const statusBadge = player.is_in_season
@@ -1193,8 +1199,47 @@ function renderSeasonPlayersPanel() {
         </button>
       </div>
     `;
-    seasonPlayersList.appendChild(item);
+    return item;
+  };
+
+  const columns = document.createElement("div");
+  columns.className = "season-rank-columns";
+
+  [
+    { key: "core", title: "核心", empty: "暂无核心选手" },
+    { key: "support", title: "辅助", empty: "暂无辅助选手" },
+  ].forEach(({ key, title, empty }) => {
+    const section = document.createElement("section");
+    section.className = "season-rank-column";
+    section.innerHTML = `
+      <div class="season-rank-head">
+        <h3>${title}</h3>
+        <span class="queue-slot">${groups[key].length} 人</span>
+      </div>
+      <div class="season-rank-list"></div>
+      <p class="muted season-rank-empty"${groups[key].length ? ' hidden' : ''}>${empty}</p>
+    `;
+
+    const list = section.querySelector(".season-rank-list");
+    groups[key].forEach((player) => list.appendChild(renderPlayerCard(player)));
+    columns.appendChild(section);
   });
+
+  seasonPlayersList.appendChild(columns);
+
+  const idleSection = document.createElement("section");
+  idleSection.className = "season-unranked-section";
+  idleSection.innerHTML = `
+    <div class="season-rank-head">
+      <h3>未参赛</h3>
+      <span class="queue-slot">${groups.idle.length} 人</span>
+    </div>
+    <div class="season-unranked-list"></div>
+    <p class="muted season-rank-empty"${groups.idle.length ? ' hidden' : ''}>当前所有选手都已设置身份</p>
+  `;
+  const idleList = idleSection.querySelector(".season-unranked-list");
+  groups.idle.forEach((player) => idleList.appendChild(renderPlayerCard(player)));
+  seasonPlayersList.appendChild(idleSection);
 
   renderKoiPlayerOptions();
 }

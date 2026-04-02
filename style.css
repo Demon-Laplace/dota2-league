@@ -242,9 +242,51 @@ button.season-total {
 
 .season-players-list {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
-  gap: 10px;
+  gap: 16px;
   margin-top: 14px;
+}
+
+.season-rank-columns {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.season-rank-column,
+.season-unranked-section {
+  display: grid;
+  gap: 12px;
+  padding: 14px;
+  border: 1px solid rgba(124, 165, 209, 0.2);
+  border-radius: 14px;
+  background: rgba(12, 29, 49, 0.5);
+}
+
+.season-rank-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.season-rank-head h3 {
+  margin: 0;
+  font-size: 15px;
+}
+
+.season-rank-list,
+.season-unranked-list {
+  display: grid;
+  gap: 10px;
+}
+
+.season-unranked-list {
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+}
+
+.season-rank-empty {
+  margin: 0;
 }
 
 .season-player-item {
@@ -510,8 +552,34 @@ button:disabled {
 
 .match-form-panel {
   margin-top: 16px;
-  padding-top: 16px;
-  border-top: 1px solid var(--border);
+  padding: 18px;
+  border: 1px solid rgba(124, 165, 209, 0.18);
+  border-radius: 16px;
+  background: rgba(10, 26, 45, 0.42);
+}
+
+.match-form-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 12px;
+}
+
+.match-form-head h3 {
+  margin: 0 0 6px;
+}
+
+.match-meta-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
+.match-form-actions {
+  margin-top: 4px;
 }
 
 .team-panel {
@@ -967,6 +1035,14 @@ ol {
   }
 
   .match-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .match-meta-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .season-rank-columns {
     grid-template-columns: 1fr;
   }
 

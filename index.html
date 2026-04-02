@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Dota2 宁德联赛</title>
-  <link rel="stylesheet" href="style.css?v=20260402-11" />
+  <link rel="stylesheet" href="style.css?v=20260402-12" />
 </head>
 <body>
   <div id="loadingScreen" class="loading-screen" aria-live="polite">
@@ -139,7 +139,13 @@
             </div>
           </div>
           <div id="matchFormPanel" class="match-form-panel" hidden>
-            <p id="seasonInfo" class="muted"></p>
+            <div class="match-form-head">
+              <div>
+                <h3>当日比赛登记</h3>
+                <p id="seasonInfo" class="muted"></p>
+              </div>
+              <span class="queue-slot">即时保存</span>
+            </div>
             <div class="match-grid">
               <div class="team-panel">
                 <h3>天辉方</h3>
@@ -150,7 +156,7 @@
                 <div id="teamBFields" class="team-fields"></div>
               </div>
             </div>
-            <div class="row">
+            <div class="match-meta-grid">
               <select id="winnerSelect">
                 <option value="">胜负未定，先保存不计分</option>
                 <option value="A">天辉方获胜</option>
@@ -158,15 +164,21 @@
               </select>
               <input id="matchNote" type="text" placeholder="备注，可选" />
             </div>
-            <div class="row">
+            <div class="row match-form-actions">
               <button id="recordMatchBtn">保存比赛记录</button>
               <button id="closeMatchFormBtn" class="button-secondary">收起</button>
             </div>
             <p id="matchMessage" class="message"></p>
           </div>
           <div id="backfillFormPanel" class="match-form-panel" hidden>
-            <p class="muted">用于补录漏记的历史比赛，可选择赛季和日期。</p>
-            <div class="row">
+            <div class="match-form-head">
+              <div>
+                <h3>历史比赛补录</h3>
+                <p class="muted">用于补录漏记的历史比赛，可选择赛季和日期。</p>
+              </div>
+              <span class="queue-slot">历史归档</span>
+            </div>
+            <div class="match-meta-grid">
               <select id="backfillSeasonSelect">
                 <option value="">请选择赛季</option>
               </select>
@@ -182,7 +194,7 @@
                 <div id="backfillTeamBFields" class="team-fields"></div>
               </div>
             </div>
-            <div class="row">
+            <div class="match-meta-grid">
               <select id="backfillWinnerSelect">
                 <option value="">胜负未定，先保存不计分</option>
                 <option value="A">天辉方获胜</option>
@@ -190,7 +202,7 @@
               </select>
               <input id="backfillMatchNote" type="text" placeholder="补录备注，可选" />
             </div>
-            <div class="row">
+            <div class="row match-form-actions">
               <button id="recordBackfillBtn">保存补录比赛</button>
               <button id="closeBackfillFormBtn" class="button-secondary">收起</button>
             </div>
@@ -235,6 +247,6 @@
   </div>
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="app.js?v=20260402-14"></script>
+  <script src="app.js?v=20260402-15"></script>
 </body>
 </html>
