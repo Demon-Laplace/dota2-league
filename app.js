@@ -13,6 +13,7 @@ const SCORER_ACCESS_PASSWORD = "夜神夜神夜神";
 const ACCESS_SESSION_STORAGE_KEY = "nd_dota_access_session_v1";
 const REMEMBERED_SCORER_PLAYER_KEY = "nd_dota_remembered_scorer_player_v1";
 const SKIP_NEXT_SCORER_RECONNECT_KEY = "nd_dota_skip_next_scorer_reconnect_v1";
+const DEVICE_ID_STORAGE_KEY = "nd_dota_device_id_v1";
 const ADMIN_ACTION_LOGS_STORAGE_PREFIX = "nd_dota_admin_action_logs_";
 
 const db = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
@@ -934,6 +935,18 @@ function writeRememberedScorerPlayerId(playerId) {
   }
 }
 
+function getOrCreateLocalDeviceId() {
+  try {
+    const existing = window.localStorage.getItem(DEVICE_ID_STORAGE_KEY);
+    if (existing) return existing;
+    const created = `device-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+    window.localStorage.setItem(DEVICE_ID_STORAGE_KEY, created);
+    return created;
+  } catch {
+    return "device-fallback";
+  }
+}
+
 function shouldSkipNextScorerReconnect() {
   try {
     return window.sessionStorage.getItem(SKIP_NEXT_SCORER_RECONNECT_KEY) === "true";
@@ -982,8 +995,10 @@ function tryReconnectRememberedScorer() {
   }
   const rememberedPlayerId = readRememberedScorerPlayerId();
   if (!rememberedPlayerId) return false;
+  const localDeviceId = getOrCreateLocalDeviceId();
   const scorerMember = getRoleMembersByRole("scorer").find((member) => member.player_id === rememberedPlayerId);
   if (!scorerMember || !scorerMember.allow_auto_reconnect) return false;
+  if (!scorerMember.auto_reconnect_device_id || scorerMember.auto_reconnect_device_id !== localDeviceId) return false;
 
   writeStoredAccessSession({
     role: "scorer",
@@ -3248,10 +3263,10 @@ async function loadActiveSeason() {
 async function loadRoleMembers() {
   let { data, error } = await db
     .from("app_role_members")
-    .select("id, role, player_id, allow_auto_reconnect, created_at")
+    .select("id, role, player_id, allow_auto_reconnect, auto_reconnect_device_id, created_at")
     .order("created_at", { ascending: true });
 
-  if (error && String(error.message || "").includes("allow_auto_reconnect")) {
+  if (error && (String(error.message || "").includes("allow_auto_reconnect") || String(error.message || "").includes("auto_reconnect_device_id"))) {
     ({ data, error } = await db
       .from("app_role_members")
       .select("id, role, player_id, created_at")
@@ -3270,6 +3285,7 @@ async function loadRoleMembers() {
   roleMembers = (data || []).map((member) => ({
     ...member,
     allow_auto_reconnect: Boolean(member.allow_auto_reconnect),
+    auto_reconnect_device_id: member.auto_reconnect_device_id || "",
     display_name: member.player_id ? (nameMap.get(member.player_id) || "未命名选手") : "",
   }));
   validateStoredAccessSession();
@@ -3347,7 +3363,10 @@ async function toggleScorerAutoReconnect(memberId, shouldAllow) {
 
   const { error } = await db
     .from("app_role_members")
-    .update({ allow_auto_reconnect: shouldAllow })
+    .update({
+      allow_auto_reconnect: shouldAllow,
+      auto_reconnect_device_id: shouldAllow ? (member.auto_reconnect_device_id || "") : null,
+    })
     .eq("id", memberId);
 
   if (error) {
@@ -3358,6 +3377,24 @@ async function toggleScorerAutoReconnect(memberId, shouldAllow) {
   setAdminPanelMessage(shouldAllow ? "已启用永久自动重连。" : "已关闭永久自动重连。");
   appendAdminActionLog(`${shouldAllow ? "启用" : "关闭"}了记分员 ${member.display_name || "该选手"} 的永久自动重连。`);
   await loadRoleMembers();
+}
+
+async function bindScorerAutoReconnectDevice(member) {
+  if (!member?.id || !member.allow_auto_reconnect) return;
+  const localDeviceId = getOrCreateLocalDeviceId();
+  if (member.auto_reconnect_device_id === localDeviceId) return;
+
+  const { error } = await db
+    .from("app_role_members")
+    .update({ auto_reconnect_device_id: localDeviceId })
+    .eq("id", member.id);
+
+  if (error) {
+    console.error("绑定记分员自动重连设备失败：", error);
+    return;
+  }
+
+  member.auto_reconnect_device_id = localDeviceId;
 }
 
 async function confirmAccessRole() {
@@ -3414,6 +3451,7 @@ async function confirmAccessRole() {
       playerId: scorerMember.player_id || selectedPlayerId || "",
     });
     writeRememberedScorerPlayerId(scorerMember.player_id || selectedPlayerId || "");
+    await bindScorerAutoReconnectDevice(scorerMember);
     setAccessMessage("记分员身份已启用。");
     renderRoleMembers();
     applyRolePermissions();
