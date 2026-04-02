@@ -107,11 +107,37 @@ body::before {
 }
 
 .page-head {
+  position: relative;
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
   gap: 16px;
   flex-wrap: wrap;
+}
+
+.admin-secret-trigger {
+  position: absolute;
+  top: -10px;
+  right: 0;
+  width: 150px;
+  height: 150px;
+  padding: 0;
+  border: 0;
+  border-radius: 36px 0 48px 48px;
+  background: transparent;
+  box-shadow: none;
+  opacity: 0;
+  z-index: 3;
+}
+
+.admin-secret-trigger:hover,
+.admin-secret-trigger:focus,
+.admin-secret-trigger:active {
+  transform: none;
+  filter: none;
+  box-shadow: none;
+  background: transparent;
+  outline: none;
 }
 
 .page-head-meta {

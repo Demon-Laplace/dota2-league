@@ -22,6 +22,7 @@
   </div>
   <main class="container">
     <div class="page-head">
+      <button id="adminSecretTrigger" class="admin-secret-trigger" type="button" aria-label="管理员隐藏入口"></button>
       <div class="league-brand">
         <p class="league-brand-kicker">DOTA 2 COMMUNITY LEAGUE</p>
         <h1 class="league-brand-title">
@@ -318,7 +319,7 @@
         <label for="accessPasswordInput" class="muted access-field-label">你的回答是：</label>
         <input id="accessPasswordInput" type="text" placeholder="你的回答是：" />
       </div>
-      <div class="access-scorer-picker">
+      <div id="accessScorerPicker" class="access-scorer-picker">
         <p class="muted access-scorer-picker-title">记分员身份选择</p>
         <div id="accessScorerChips" class="access-scorer-chips"></div>
         <select id="accessScorerSelect" hidden>

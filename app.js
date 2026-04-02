@@ -23,6 +23,7 @@ const signupPlayerGrid = document.getElementById("signupPlayerGrid");
 const signupEmpty = document.getElementById("signupEmpty");
 const messageEl = document.getElementById("message");
 const seasonToggleBtn = document.getElementById("seasonToggleBtn");
+const adminSecretTrigger = document.getElementById("adminSecretTrigger");
 const adminLogoTrigger = document.getElementById("adminLogoTrigger");
 const adminModeBtn = document.getElementById("adminModeBtn");
 const adminPanel = document.getElementById("adminPanel");
@@ -124,7 +125,10 @@ const heroPickerMessage = document.getElementById("heroPickerMessage");
 const accessModal = document.getElementById("accessModal");
 const accessModalBackdrop = document.getElementById("accessModalBackdrop");
 const closeAccessModalBtn = document.getElementById("closeAccessModalBtn");
+const accessModalTitle = document.getElementById("accessModalTitle");
+const accessModalHint = document.getElementById("accessModalHint");
 const accessPasswordInput = document.getElementById("accessPasswordInput");
+const accessScorerPicker = document.getElementById("accessScorerPicker");
 const accessScorerSelect = document.getElementById("accessScorerSelect");
 const accessScorerChips = document.getElementById("accessScorerChips");
 const confirmAccessBtn = document.getElementById("confirmAccessBtn");
@@ -184,6 +188,7 @@ let currentAccessSession = {
   playerId: "",
 };
 currentAccessSession = readStoredAccessSession();
+let accessModalMode = "scorer";
 let heroPickerState = null;
 let realtimeChannel = null;
 let refreshTimer = null;
@@ -1056,7 +1061,26 @@ function normalizeAccessPassword(value) {
   return String(value || "").normalize("NFKC").trim();
 }
 
-function setAccessModalOpen(isOpen) {
+function applyAccessModalMode() {
+  const isAdminMode = accessModalMode === "admin";
+  if (accessModalTitle) {
+    accessModalTitle.textContent = isAdminMode
+      ? "噢！你居然直接来到了天地迷宫的大门！"
+      : "你居然找到了阿哈利姆迷宫的入口！ 小强，你是从哪来的";
+  }
+  if (accessModalHint) {
+    accessModalHint.textContent = isAdminMode
+      ? "请输入管理员口令。"
+      : "请输入口令。若为记分员，请在下方点选对应选手后再提交。";
+  }
+  if (accessScorerPicker) {
+    accessScorerPicker.hidden = isAdminMode;
+  }
+}
+
+function setAccessModalOpen(isOpen, mode = accessModalMode) {
+  accessModalMode = mode;
+  applyAccessModalMode();
   accessModal.hidden = !isOpen;
   if (!isOpen) {
     accessPasswordInput.value = "";
@@ -3345,7 +3369,11 @@ async function confirmAccessRole() {
     return;
   }
 
-  if (password === normalizeAccessPassword(ADMIN_ACCESS_PASSWORD)) {
+  if (accessModalMode === "admin") {
+    if (password !== normalizeAccessPassword(ADMIN_ACCESS_PASSWORD)) {
+      setAccessMessage("口令错误。", true);
+      return;
+    }
     writeStoredAccessSession({ role: "admin", memberId: "", playerId: "" });
     setAccessMessage("管理员模式已启用。");
     renderRoleMembers();
@@ -5359,7 +5387,18 @@ if (adminLogoTrigger) {
       return;
     }
     renderAccessScorerOptions();
-    setAccessModalOpen(true);
+    setAccessModalOpen(true, "scorer");
+  });
+}
+
+if (adminSecretTrigger) {
+  adminSecretTrigger.addEventListener("dblclick", (event) => {
+    if (isCurrentRoleAdmin()) {
+      setAdminPanelOpen(!isAdminPanelOpen);
+      return;
+    }
+    event.preventDefault();
+    setAccessModalOpen(true, "admin");
   });
 }
 
