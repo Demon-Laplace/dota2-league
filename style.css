@@ -1409,7 +1409,8 @@ button:disabled {
   box-shadow: none;
 }
 
-.recent-match-player .player-name-display {
+.recent-match-player .player-name-display,
+.recent-match-player-name {
   font-size: 15px;
 }
 
@@ -1569,7 +1570,8 @@ td {
   gap: 4px;
 }
 
-.leaderboard-player-name {
+.leaderboard-player-name,
+.player-name-stack {
   position: relative;
   display: inline-grid;
   isolation: isolate;
@@ -1578,10 +1580,15 @@ td {
   letter-spacing: 0.04em;
 }
 
-.leaderboard-player-name > .player-name-display {
+.leaderboard-player-name > .player-name-stack,
+.player-name-stack > .player-name-display {
   grid-area: 1 / 1;
   position: relative;
   z-index: 1;
+}
+
+.leaderboard-player-name > .player-name-stack {
+  display: inline-grid;
 }
 
 .leaderboard-rank-overlay {

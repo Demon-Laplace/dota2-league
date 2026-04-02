@@ -1027,6 +1027,30 @@ function getLeaderboardNameRankClass(rank) {
   return "";
 }
 
+function getLeaderboardRankByPlayerId(playerId, players = leaderboardPlayers) {
+  if (!playerId || !players?.length) return 0;
+  const index = players.findIndex((player) => (player.player_id || player.id) === playerId);
+  return index >= 0 ? index + 1 : 0;
+}
+
+function buildDecoratedPlayerNameHtml(playerId, displayName, options = {}) {
+  const safeName = escapeHtml(displayName || "未知选手");
+  const nameClassName = getPlayerNameStyleClass(playerId, options);
+  const rankClassName = getLeaderboardNameRankClass(options.rank || 0);
+  const wrapperClassName = options.wrapperClassName || "player-name-stack";
+
+  return `
+    <span class="${wrapperClassName}">
+      ${rankClassName
+        ? `<span class="leaderboard-rank-overlay leaderboard-rank-overlay-base ${rankClassName}" aria-hidden="true">${safeName}</span>
+           <span class="leaderboard-rank-overlay leaderboard-rank-overlay-gloss ${rankClassName}" aria-hidden="true">${safeName}</span>`
+        : ""
+      }
+      <span class="${nameClassName}">${safeName}</span>
+    </span>
+  `;
+}
+
 function hasRecordedWinner(value) {
   return value === "A" || value === "B";
 }
@@ -2218,14 +2242,13 @@ function renderLeaderboard(data) {
       <td><span class="leaderboard-rank">${rank}</span></td>
       <td>
         <div class="leaderboard-player-cell">
-          <strong class="leaderboard-player-name">
-            ${getLeaderboardNameRankClass(rank)
-              ? `<span class="leaderboard-rank-overlay leaderboard-rank-overlay-base ${getLeaderboardNameRankClass(rank)}" aria-hidden="true">${escapeHtml(player.display_name)}</span>
-                 <span class="leaderboard-rank-overlay leaderboard-rank-overlay-gloss ${getLeaderboardNameRankClass(rank)}" aria-hidden="true">${escapeHtml(player.display_name)}</span>`
-              : ""
-            }
-            <span class="${nameClassName}">${escapeHtml(player.display_name)}</span>
-          </strong>
+          <strong class="leaderboard-player-name">${buildDecoratedPlayerNameHtml(playerId, player.display_name, {
+            players: data,
+            highestRewardIds,
+            hardcoreLoseIds,
+            rank,
+            wrapperClassName: "player-name-stack",
+          })}</strong>
           ${tagsHtml}
         </div>
       </td>
@@ -2643,12 +2666,14 @@ function renderRecentMatches(data) {
             data-player-name="${escapeHtml(player.display_name || "未知选手")}"
             data-hero-name="${escapeHtml(player.hero_name || "")}"
           >
-            <span class="${getPlayerNameStyleClass(player.player_id, {
+            ${buildDecoratedPlayerNameHtml(player.player_id, player.display_name || "未知选手", {
               players: leaderboardPlayers,
               highestRewardIds,
               hardcoreLoseIds,
               koiPlayerId: getSeasonKoiPlayerId(match.season_id),
-            })}">${escapeHtml(player.display_name || "未知选手")}</span>
+              rank: getLeaderboardRankByPlayerId(player.player_id, leaderboardPlayers),
+              wrapperClassName: "player-name-stack recent-match-player-name",
+            })}
             ${player.hero_name ? `<span class="match-picked-hero">${escapeHtml(getHeroDisplayName(player.hero_name))}</span>` : '<span class="muted">未选英雄</span>'}
           </button>
         </li>
