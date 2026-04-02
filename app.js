@@ -1824,9 +1824,34 @@ function renderLeaderboard(data) {
   renderRewardPlayerOptions();
   updateRewardMinimumHint();
 
+  const highestReward = data.reduce((max, player) => {
+    const rewardPoints = Number(player.reward_points ?? 0);
+    return rewardPoints > max ? rewardPoints : max;
+  }, 0);
+
   data.forEach((player, idx) => {
     const tr = document.createElement("tr");
     const rank = idx + 1;
+    const playerId = player.player_id || player.id || "";
+    const tags = [];
+
+    if (highestReward > 0 && Number(player.reward_points ?? 0) === highestReward) {
+      tags.push({ icon: "¤", label: "金主", tone: "gold" });
+    }
+
+    if (activeSeason?.koi_player_id && playerId === activeSeason.koi_player_id) {
+      tags.push({ icon: "✦", label: "锦鲤", tone: "teal" });
+    }
+
+    const tagsHtml = tags.length
+      ? `<div class="leaderboard-player-tags">${tags.map((tag) => `
+        <span class="leaderboard-tag leaderboard-tag-${tag.tone}">
+          <span class="leaderboard-tag-icon">${escapeHtml(tag.icon)}</span>
+          <span>${escapeHtml(tag.label)}</span>
+        </span>
+      `).join("")}</div>`
+      : "";
+
     if (rank === 1) {
       tr.className = "leaderboard-row-top1";
     } else if (rank <= 3) {
@@ -1839,7 +1864,7 @@ function renderLeaderboard(data) {
       <td>
         <div class="leaderboard-player-cell">
           <strong class="leaderboard-player-name">${escapeHtml(player.display_name)}</strong>
-          <span class="leaderboard-player-meta">赛季选手</span>
+          ${tagsHtml}
         </div>
       </td>
       <td><span class="leaderboard-score">${formatScore(player.score)}</span></td>

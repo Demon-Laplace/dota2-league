@@ -1198,9 +1198,59 @@ td {
   letter-spacing: 0.02em;
 }
 
-.leaderboard-player-meta {
-  font-size: 11px;
-  color: var(--text-dim);
+.leaderboard-player-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.leaderboard-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 2px 8px 2px 6px;
+  border-radius: 999px;
+  font-size: 10px;
+  line-height: 1.4;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  border: 1px solid rgba(124, 165, 209, 0.2);
+  background: rgba(16, 34, 57, 0.68);
+  color: #dce9f8;
+}
+
+.leaderboard-tag-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  border-radius: 999px;
+  font-size: 9px;
+  line-height: 1;
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.leaderboard-tag-gold {
+  color: #fff3cc;
+  border-color: rgba(240, 195, 106, 0.28);
+  background: rgba(104, 73, 27, 0.3);
+}
+
+.leaderboard-tag-gold .leaderboard-tag-icon {
+  background: rgba(240, 195, 106, 0.18);
+  color: #ffe2a1;
+}
+
+.leaderboard-tag-teal {
+  color: #ddfbf6;
+  border-color: rgba(99, 213, 208, 0.26);
+  background: rgba(27, 82, 88, 0.26);
+}
+
+.leaderboard-tag-teal .leaderboard-tag-icon {
+  background: rgba(99, 213, 208, 0.16);
+  color: #bff6e8;
 }
 
 .leaderboard-score {
