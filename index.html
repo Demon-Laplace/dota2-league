@@ -84,6 +84,16 @@
           </div>
           <div id="scorerMembersList" class="admin-members-list"></div>
         </section>
+        <section class="admin-panel-card">
+          <div class="section-head">
+            <div>
+              <h3>今日操作记录</h3>
+              <p class="muted">北京时间凌晨 2 点自动清空</p>
+            </div>
+          </div>
+          <div id="adminActionLogsList" class="admin-action-logs"></div>
+          <p id="adminActionLogsEmpty" class="muted">当前还没有操作记录</p>
+        </section>
       </div>
       <p id="adminPanelMessage" class="message"></p>
     </section>
@@ -130,11 +140,11 @@
             <span id="matchDayStatus" class="muted">未发起</span>
           </div>
           <div class="row">
-            <input id="matchStartTimeInput" type="text" inputmode="numeric" placeholder="可留空，默认 19:30" maxlength="5" />
+            <input id="matchStartTimeInput" type="text" inputmode="numeric" placeholder="请输入开始时间，留空默认19:30" maxlength="5" />
             <button id="startMatchDayBtn">发起当日比赛</button>
           </div>
           <p id="matchStartTimeDisplay" class="muted"></p>
-          <p id="matchDayInfo" class="muted">发起后，报名与比赛记录会归入本比赛日，至北京时间次日凌晨 2 点自动结束。</p>
+          <p id="matchDayInfo" class="muted">请输入开始时间，留空默认19:30</p>
         </section>
 
         <section class="card">
@@ -298,13 +308,14 @@
     <div class="hero-picker-dialog access-dialog" role="dialog" aria-modal="true" aria-labelledby="accessModalTitle">
       <div class="section-head">
         <div>
-          <h2 id="accessModalTitle">你居然找到了阿哈利姆的迷宫入口！</h2>
+          <h2 id="accessModalTitle">你居然找到了阿哈利姆迷宫的入口！ 小强，你是从哪来的</h2>
           <p id="accessModalHint" class="muted">请输入口令。若为记分员，请在下方点选对应选手后再提交。</p>
         </div>
         <button id="closeAccessModalBtn" class="button-secondary" type="button">关闭</button>
       </div>
-      <div class="row">
-        <input id="accessPasswordInput" type="text" placeholder="请输入口令" />
+      <div class="access-field">
+        <label for="accessPasswordInput" class="muted access-field-label">你的回答是：</label>
+        <input id="accessPasswordInput" type="text" placeholder="你的回答是：" />
       </div>
       <div class="access-scorer-picker">
         <p class="muted access-scorer-picker-title">记分员身份选择</p>

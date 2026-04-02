@@ -11,6 +11,7 @@ const HARDCORE_TAG_SHOW_THRESHOLD = 0.35;
 const ADMIN_ACCESS_PASSWORD = "我是大魔导师";
 const SCORER_ACCESS_PASSWORD = "夜神夜神夜神";
 const ACCESS_SESSION_STORAGE_KEY = "nd_dota_access_session_v1";
+const ADMIN_ACTION_LOGS_STORAGE_PREFIX = "nd_dota_admin_action_logs_";
 
 const db = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
@@ -30,6 +31,8 @@ const adminMembersCount = document.getElementById("adminMembersCount");
 const scorerMembersCount = document.getElementById("scorerMembersCount");
 const adminMembersList = document.getElementById("adminMembersList");
 const scorerMembersList = document.getElementById("scorerMembersList");
+const adminActionLogsList = document.getElementById("adminActionLogsList");
+const adminActionLogsEmpty = document.getElementById("adminActionLogsEmpty");
 const adminAddScorerSelect = document.getElementById("adminAddScorerSelect");
 const adminAddScorerBtn = document.getElementById("adminAddScorerBtn");
 const adminPanelMessage = document.getElementById("adminPanelMessage");
@@ -648,6 +651,69 @@ function writeExternalDonationLogs(seasonId, logs) {
   );
 }
 
+function getAdminActionLogsStorageKey() {
+  return `${ADMIN_ACTION_LOGS_STORAGE_PREFIX}${getBeijingBusinessDateString()}`;
+}
+
+function cleanupExpiredAdminActionLogs() {
+  const activeKey = getAdminActionLogsStorageKey();
+  Object.keys(window.localStorage).forEach((key) => {
+    if (key.startsWith(ADMIN_ACTION_LOGS_STORAGE_PREFIX) && key !== activeKey) {
+      window.localStorage.removeItem(key);
+    }
+  });
+}
+
+function readAdminActionLogs() {
+  cleanupExpiredAdminActionLogs();
+  try {
+    const raw = window.localStorage.getItem(getAdminActionLogsStorageKey());
+    const parsed = raw ? JSON.parse(raw) : [];
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
+function writeAdminActionLogs(logs) {
+  cleanupExpiredAdminActionLogs();
+  window.localStorage.setItem(getAdminActionLogsStorageKey(), JSON.stringify(logs));
+}
+
+function getCurrentAccessActorLabel() {
+  if (currentAccessSession.role === "admin") {
+    return "管理员";
+  }
+
+  if (currentAccessSession.role === "scorer") {
+    const scorerMember = getRoleMembersByRole("scorer").find((member) => member.id === currentAccessSession.memberId);
+    if (scorerMember?.display_name) {
+      return scorerMember.display_name;
+    }
+    const player = seasonPlayers.find((item) => item.id === currentAccessSession.playerId);
+    if (player?.display_name) {
+      return player.display_name;
+    }
+    return "记分员";
+  }
+
+  return "游客";
+}
+
+function appendAdminActionLog(action) {
+  const text = String(action || "").trim();
+  if (!text) return;
+  const logs = readAdminActionLogs();
+  logs.unshift({
+    id: `action-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+    actor: getCurrentAccessActorLabel(),
+    text,
+    created_at: new Date().toISOString(),
+  });
+  writeAdminActionLogs(logs.slice(0, 100));
+  renderAdminActionLogs();
+}
+
 function formatTime24(value) {
   if (!value) return "";
   const match = String(value).match(/^(\d{1,2}):(\d{2})/);
@@ -894,8 +960,21 @@ function getAdminDisplayName(index) {
   return `管理员 ${String.fromCharCode(65 + index)}`;
 }
 
-function getScorerDisplayName(member, index) {
-  return `记分员 ${String.fromCharCode(65 + index)}${member.display_name ? ` · ${member.display_name}` : ""}`;
+function getScorerDisplayName(member) {
+  return member.display_name || "未命名选手";
+}
+
+function renderAdminActionLogs() {
+  if (!adminActionLogsList || !adminActionLogsEmpty) return;
+  const logs = readAdminActionLogs();
+  adminActionLogsList.innerHTML = logs.length
+    ? logs.map((log) => `
+      <div class="admin-action-log-card">
+        <p class="admin-action-log-text">${escapeHtml(log.actor)} 在 ${escapeHtml(formatLocalTime(log.created_at) || "未知时间")} ${escapeHtml(log.text)}</p>
+      </div>
+    `).join("")
+    : "";
+  adminActionLogsEmpty.hidden = logs.length > 0;
 }
 
 function setAdminPanelMessage(text = "", isError = false) {
@@ -989,7 +1068,7 @@ function renderRoleMembers() {
     ? scorers.map((member, index) => `
       <div class="admin-member-card">
         <div>
-          <strong>${escapeHtml(getScorerDisplayName(member, index))}</strong>
+          <strong>${escapeHtml(getScorerDisplayName(member))}</strong>
         </div>
         ${canCurrentUserManageRoles()
           ? `<button type="button" class="button-danger admin-remove-scorer-btn" data-role-member-id="${member.id}">移除</button>`
@@ -1001,6 +1080,7 @@ function renderRoleMembers() {
 
   renderAccessScorerOptions();
   renderAdminAddScorerOptions();
+  renderAdminActionLogs();
 }
 
 function getRoleAssignmentById(id) {
@@ -1056,7 +1136,8 @@ function applyRolePermissions() {
     recordEntryTitle.textContent = "记录比赛";
   }
 
-  startMatchDayBtn.hidden = !canScore;
+  startMatchDayBtn.hidden = false;
+  matchStartTimeInput.disabled = Boolean(activeMatchDay);
   confirmQueueBtn.hidden = !canScore;
   addTodayPlayerBtn.hidden = !canScore;
   todayAddPlayerSelect.hidden = !canScore;
@@ -2212,7 +2293,7 @@ function renderMatchDayStatus() {
 
   matchDayStatus.textContent = "未发起";
   matchDayStatus.className = "muted day-status-inactive";
-  matchDayInfo.textContent = "需要先发起当日比赛，报名功能才会开放。";
+  matchDayInfo.textContent = "请输入开始时间，留空默认19:30";
   startMatchDayBtn.textContent = "发起当日比赛";
   startMatchDayBtn.disabled = false;
   matchStartTimeInput.disabled = false;
@@ -2374,6 +2455,7 @@ function renderQueue(data) {
   queueList.innerHTML = "";
   const allRows = data || [];
   const readyEntries = getQueueReadyEntries();
+  const canScore = isCurrentRoleScorer();
   confirmQueueBtn.disabled = readyEntries.length < 10;
 
   const visibleRows = allRows.filter((row) =>
@@ -2410,7 +2492,9 @@ function renderQueue(data) {
     const actionHtml = isCancelled
       ? `<button class="button-secondary queue-resignup-btn" data-entry-id="${row.id}" data-player-name="${escapeHtml(playerName)}">重新报名</button>`
       : hasArrived
-        ? `<button class="button-danger queue-unready-btn" data-roster-entry-id="${readyEntry.id}" data-player-name="${escapeHtml(playerName)}">取消就位</button>`
+        ? (canScore
+            ? `<button class="button-danger queue-unready-btn" data-roster-entry-id="${readyEntry.id}" data-player-name="${escapeHtml(playerName)}">取消就位</button>`
+            : "")
         : `<button class="button-secondary queue-ready-btn" data-entry-id="${row.id}" data-player-id="${row.player_id}" data-player-name="${escapeHtml(playerName)}">就位</button>`;
     let laneLabel = "";
 
@@ -2613,6 +2697,7 @@ async function addRewardExtra() {
     rewardOutsideNameInput.value = "";
     rewardPlayerSelect.value = "";
     setRewardMessage(`${outsideName} 的场外赞助已记录在本地。`);
+    appendAdminActionLog(`记录了一笔场外赞助 ${outsideName} +${extraAmount}。`);
     await loadRewardLogs();
     updateRewardMinimumHint();
     return;
@@ -2636,6 +2721,7 @@ async function addRewardExtra() {
   rewardOutsideNameInput.value = "";
   rewardPlayerSelect.value = "";
   setRewardMessage(`${selectedPlayer?.display_name || outsideName} 已增加赞助额 ${extraAmount}。`);
+  appendAdminActionLog(`为 ${selectedPlayer?.display_name || outsideName || "该选手"} 添加了赞助 +${extraAmount}。`);
   updateRewardMinimumHint();
   requestImmediateRefresh({
     playerDriven: true,
@@ -3108,6 +3194,7 @@ async function addScorerRoleByPlayer(playerId) {
 
   adminAddScorerSelect.value = "";
   setAdminPanelMessage("记分员已添加。");
+  appendAdminActionLog(`将 ${seasonPlayers.find((player) => player.id === playerId)?.display_name || "该选手"} 设为记分员。`);
   await loadRoleMembers();
 }
 
@@ -3132,6 +3219,7 @@ async function removeScorerRole(memberId) {
   }
 
   setAdminPanelMessage("记分员已移除。");
+  appendAdminActionLog(`移除了记分员 ${member?.display_name || "该选手"}。`);
   await loadRoleMembers();
 }
 
@@ -3548,6 +3636,7 @@ async function resetCurrentSeason() {
   setMatchFormOpen(false);
   writeExternalDonationLogs(activeSeason.id, []);
   setMessage(`已重置 ${activeSeason.name}，并从总表同步了 ${data ?? 0} 名选手。`);
+  appendAdminActionLog(`重置了赛季 ${activeSeason.name}。`);
   await loadRewardLogs();
   requestImmediateRefresh({
     seasonContext: true,
@@ -3841,6 +3930,7 @@ async function confirmQueueToTodayPlayers() {
   }
 
   setMessage(`已确认已就位选手 ${data ?? 0} 人，未就位的报名选手仍保留在队列中。`);
+  appendAdminActionLog(`确认了 ${data ?? 0} 名已就位选手。`);
   requestImmediateRefresh({
     playerDriven: true,
     queue: true,
@@ -3870,6 +3960,7 @@ async function clearSignupQueueForTesting() {
   }
 
   setMessage(`已清空当前赛季报名队列，共删除 ${data ?? 0} 条记录。`);
+  appendAdminActionLog(`测试清空了报名队列，共删除 ${data ?? 0} 条记录。`);
   requestImmediateRefresh({ queue: true });
 }
 
@@ -3896,6 +3987,7 @@ async function clearTodayPlayersForTesting() {
   }
 
   setMessage(`已清空当日选手名单，共删除 ${data ?? 0} 条记录。`);
+  appendAdminActionLog(`测试清空了当日选手，共删除 ${data ?? 0} 条记录。`);
   requestImmediateRefresh({
     playerDriven: true,
     queue: true,
@@ -3903,7 +3995,6 @@ async function clearTodayPlayersForTesting() {
 }
 
 async function startMatchDay() {
-  if (!ensureScorerAccess("仅记分员或管理员可发起比赛日。")) return;
   matchStartTimeInput.value = normalizeTimeInput(matchStartTimeInput.value);
   const startTime = matchStartTimeInput.value || "19:30";
 
@@ -3933,6 +4024,7 @@ async function startMatchDay() {
   });
   matchStartTimeInput.value = "";
   setMessage("当日比赛已发起，可以开始报名和记录比赛。");
+  appendAdminActionLog(`发起了一次比赛，开始时间为 ${formatTime24(startTime)}。`);
   requestImmediateRefresh({
     playerDriven: true,
     recentMatches: true,
@@ -3940,7 +4032,6 @@ async function startMatchDay() {
 }
 
 async function cancelMatchDay() {
-  if (!ensureScorerAccess("仅记分员或管理员可取消比赛日。")) return;
   const confirmed = window.confirm("确认取消当前已发起的比赛吗？这会清空当前赛季的报名队列和当日选手名单。");
 
   if (!confirmed) {
@@ -3963,6 +4054,7 @@ async function cancelMatchDay() {
   clearStoredMatchDayStartTime();
   matchStartTimeInput.value = "";
   setMessage("已取消当日比赛发起。");
+  appendAdminActionLog("取消了当前比赛日。");
   requestImmediateRefresh({
     playerDriven: true,
     queue: true,
@@ -4001,6 +4093,7 @@ async function addTodayPlayer() {
   }
 
   setMessage("已加入当日选手名单。");
+  appendAdminActionLog(`添加了当日选手 ${seasonPlayers.find((player) => player.id === playerId)?.display_name || "该选手"}。`);
   requestImmediateRefresh({
     playerDriven: true,
     queue: true,
@@ -4058,6 +4151,7 @@ async function markQueuePlayerReady(playerId, playerName, buttonEl) {
 }
 
 async function cancelQueuePlayerReady(entryId, playerName, buttonEl) {
+  if (!ensureScorerAccess("仅记分员或管理员可取消已就位选手。")) return;
   if (!entryId) {
     setMessage("缺少就位记录，无法取消。", true);
     return;
@@ -4107,6 +4201,7 @@ async function removeTodayPlayer(entryId, buttonEl) {
   }
 
   setMessage("已移出当日名单。");
+  appendAdminActionLog("移出了一名当日选手。");
   requestImmediateRefresh({
     playerDriven: true,
     queue: true,
@@ -4408,6 +4503,7 @@ async function recordMatch() {
   setMatchFormOpen(false);
   renderMatchForm();
   setMatchMessage(winner ? "比赛记录成功，积分榜已刷新。" : "比赛记录已保存，当前未计分，补填胜负后才会变动积分。");
+  appendAdminActionLog("添加了一场比赛记录。");
   requestImmediateRefresh({
     leaderboard: true,
     recentMatches: true,
@@ -4497,6 +4593,7 @@ async function recordBackfillMatch() {
       ? (winner ? "比赛修改成功，积分已按全部记录重算。" : "比赛修改成功，当前未计分，补填胜负后才会变动积分。")
       : (winner ? "历史比赛补录成功。" : "历史比赛已归档，当前未计分，补填胜负后才会变动积分。")
   );
+  appendAdminActionLog(isEditing ? "修改了一场比赛记录。" : "补录了一场比赛记录。");
   requestImmediateRefresh({
     leaderboard: true,
     recentMatches: true,
@@ -4596,6 +4693,7 @@ async function deleteMatch(matchId, buttonEl) {
 
   setMessage("比赛记录已删除，积分已按全部比赛记录重算。");
   setMatchMessage("比赛记录已删除，积分已按全部比赛记录重算。");
+  appendAdminActionLog("删除了一场比赛记录。");
   requestImmediateRefresh({
     leaderboard: true,
     recentMatches: true,
