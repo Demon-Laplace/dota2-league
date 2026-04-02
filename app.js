@@ -1915,6 +1915,18 @@ function renderLeaderboard(data) {
     const rewardPoints = Number(player.reward_points ?? 0);
     return rewardPoints > max ? rewardPoints : max;
   }, 0);
+  const playersWithGames = data.filter((player) => Number(player.games_played ?? 0) > 0);
+  const lowestAverageScore = playersWithGames.reduce((min, player) => {
+    const averageScore = Number(player.score ?? 0) / Number(player.games_played ?? 1);
+    return averageScore < min ? averageScore : min;
+  }, Number.POSITIVE_INFINITY);
+  const lowestAveragePlayers = playersWithGames.filter((player) => (
+    (Number(player.score ?? 0) / Number(player.games_played ?? 1)) === lowestAverageScore
+  ));
+  const maxGamesAmongLowestAverage = lowestAveragePlayers.reduce((max, player) => {
+    const gamesPlayed = Number(player.games_played ?? 0);
+    return gamesPlayed > max ? gamesPlayed : max;
+  }, 0);
 
   data.forEach((player, idx) => {
     const tr = document.createElement("tr");
@@ -1928,6 +1940,14 @@ function renderLeaderboard(data) {
 
     if (activeSeason?.koi_player_id && playerId === activeSeason.koi_player_id) {
       tags.push({ icon: "✦", label: "锦鲤", tone: "teal" });
+    }
+
+    if (
+      Number(player.games_played ?? 0) > 0 &&
+      (Number(player.score ?? 0) / Number(player.games_played ?? 1)) === lowestAverageScore &&
+      Number(player.games_played ?? 0) === maxGamesAmongLowestAverage
+    ) {
+      tags.push({ icon: "☄", label: "又菜又爱玩", tone: "slate" });
     }
 
     const tagsHtml = tags.length

@@ -1331,6 +1331,17 @@ td {
   color: #bff6e8;
 }
 
+.leaderboard-tag-slate {
+  color: #d8e2f0;
+  border-color: rgba(148, 163, 184, 0.24);
+  background: rgba(48, 61, 80, 0.28);
+}
+
+.leaderboard-tag-slate .leaderboard-tag-icon {
+  background: rgba(148, 163, 184, 0.14);
+  color: #e2e8f0;
+}
+
 .leaderboard-score {
   display: inline-flex;
   align-items: center;
