@@ -242,23 +242,23 @@ button.season-total {
 
 .season-players-list {
   display: grid;
-  gap: 16px;
+  gap: 10px;
   margin-top: 14px;
 }
 
 .season-rank-columns {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 16px;
+  gap: 10px;
 }
 
 .season-rank-column,
 .season-unranked-section {
   display: grid;
-  gap: 12px;
-  padding: 14px;
+  gap: 8px;
+  padding: 10px;
   border: 1px solid rgba(124, 165, 209, 0.2);
-  border-radius: 14px;
+  border-radius: 12px;
   background: rgba(12, 29, 49, 0.5);
 }
 
@@ -272,13 +272,13 @@ button.season-total {
 
 .season-rank-head h3 {
   margin: 0;
-  font-size: 15px;
+  font-size: 14px;
 }
 
 .season-rank-list,
 .season-unranked-list {
   display: grid;
-  gap: 10px;
+  gap: 8px;
 }
 
 .season-unranked-list {
@@ -290,12 +290,12 @@ button.season-total {
 }
 
 .season-player-item {
-  padding: 10px 12px;
+  padding: 8px 9px;
   border: 1px solid var(--border);
-  border-radius: 12px;
+  border-radius: 10px;
   background: rgba(14, 32, 54, 0.64);
   display: grid;
-  gap: 10px;
+  gap: 6px;
 }
 
 .season-player-item-active {
@@ -307,20 +307,21 @@ button.season-total {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  gap: 10px;
+  gap: 8px;
+  font-size: 13px;
 }
 
 .season-player-actions {
   display: flex;
-  gap: 8px;
+  gap: 6px;
 }
 
 .season-player-rank-btn {
   flex: 1;
   min-width: 0;
-  padding: 6px 10px;
+  padding: 4px 7px;
   border-radius: 10px;
-  font-size: 13px;
+  font-size: 12px;
   background: rgba(17, 36, 59, 0.72);
   border: 1px solid rgba(124, 165, 209, 0.22);
   color: var(--text);
@@ -625,19 +626,39 @@ button:disabled {
 }
 
 .match-player-pool {
-  display: flex;
-  flex-wrap: wrap;
+  display: grid;
   gap: 8px;
 }
 
+.match-player-group {
+  display: grid;
+  gap: 6px;
+}
+
+.match-player-group-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+}
+
+.match-player-group-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px;
+}
+
 .match-player-chip {
-  padding: 6px 10px;
+  padding: 6px 8px;
   min-height: 32px;
-  border-radius: 999px;
+  border-radius: 9px;
   background: rgba(14, 31, 54, 0.82);
   border: 1px solid var(--border);
   color: var(--text);
   box-shadow: none;
+  font-size: 12px;
+  text-align: left;
 }
 
 .match-player-chip:hover:not(:disabled) {

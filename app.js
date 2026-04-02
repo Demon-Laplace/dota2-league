@@ -896,9 +896,11 @@ function getSelectedBackfillPlayerIds() {
 }
 
 function getTodayMatchPlayers() {
+  const seasonRankMap = new Map(seasonPlayers.map((player) => [player.id, player.player_rank || null]));
   return todayPlayers.map((player) => ({
     id: player.player_id || player.id,
     display_name: player.display_name,
+    player_rank: seasonRankMap.get(player.player_id || player.id) || null,
   }));
 }
 
@@ -940,6 +942,11 @@ function renderTeamSelectionUI({
   formType,
 }) {
   syncTeamSelections(selections, players, assignments);
+  const groupedPlayers = [
+    { title: "核心", players: players.filter((player) => player.player_rank === "core") },
+    { title: "辅助", players: players.filter((player) => player.player_rank === "support") },
+    { title: "未分组", players: players.filter((player) => player.player_rank !== "core" && player.player_rank !== "support") },
+  ].filter((group) => group.players.length);
   [
     { container: teamAContainer, teamKey: "teamA", title: "天辉方已选" },
     { container: teamBContainer, teamKey: "teamB", title: "夜魇方已选" },
@@ -974,26 +981,41 @@ function renderTeamSelectionUI({
     `;
 
     const pool = container.querySelector(".match-player-pool");
-    players.forEach((player) => {
-      const chip = document.createElement("button");
-      chip.type = "button";
-      chip.className = "match-player-chip";
-      chip.dataset.team = teamKey;
-      chip.dataset.formType = formType;
-      chip.dataset.playerId = player.id;
-      chip.textContent = player.display_name;
+    groupedPlayers.forEach((group) => {
+      const groupEl = document.createElement("section");
+      groupEl.className = "match-player-group";
+      groupEl.innerHTML = `
+        <div class="match-player-group-head">
+          <span>${group.title}</span>
+          <span class="muted">${group.players.length} 人</span>
+        </div>
+        <div class="match-player-group-grid"></div>
+      `;
 
-      if (selectedIds.has(player.id)) {
-        chip.classList.add("match-player-chip-selected");
-      } else if (oppositeIds.has(player.id)) {
-        chip.classList.add("match-player-chip-disabled");
-        chip.disabled = true;
-      } else if (selections[teamKey].length >= TEAM_SIZE) {
-        chip.classList.add("match-player-chip-disabled");
-        chip.disabled = true;
-      }
+      const grid = groupEl.querySelector(".match-player-group-grid");
+      group.players.forEach((player) => {
+        const chip = document.createElement("button");
+        chip.type = "button";
+        chip.className = "match-player-chip";
+        chip.dataset.team = teamKey;
+        chip.dataset.formType = formType;
+        chip.dataset.playerId = player.id;
+        chip.textContent = player.display_name;
 
-      pool.appendChild(chip);
+        if (selectedIds.has(player.id)) {
+          chip.classList.add("match-player-chip-selected");
+        } else if (oppositeIds.has(player.id)) {
+          chip.classList.add("match-player-chip-disabled");
+          chip.disabled = true;
+        } else if (selections[teamKey].length >= TEAM_SIZE) {
+          chip.classList.add("match-player-chip-disabled");
+          chip.disabled = true;
+        }
+
+        grid.appendChild(chip);
+      });
+
+      pool.appendChild(groupEl);
     });
   });
 }
@@ -1889,6 +1911,7 @@ async function loadPlayersForSeason(seasonId) {
     .from("season_players")
     .select(`
       player_id,
+      player_rank,
       players (
         display_name
       )
@@ -1907,6 +1930,7 @@ async function loadPlayersForSeason(seasonId) {
   backfillPlayers = (data || []).map((row) => ({
     id: row.player_id,
     display_name: row.players?.display_name || "未知选手",
+    player_rank: row.player_rank || null,
   })).sort((a, b) => a.display_name.localeCompare(b.display_name, "zh-CN"));
 
   renderBackfillForm();
