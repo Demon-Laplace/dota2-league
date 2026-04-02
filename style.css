@@ -668,7 +668,7 @@ button:disabled {
 
 .team-panel-head {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: space-between;
   gap: 10px;
   margin-bottom: 12px;
@@ -676,10 +676,12 @@ button:disabled {
 }
 
 .team-double-slot {
-  display: flex;
-  align-items: center;
-  gap: 8px;
+  position: relative;
+  display: inline-flex;
+  align-items: flex-start;
+  justify-content: flex-end;
   min-height: 34px;
+  flex: 0 0 auto;
 }
 
 .team-double-toggle {
@@ -706,8 +708,20 @@ button:disabled {
 
 .team-double-options {
   display: none;
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  z-index: 4;
   flex-wrap: wrap;
+  justify-content: flex-end;
   gap: 6px;
+  padding: 8px;
+  border-radius: 12px;
+  border: 1px solid rgba(124, 165, 209, 0.16);
+  background: rgba(8, 21, 37, 0.96);
+  box-shadow: 0 14px 28px rgba(4, 14, 24, 0.34);
+  min-width: 180px;
+  max-width: min(240px, calc(100vw - 40px));
 }
 
 .team-double-options-open {

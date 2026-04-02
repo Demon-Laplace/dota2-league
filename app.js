@@ -1261,7 +1261,7 @@ function buildSingleDoubleOptionsHtml(formType, player, allSelectedPlayers) {
         data-role="player-double-clear"
         data-form-type="${formType}"
         data-user-player-id="${player.id}"
-      >取消</button>
+      >不使用</button>
     `,
     ...options.map((candidate) => {
     const isActive = candidate.id === currentTargetId;
