@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Dota2 宁德联赛</title>
-  <link rel="stylesheet" href="style.css?v=20260402-14" />
+  <link rel="stylesheet" href="style.css?v=20260402-15" />
 </head>
 <body>
   <div id="loadingScreen" class="loading-screen" aria-live="polite">
@@ -164,6 +164,7 @@
               </select>
               <input id="matchNote" type="text" placeholder="备注，可选" />
             </div>
+            <div id="matchDoublePanel" class="double-panel"></div>
             <div class="row match-form-actions">
               <button id="recordMatchBtn">保存比赛记录</button>
               <button id="closeMatchFormBtn" class="button-secondary">收起</button>
@@ -202,6 +203,7 @@
               </select>
               <input id="backfillMatchNote" type="text" placeholder="补录备注，可选" />
             </div>
+            <div id="backfillDoublePanel" class="double-panel"></div>
             <div class="row match-form-actions">
               <button id="recordBackfillBtn">保存补录比赛</button>
               <button id="closeBackfillFormBtn" class="button-secondary">收起</button>
@@ -247,6 +249,6 @@
   </div>
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="app.js?v=20260402-17"></script>
+  <script src="app.js?v=20260402-18"></script>
 </body>
 </html>
