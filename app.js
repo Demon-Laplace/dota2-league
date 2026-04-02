@@ -6,6 +6,7 @@ const LOADING_SCREEN_MIN_MS = 900;
 const db = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 const loadingScreen = document.getElementById("loadingScreen");
+const lastUpdatedText = document.getElementById("lastUpdatedText");
 const signupPlayerGrid = document.getElementById("signupPlayerGrid");
 const signupEmpty = document.getElementById("signupEmpty");
 const messageEl = document.getElementById("message");
@@ -695,6 +696,24 @@ function formatLocalTime(value) {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return "";
   return date.toLocaleString("zh-CN", { hour12: false });
+}
+
+function renderLastUpdatedTime() {
+  if (!lastUpdatedText) return;
+
+  const raw = document.lastModified;
+  if (!raw) {
+    lastUpdatedText.textContent = "未知";
+    return;
+  }
+
+  const date = new Date(raw);
+  if (Number.isNaN(date.getTime())) {
+    lastUpdatedText.textContent = raw;
+    return;
+  }
+
+  lastUpdatedText.textContent = formatLocalTime(date.toISOString()) || raw;
 }
 
 function formatArchiveDate(value) {
@@ -3429,6 +3448,7 @@ document.addEventListener("click", (event) => {
 
 async function init() {
   try {
+    renderLastUpdatedTime();
     setMatchFormOpen(false);
     setBackfillFormOpen(false);
     setSeasonPanelOpen(false);
