@@ -1111,18 +1111,35 @@ function renderSeasonPlayersPanel() {
     const item = document.createElement("div");
     item.className = `season-player-item${player.is_in_season ? " season-player-item-active" : ""}`;
     const statusBadge = player.is_in_season
-      ? '<span class="queue-slot">本赛季参赛</span>'
-      : '<span class="muted">点击加入赛季</span>';
+      ? `<span class="queue-slot">${player.player_rank === "core" ? "核心" : "辅助"}</span>`
+      : '<span class="muted">未参赛</span>';
     item.innerHTML = `
-      <button
-        class="season-player-button${player.is_in_season ? " season-player-button-active" : ""}"
-        type="button"
-        data-player-id="${player.id}"
-        data-player-name="${escapeHtml(player.display_name)}"
-      >
+      <div class="season-player-main">
         <strong>${escapeHtml(player.display_name)}</strong>
         ${statusBadge}
-      </button>
+      </div>
+      <div class="season-player-actions">
+        <button
+          class="season-player-rank-btn${player.player_rank === "core" ? " season-player-rank-btn-active" : ""}"
+          type="button"
+          data-role="season-rank"
+          data-rank="core"
+          data-player-id="${player.id}"
+          data-player-name="${escapeHtml(player.display_name)}"
+        >
+          核心
+        </button>
+        <button
+          class="season-player-rank-btn${player.player_rank === "support" ? " season-player-rank-btn-active" : ""}"
+          type="button"
+          data-role="season-rank"
+          data-rank="support"
+          data-player-id="${player.id}"
+          data-player-name="${escapeHtml(player.display_name)}"
+        >
+          辅助
+        </button>
+      </div>
     `;
     seasonPlayersList.appendChild(item);
   });
@@ -1840,16 +1857,18 @@ async function loadSeasonPlayers() {
   }
 
   let participantIds = new Set();
+  let participantRanks = new Map();
   let rewardStats = new Map();
 
   if (activeSeason?.id) {
     const participantsResult = await db
       .from("season_players")
-      .select("player_id")
+      .select("player_id, player_rank")
       .eq("season_id", activeSeason.id);
 
     if (!participantsResult.error) {
       participantIds = new Set((participantsResult.data || []).map((row) => row.player_id));
+      participantRanks = new Map((participantsResult.data || []).map((row) => [row.player_id, row.player_rank]));
     }
 
     const statsResult = await db
@@ -1867,6 +1886,7 @@ async function loadSeasonPlayers() {
     return {
       id: player.id,
       is_in_season: participantIds.has(player.id),
+      player_rank: participantRanks.get(player.id) || null,
       display_name: player.display_name,
       reward_points: stats?.reward_points ?? (20 + Number(player.reward_floor_bonus ?? 0) + Number(player.reward_extra_points ?? 0)),
       reward_minimum: 20 + Number(stats?.reward_floor_bonus ?? player.reward_floor_bonus ?? 0),
@@ -1877,6 +1897,13 @@ async function loadSeasonPlayers() {
   seasonPlayers.sort((a, b) => {
     if (a.is_in_season !== b.is_in_season) {
       return a.is_in_season ? -1 : 1;
+    }
+
+    const rankOrder = { core: 0, support: 1 };
+    const aRank = rankOrder[a.player_rank] ?? 9;
+    const bRank = rankOrder[b.player_rank] ?? 9;
+    if (aRank !== bRank) {
+      return aRank - bRank;
     }
 
     return a.display_name.localeCompare(b.display_name, "zh-CN");
@@ -2074,28 +2101,37 @@ async function resetCurrentSeason() {
   });
 }
 
-async function toggleSeasonPlayer(playerId, playerName) {
+async function setSeasonPlayerRank(playerId, playerName, playerRank) {
   if (!activeSeason?.id) {
     setMessage("当前没有可操作的赛季。", true);
     return;
   }
 
   const currentPlayer = seasonPlayers.find((player) => player.id === playerId);
-  const isInSeason = Boolean(currentPlayer?.is_in_season);
+  const nextRank = currentPlayer?.player_rank === playerRank ? null : playerRank;
 
-  setMessage(isInSeason ? `正在取消 ${playerName} 的赛季参赛...` : `正在将 ${playerName} 加入当前赛季...`);
+  setMessage(
+    nextRank
+      ? `正在将 ${playerName} 设为${nextRank === "core" ? "核心" : "辅助"}...`
+      : `正在取消 ${playerName} 的赛季参赛...`
+  );
 
-  const { data, error } = await db.rpc("toggle_season_player", {
+  const { data, error } = await db.rpc("set_season_player_rank", {
     p_player_id: playerId,
     p_season_id: activeSeason.id,
+    p_player_rank: nextRank,
   });
 
   if (error) {
-    setMessage(`更新赛季参赛状态失败：${error.message}。请先在 Supabase 执行对应 SQL。`, true);
+    setMessage(`更新赛季选手身份失败：${error.message}。请先在 Supabase 执行对应 SQL。`, true);
     return;
   }
 
-  setMessage(data ? `${playerName} 已加入当前赛季。` : `${playerName} 已取消当前赛季参赛。`);
+  setMessage(
+    data
+      ? `${playerName} 已设为${data === "core" ? "核心" : "辅助"}。`
+      : `${playerName} 已取消当前赛季参赛。`
+  );
   requestImmediateRefresh({
     playerDriven: true,
     queue: true,
@@ -3355,10 +3391,10 @@ recentMatchesList.addEventListener("click", async (event) => {
 });
 
 seasonPlayersList.addEventListener("click", async (event) => {
-  const button = event.target.closest(".season-player-button");
+  const button = event.target.closest('[data-role="season-rank"]');
   if (!button) return;
 
-  await toggleSeasonPlayer(button.dataset.playerId, button.dataset.playerName);
+  await setSeasonPlayerRank(button.dataset.playerId, button.dataset.playerName, button.dataset.rank);
 });
 
 seasonRewardTotal.addEventListener("click", () => {

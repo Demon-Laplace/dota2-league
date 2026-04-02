@@ -248,10 +248,12 @@ button.season-total {
 }
 
 .season-player-item {
-  padding: 0;
+  padding: 10px 12px;
   border: 1px solid var(--border);
   border-radius: 12px;
   background: rgba(14, 32, 54, 0.64);
+  display: grid;
+  gap: 10px;
 }
 
 .season-player-item-active {
@@ -259,25 +261,36 @@ button.season-total {
   background: linear-gradient(135deg, rgba(37, 97, 186, 0.22), rgba(14, 33, 56, 0.72));
 }
 
-.season-player-button {
-  width: 100%;
-  background: transparent;
-  border: 0;
-  color: inherit;
-  text-align: left;
+.season-player-main {
   display: flex;
   justify-content: space-between;
   align-items: center;
   gap: 10px;
-  padding: 10px 12px;
 }
 
-.season-player-button:hover {
+.season-player-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.season-player-rank-btn {
+  flex: 1;
+  min-width: 0;
+  padding: 6px 10px;
+  border-radius: 10px;
+  font-size: 13px;
+  background: rgba(17, 36, 59, 0.72);
+  border: 1px solid rgba(124, 165, 209, 0.22);
+  color: var(--text);
+}
+
+.season-player-rank-btn:hover {
   background: rgba(86, 166, 255, 0.1);
 }
 
-.season-player-button-active {
-  background: rgba(86, 166, 255, 0.08);
+.season-player-rank-btn-active {
+  background: rgba(86, 166, 255, 0.16);
+  border-color: rgba(86, 166, 255, 0.45);
 }
 
 .signup-player-grid {
