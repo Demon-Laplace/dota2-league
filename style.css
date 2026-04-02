@@ -2367,6 +2367,12 @@ ol {
   box-shadow: 0 0 0 1px rgba(117, 230, 214, 0.12), 0 10px 20px rgba(9, 25, 39, 0.24);
 }
 
+.access-scorer-chip-mark {
+  margin-left: 6px;
+  color: #9ee7da;
+  font-size: 11px;
+}
+
 .hero-picker-dialog select {
   width: 100%;
   min-width: 0;

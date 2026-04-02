@@ -910,6 +910,10 @@ function setAccessMessage(text = "", isError = false) {
   accessMessage.className = isError ? "message error" : "message";
 }
 
+function normalizeAccessPassword(value) {
+  return String(value || "").normalize("NFKC").trim();
+}
+
 function setAccessModalOpen(isOpen) {
   accessModal.hidden = !isOpen;
   if (!isOpen) {
@@ -926,26 +930,27 @@ function setAccessModalOpen(isOpen) {
 
 function renderAccessScorerOptions() {
   if (!accessScorerSelect) return;
-  const scorers = getRoleMembersByRole("scorer")
+  const scorerPlayerIds = new Set(getRoleMembersByRole("scorer").map((member) => member.player_id));
+  const players = seasonPlayers
     .slice()
     .sort((a, b) => (a.display_name || "").localeCompare(b.display_name || "", "zh-CN"));
   const options = ['<option value="">若为记分员，请选择对应选手</option>'];
-  scorers.forEach((member) => {
-    options.push(`<option value="${member.id}">${escapeHtml(member.display_name || "未命名记分员")}</option>`);
+  players.forEach((player) => {
+    options.push(`<option value="${player.id}">${escapeHtml(player.display_name || "未命名选手")}</option>`);
   });
   accessScorerSelect.innerHTML = options.join("");
   if (accessScorerChips) {
-    accessScorerChips.innerHTML = scorers.length
-      ? scorers.map((member) => `
+    accessScorerChips.innerHTML = players.length
+      ? players.map((player) => `
         <button
           type="button"
-          class="access-scorer-chip${accessScorerSelect.value === member.id ? " access-scorer-chip-active" : ""}"
-          data-role-member-id="${member.id}"
+          class="access-scorer-chip${accessScorerSelect.value === player.id ? " access-scorer-chip-active" : ""}"
+          data-player-id="${player.id}"
         >
-          ${escapeHtml(member.display_name || "未命名记分员")}
+          ${escapeHtml(player.display_name || "未命名选手")}${scorerPlayerIds.has(player.id) ? '<span class="access-scorer-chip-mark">记分员</span>' : ""}
         </button>
       `).join("")
-      : '<p class="muted">当前还没有可用的记分员身份。</p>';
+      : '<p class="muted">当前还没有可选选手。</p>';
   }
 }
 
@@ -3131,15 +3136,15 @@ async function removeScorerRole(memberId) {
 }
 
 async function confirmAccessRole() {
-  const password = accessPasswordInput.value.trim();
-  const scorerMemberId = accessScorerSelect.value;
+  const password = normalizeAccessPassword(accessPasswordInput.value);
+  const selectedPlayerId = accessScorerSelect.value;
 
   if (!password) {
     setAccessMessage("请输入口令。", true);
     return;
   }
 
-  if (password === ADMIN_ACCESS_PASSWORD) {
+  if (password === normalizeAccessPassword(ADMIN_ACCESS_PASSWORD)) {
     writeStoredAccessSession({ role: "admin", memberId: "", playerId: "" });
     setAccessMessage("管理员模式已启用。");
     renderRoleMembers();
@@ -3148,19 +3153,38 @@ async function confirmAccessRole() {
     return;
   }
 
-  if (password === SCORER_ACCESS_PASSWORD) {
-    const scorerMember = getRoleAssignmentById(scorerMemberId);
+  if (password === normalizeAccessPassword(SCORER_ACCESS_PASSWORD)) {
+    if (!selectedPlayerId) {
+      setAccessMessage("请选择对应的总表选手。", true);
+      return;
+    }
+
+    let scorerMember = getRoleMembersByRole("scorer").find((member) => member.player_id === selectedPlayerId);
+
+    if (!scorerMember) {
+      setAccessMessage("正在登记记分员身份...");
+      const { error } = await db.from("app_role_members").insert([{ role: "scorer", player_id: selectedPlayerId }]);
+
+      if (error && !String(error.message || "").includes("duplicate key")) {
+        setAccessMessage(`记分员身份登记失败：${error.message}`, true);
+        return;
+      }
+
+      await loadRoleMembers();
+      scorerMember = getRoleMembersByRole("scorer").find((member) => member.player_id === selectedPlayerId);
+    }
+
     if (!scorerMember || scorerMember.role !== "scorer") {
-      setAccessMessage("请选择已授权的记分员选手。", true);
+      setAccessMessage("该选手暂时无法成为记分员。", true);
       return;
     }
 
     writeStoredAccessSession({
       role: "scorer",
       memberId: scorerMember.id,
-      playerId: scorerMember.player_id || "",
+      playerId: scorerMember.player_id || selectedPlayerId || "",
     });
-    setAccessMessage("记分员身份已恢复。");
+    setAccessMessage("记分员身份已启用。");
     renderRoleMembers();
     applyRolePermissions();
     setAccessModalOpen(false);
@@ -5116,8 +5140,8 @@ if (accessScorerChips) {
   accessScorerChips.addEventListener("click", (event) => {
     const chip = event.target.closest(".access-scorer-chip");
     if (!chip) return;
-    const memberId = chip.dataset.roleMemberId || "";
-    accessScorerSelect.value = memberId;
+    const playerId = chip.dataset.playerId || "";
+    accessScorerSelect.value = playerId;
     accessScorerChips.querySelectorAll(".access-scorer-chip").forEach((item) => {
       item.classList.toggle("access-scorer-chip-active", item === chip);
     });
