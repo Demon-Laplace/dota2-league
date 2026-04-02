@@ -1021,9 +1021,9 @@ function getActiveWinStreakPlayerIds(matches, minStreak = 3) {
 }
 
 function getLeaderboardNameRankClass(rank) {
-  if (rank === 1) return "leaderboard-player-name-rank1";
-  if (rank <= 3) return "leaderboard-player-name-rank23";
-  if (rank <= 5) return "leaderboard-player-name-rank45";
+  if (rank === 1) return "player-name-display-rank1";
+  if (rank <= 3) return "player-name-display-rank23";
+  if (rank <= 5) return "player-name-display-rank45";
   return "";
 }
 
@@ -1037,18 +1037,11 @@ function buildDecoratedPlayerNameHtml(playerId, displayName, options = {}) {
   const safeName = escapeHtml(displayName || "未知选手");
   const nameClassName = getPlayerNameStyleClass(playerId, options);
   const rankClassName = getLeaderboardNameRankClass(options.rank || 0);
-  const wrapperClassName = options.wrapperClassName || "player-name-stack";
+  const className = [nameClassName, rankClassName, options.wrapperClassName]
+    .filter(Boolean)
+    .join(" ");
 
-  return `
-    <span class="${wrapperClassName}">
-      ${rankClassName
-        ? `<span class="leaderboard-rank-overlay leaderboard-rank-overlay-base ${rankClassName}" aria-hidden="true">${safeName}</span>
-           <span class="leaderboard-rank-overlay leaderboard-rank-overlay-gloss ${rankClassName}" aria-hidden="true">${safeName}</span>`
-        : ""
-      }
-      <span class="${nameClassName}">${safeName}</span>
-    </span>
-  `;
+  return `<span class="${className}">${safeName}</span>`;
 }
 
 function hasRecordedWinner(value) {
