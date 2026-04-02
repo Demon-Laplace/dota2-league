@@ -2433,7 +2433,7 @@ function renderRecentMatches(data) {
     const matchDayPlayerNames = getMatchDayPlayerNames(matches);
     const matchDayPlayerText = matchDayPlayerNames.join(" · ");
     details.dataset.matchDate = matchDate;
-    details.className = "match-day-group";
+    details.className = `match-day-group${isActiveDay ? " match-day-group-active-day" : " match-day-group-archive-day"}`;
     details.open = isActiveDay || openRecentMatchGroups.has(matchDate);
     details.dataset.expanded = details.open ? "true" : "false";
     details.addEventListener("toggle", () => {
