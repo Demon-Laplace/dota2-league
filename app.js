@@ -1338,12 +1338,7 @@ function buildHeroBadge(heroName) {
 function buildSingleDoubleOptionsHtml(formType, player, allSelectedPlayers) {
   const { teamMap } = getSelectedPlayersWithTeams(formType);
   const currentTargetId = getSingleDoubleTargetByUser(formType, player.id);
-  const playerTeam = teamMap.get(player.id);
-  const options = allSelectedPlayers.filter((candidate) => {
-    const candidateTeam = teamMap.get(candidate.id);
-    if (!candidateTeam || !playerTeam) return false;
-    return candidate.id === player.id || candidateTeam !== playerTeam;
-  });
+  const options = getOrderedSingleDoubleCandidates(player, allSelectedPlayers, teamMap);
 
   return [
     `
@@ -2406,6 +2401,26 @@ function getMatchDayPlayerNames(matches) {
   return names;
 }
 
+function getOrderedSingleDoubleCandidates(player, candidates, teamMap) {
+  const selfCandidate = [];
+  const opponentCandidates = [];
+  const playerTeam = teamMap.get(player.id);
+
+  candidates.forEach((candidate) => {
+    const candidateTeam = teamMap.get(candidate.id);
+    if (!candidateTeam || !playerTeam) return;
+    if (candidate.id === player.id) {
+      selfCandidate.push(candidate);
+      return;
+    }
+    if (candidateTeam !== playerTeam) {
+      opponentCandidates.push(candidate);
+    }
+  });
+
+  return [...selfCandidate, ...opponentCandidates];
+}
+
 function renderRecentMatches(data) {
   recentMatchesData = data || [];
   recentMatchesList.innerHTML = "";
@@ -2431,6 +2446,7 @@ function renderRecentMatches(data) {
     const details = document.createElement("details");
     const isActiveDay = matches.some((match) => match.day_is_active);
     const matchDayPlayerNames = getMatchDayPlayerNames(matches);
+    const matchDayPlayerCount = matchDayPlayerNames.length;
     const matchDayPlayerText = matchDayPlayerNames.join(" · ");
     details.dataset.matchDate = matchDate;
     details.className = `match-day-group${isActiveDay ? " match-day-group-active-day" : " match-day-group-archive-day"}`;
@@ -2450,6 +2466,7 @@ function renderRecentMatches(data) {
         <div class="match-day-summary">
           <strong>${escapeHtml(matchDate)}</strong>
           <span class="queue-slot">${matches.length} 场</span>
+          <span class="match-day-player-count" title="当日参赛选手总数">${matchDayPlayerCount} 人</span>
           ${matchDayPlayerText
             ? `<span class="match-day-player-list" title="${escapeHtml(matchDayPlayerText)}">${escapeHtml(matchDayPlayerText)}</span>`
             : ""

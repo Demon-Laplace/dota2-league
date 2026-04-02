@@ -1192,6 +1192,26 @@ button:disabled {
   flex: 1 1 360px;
 }
 
+.match-day-player-count {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 2px 8px 2px 6px;
+  border-radius: 999px;
+  border: 1px solid rgba(240, 195, 106, 0.24);
+  background: rgba(88, 62, 22, 0.3);
+  color: #f5e3b8;
+  font-size: 11px;
+  line-height: 1.4;
+  white-space: nowrap;
+}
+
+.match-day-player-count::before {
+  content: "◉";
+  font-size: 10px;
+  color: rgba(240, 195, 106, 0.9);
+}
+
 .match-day-player-list {
   min-width: 0;
   max-width: min(100%, 720px);
