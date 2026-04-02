@@ -1768,7 +1768,7 @@ function renderLeaderboard(data) {
     renderRewardPlayerOptions();
     updateRewardMinimumHint();
     const tr = document.createElement("tr");
-    tr.innerHTML = '<td colspan="5" class="muted">暂无排行榜数据</td>';
+    tr.innerHTML = '<td colspan="5" class="muted leaderboard-empty">暂无排行榜数据</td>';
     leaderboardBody.appendChild(tr);
     return;
   }
@@ -1793,10 +1793,15 @@ function renderLeaderboard(data) {
     }
     tr.innerHTML = `
       <td><span class="leaderboard-rank">${rank}</span></td>
-      <td>${escapeHtml(player.display_name)}</td>
-      <td>${formatScore(player.score)}</td>
-      <td>${player.games_played ?? 0}</td>
-      <td>${Number(player.reward_points ?? 0)}</td>
+      <td>
+        <div class="leaderboard-player-cell">
+          <strong class="leaderboard-player-name">${escapeHtml(player.display_name)}</strong>
+          <span class="leaderboard-player-meta">赛季选手</span>
+        </div>
+      </td>
+      <td><span class="leaderboard-score">${formatScore(player.score)}</span></td>
+      <td><span class="leaderboard-stat">${player.games_played ?? 0}</span></td>
+      <td><span class="leaderboard-reward">${Number(player.reward_points ?? 0)}</span></td>
     `;
     leaderboardBody.appendChild(tr);
   });
