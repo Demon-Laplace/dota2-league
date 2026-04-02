@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Dota2 宁德联赛</title>
-  <link rel="stylesheet" href="style.css?v=20260402-16" />
+  <link rel="stylesheet" href="style.css?v=20260402-17" />
 </head>
   <body>
   <div id="loadingScreen" class="loading-screen" aria-live="polite">
@@ -26,10 +26,11 @@
         <p class="league-brand-kicker">DOTA 2 COMMUNITY LEAGUE</p>
         <h1 class="league-brand-title">
           <span class="league-brand-title-main">宁德联赛</span>
-          <span class="league-brand-title-sub">DOTA 2</span>
+          <span id="adminLogoTrigger" class="league-brand-title-sub">DOTA 2</span>
         </h1>
       </div>
       <div class="page-head-meta">
+        <button id="adminModeBtn" class="season-chip" type="button" hidden>管理员模式</button>
         <button id="seasonToggleBtn" class="season-chip" type="button" aria-expanded="false">
           当前赛季：加载中...
         </button>
@@ -37,6 +38,55 @@
       </div>
     </div>
     <p class="sub">测试版：报名队列 + 积分榜, 项目启动于北京时间 2026/4/1 19:30:59, 最后更新于 <span id="lastUpdatedText">读取中...</span></p>
+    <section id="adminPanel" class="season-panel admin-panel" hidden>
+      <div class="section-head">
+        <div>
+          <h2>管理员面板</h2>
+          <p id="adminPanelSummary" class="muted">加载中...</p>
+        </div>
+        <div class="row">
+          <button id="adminExitModeBtn" class="button-danger" type="button">退出管理员模式</button>
+          <button id="closeAdminPanelBtn" class="button-secondary" type="button">收起</button>
+        </div>
+      </div>
+      <div class="admin-panel-grid">
+        <section class="admin-panel-card">
+          <div class="section-head">
+            <h3>管理操作</h3>
+          </div>
+          <div class="row admin-panel-actions">
+            <button id="adminClearQueueBtn" class="button-danger" type="button">测试清空报名队列</button>
+            <button id="adminClearTodayPlayersBtn" class="button-danger" type="button">测试清空当日选手</button>
+            <button id="adminResetSeasonBtn" class="button-danger" type="button">重置当前赛季</button>
+          </div>
+        </section>
+        <section class="admin-panel-card">
+          <div class="section-head">
+            <div>
+              <h3>管理员</h3>
+              <p id="adminMembersCount" class="muted">0 人</p>
+            </div>
+          </div>
+          <div id="adminMembersList" class="admin-members-list"></div>
+        </section>
+        <section class="admin-panel-card">
+          <div class="section-head">
+            <div>
+              <h3>记分员</h3>
+              <p id="scorerMembersCount" class="muted">0 人</p>
+            </div>
+          </div>
+          <div class="row">
+            <select id="adminAddScorerSelect">
+              <option value="">请选择总表选手</option>
+            </select>
+            <button id="adminAddScorerBtn" type="button">新增记分员</button>
+          </div>
+          <div id="scorerMembersList" class="admin-members-list"></div>
+        </section>
+      </div>
+      <p id="adminPanelMessage" class="message"></p>
+    </section>
     <section id="rewardPanel" class="season-panel" hidden>
       <div class="section-head">
         <div>
@@ -98,7 +148,7 @@
           <h2>当前报名队列</h2>
           <div class="row">
             <button id="confirmQueueBtn" class="button-secondary" disabled>全部到齐</button>
-            <button id="clearQueueBtn" class="button-danger">测试清空报名队列</button>
+            <button id="clearQueueBtn" class="button-danger" hidden>测试清空报名队列</button>
           </div>
           <ol id="queueList"></ol>
           <p id="queueEmpty" class="muted">当前无人报名</p>
@@ -114,7 +164,7 @@
               <option value="">请选择临时添加选手</option>
             </select>
             <button id="addTodayPlayerBtn">临时添加选手</button>
-            <button id="clearTodayPlayersBtn" class="button-danger">测试清空当日选手</button>
+            <button id="clearTodayPlayersBtn" class="button-danger" hidden>测试清空当日选手</button>
           </div>
           <ul id="todayPlayersList" class="today-players-list"></ul>
           <p id="todayPlayersEmpty" class="muted">今日尚未确认到场选手</p>
@@ -242,6 +292,31 @@
       </div>
     </div>
   </main>
+
+  <div id="accessModal" class="hero-picker-modal" hidden>
+    <div id="accessModalBackdrop" class="hero-picker-backdrop"></div>
+    <div class="hero-picker-dialog access-dialog" role="dialog" aria-modal="true" aria-labelledby="accessModalTitle">
+      <div class="section-head">
+        <div>
+          <h2 id="accessModalTitle">身份验证</h2>
+          <p id="accessModalHint" class="muted">输入对应口令，记分员需选择已授权选手。</p>
+        </div>
+        <button id="closeAccessModalBtn" class="button-secondary" type="button">关闭</button>
+      </div>
+      <div class="row">
+        <input id="accessPasswordInput" type="password" placeholder="请输入口令" />
+      </div>
+      <div class="row">
+        <select id="accessScorerSelect">
+          <option value="">若为记分员，请选择对应选手</option>
+        </select>
+      </div>
+      <div class="row">
+        <button id="confirmAccessBtn" type="button">确认</button>
+      </div>
+      <p id="accessMessage" class="message"></p>
+    </div>
+  </div>
 
   <div id="heroPickerModal" class="hero-picker-modal" hidden>
     <div id="heroPickerBackdrop" class="hero-picker-backdrop"></div>

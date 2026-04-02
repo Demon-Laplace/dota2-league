@@ -8,6 +8,9 @@ const HARDCORE_TAG_LOVE_CAP_GAMES = 20;
 const HARDCORE_TAG_WIN_RATE_MAX = 40;
 const HARDCORE_TAG_QUANTILE = 0.35;
 const HARDCORE_TAG_SHOW_THRESHOLD = 0.35;
+const ADMIN_ACCESS_PASSWORD = "admin-nd-2026";
+const SCORER_ACCESS_PASSWORD = "scorer-nd-2026";
+const ACCESS_SESSION_STORAGE_KEY = "nd_dota_access_session_v1";
 
 const db = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
@@ -17,6 +20,22 @@ const signupPlayerGrid = document.getElementById("signupPlayerGrid");
 const signupEmpty = document.getElementById("signupEmpty");
 const messageEl = document.getElementById("message");
 const seasonToggleBtn = document.getElementById("seasonToggleBtn");
+const adminLogoTrigger = document.getElementById("adminLogoTrigger");
+const adminModeBtn = document.getElementById("adminModeBtn");
+const adminPanel = document.getElementById("adminPanel");
+const closeAdminPanelBtn = document.getElementById("closeAdminPanelBtn");
+const adminExitModeBtn = document.getElementById("adminExitModeBtn");
+const adminPanelSummary = document.getElementById("adminPanelSummary");
+const adminMembersCount = document.getElementById("adminMembersCount");
+const scorerMembersCount = document.getElementById("scorerMembersCount");
+const adminMembersList = document.getElementById("adminMembersList");
+const scorerMembersList = document.getElementById("scorerMembersList");
+const adminAddScorerSelect = document.getElementById("adminAddScorerSelect");
+const adminAddScorerBtn = document.getElementById("adminAddScorerBtn");
+const adminPanelMessage = document.getElementById("adminPanelMessage");
+const adminClearQueueBtn = document.getElementById("adminClearQueueBtn");
+const adminClearTodayPlayersBtn = document.getElementById("adminClearTodayPlayersBtn");
+const adminResetSeasonBtn = document.getElementById("adminResetSeasonBtn");
 const seasonPlayersPanel = document.getElementById("seasonPlayersPanel");
 const seasonPanelTitle = document.getElementById("seasonPanelTitle");
 const seasonPlayersCount = document.getElementById("seasonPlayersCount");
@@ -94,6 +113,13 @@ const heroSelect = document.getElementById("heroSelect");
 const saveHeroBtn = document.getElementById("saveHeroBtn");
 const clearHeroBtn = document.getElementById("clearHeroBtn");
 const heroPickerMessage = document.getElementById("heroPickerMessage");
+const accessModal = document.getElementById("accessModal");
+const accessModalBackdrop = document.getElementById("accessModalBackdrop");
+const closeAccessModalBtn = document.getElementById("closeAccessModalBtn");
+const accessPasswordInput = document.getElementById("accessPasswordInput");
+const accessScorerSelect = document.getElementById("accessScorerSelect");
+const confirmAccessBtn = document.getElementById("confirmAccessBtn");
+const accessMessage = document.getElementById("accessMessage");
 
 let seasonPlayers = [];
 let todayPlayers = [];
@@ -112,6 +138,7 @@ let isMatchFormOpen = false;
 let isBackfillFormOpen = false;
 let isSeasonPanelOpen = false;
 let isRewardPanelOpen = false;
+let isAdminPanelOpen = false;
 let editingMatchId = null;
 let matchTeamSelections = {
   teamA: [],
@@ -141,6 +168,13 @@ let singleDoublePickerOpen = {
   match: {},
   backfill: {},
 };
+let roleMembers = [];
+let currentAccessSession = {
+  role: "viewer",
+  memberId: "",
+  playerId: "",
+};
+currentAccessSession = readStoredAccessSession();
 let heroPickerState = null;
 let realtimeChannel = null;
 let refreshTimer = null;
@@ -753,16 +787,16 @@ function getFilteredHeroes(searchTerm = "") {
 }
 
 function setMatchFormOpen(isOpen) {
-  isMatchFormOpen = isOpen;
-  matchFormPanel.hidden = !isOpen;
-  openMatchFormBtn.textContent = isOpen ? "正在录入比赛" : "添加一场比赛记录";
-  openMatchFormBtn.disabled = isOpen || !activeMatchDay || todayPlayers.length < TEAM_SIZE * 2;
+  isMatchFormOpen = isOpen && isCurrentRoleScorer();
+  matchFormPanel.hidden = !isMatchFormOpen;
+  openMatchFormBtn.textContent = isMatchFormOpen ? "正在录入比赛" : "添加一场比赛记录";
+  openMatchFormBtn.disabled = !isCurrentRoleScorer() || isMatchFormOpen || !activeMatchDay || todayPlayers.length < TEAM_SIZE * 2;
 }
 
 function setBackfillFormOpen(isOpen) {
-  isBackfillFormOpen = isOpen;
-  backfillFormPanel.hidden = !isOpen;
-  openBackfillFormBtn.disabled = isOpen;
+  isBackfillFormOpen = isOpen && isCurrentRoleScorer();
+  backfillFormPanel.hidden = !isBackfillFormOpen;
+  openBackfillFormBtn.disabled = !isCurrentRoleScorer() || isBackfillFormOpen;
 }
 
 function setSeasonPanelOpen(isOpen) {
@@ -775,6 +809,249 @@ function setRewardPanelOpen(isOpen) {
   isRewardPanelOpen = isOpen;
   rewardPanel.hidden = !isOpen;
   seasonRewardTotal.setAttribute("aria-expanded", String(isOpen));
+}
+
+function setAdminPanelOpen(isOpen) {
+  isAdminPanelOpen = isOpen && isCurrentRoleAdmin();
+  adminPanel.hidden = !isAdminPanelOpen;
+  adminModeBtn.setAttribute("aria-expanded", String(isAdminPanelOpen));
+  if (adminModeBtn) {
+    adminModeBtn.textContent = isAdminPanelOpen ? "收起管理" : "管理员模式";
+  }
+}
+
+function readStoredAccessSession() {
+  try {
+    const raw = window.localStorage.getItem(ACCESS_SESSION_STORAGE_KEY);
+    if (!raw) return { role: "viewer", memberId: "", playerId: "" };
+    const parsed = JSON.parse(raw);
+    return {
+      role: parsed?.role || "viewer",
+      memberId: parsed?.memberId || "",
+      playerId: parsed?.playerId || "",
+    };
+  } catch (error) {
+    console.warn("读取本地身份失败：", error);
+    return { role: "viewer", memberId: "", playerId: "" };
+  }
+}
+
+function writeStoredAccessSession(session) {
+  currentAccessSession = {
+    role: session?.role || "viewer",
+    memberId: session?.memberId || "",
+    playerId: session?.playerId || "",
+  };
+
+  try {
+    window.localStorage.setItem(ACCESS_SESSION_STORAGE_KEY, JSON.stringify(currentAccessSession));
+  } catch (error) {
+    console.warn("写入本地身份失败：", error);
+  }
+}
+
+function clearStoredAccessSession() {
+  currentAccessSession = { role: "viewer", memberId: "", playerId: "" };
+  try {
+    window.localStorage.removeItem(ACCESS_SESSION_STORAGE_KEY);
+  } catch (error) {
+    console.warn("清理本地身份失败：", error);
+  }
+}
+
+function isCurrentRoleScorer() {
+  return currentAccessSession.role === "scorer" || currentAccessSession.role === "admin";
+}
+
+function isCurrentRoleAdmin() {
+  return currentAccessSession.role === "admin";
+}
+
+function canCurrentUserManageRoles() {
+  return isCurrentRoleAdmin();
+}
+
+function ensureScorerAccess(message = "当前身份无此操作权限。") {
+  if (isCurrentRoleScorer()) return true;
+  setMessage(message, true);
+  return false;
+}
+
+function ensureAdminAccess(message = "当前身份无管理员权限。") {
+  if (isCurrentRoleAdmin()) return true;
+  setMessage(message, true);
+  return false;
+}
+
+function getRoleMembersByRole(role) {
+  return roleMembers.filter((member) => member.role === role);
+}
+
+function getAdminDisplayName(index) {
+  return `管理员 ${String.fromCharCode(65 + index)}`;
+}
+
+function getScorerDisplayName(member, index) {
+  return `记分员 ${String.fromCharCode(65 + index)}${member.display_name ? ` · ${member.display_name}` : ""}`;
+}
+
+function setAdminPanelMessage(text = "", isError = false) {
+  if (!adminPanelMessage) return;
+  adminPanelMessage.textContent = text;
+  adminPanelMessage.className = isError ? "message error" : "message";
+}
+
+function setAccessMessage(text = "", isError = false) {
+  if (!accessMessage) return;
+  accessMessage.textContent = text;
+  accessMessage.className = isError ? "message error" : "message";
+}
+
+function setAccessModalOpen(isOpen) {
+  accessModal.hidden = !isOpen;
+  if (!isOpen) {
+    accessPasswordInput.value = "";
+    accessScorerSelect.value = "";
+    setAccessMessage("");
+  }
+}
+
+function renderAccessScorerOptions() {
+  if (!accessScorerSelect) return;
+  const scorers = getRoleMembersByRole("scorer")
+    .slice()
+    .sort((a, b) => (a.display_name || "").localeCompare(b.display_name || "", "zh-CN"));
+  const options = ['<option value="">若为记分员，请选择对应选手</option>'];
+  scorers.forEach((member) => {
+    options.push(`<option value="${member.id}">${escapeHtml(member.display_name || "未命名记分员")}</option>`);
+  });
+  accessScorerSelect.innerHTML = options.join("");
+}
+
+function renderAdminAddScorerOptions() {
+  if (!adminAddScorerSelect) return;
+  const scorerPlayerIds = new Set(getRoleMembersByRole("scorer").map((member) => member.player_id));
+  const options = ['<option value="">请选择总表选手</option>'];
+  seasonPlayers
+    .filter((player) => !scorerPlayerIds.has(player.id))
+    .sort((a, b) => a.display_name.localeCompare(b.display_name, "zh-CN"))
+    .forEach((player) => {
+      options.push(`<option value="${player.id}">${escapeHtml(player.display_name)}</option>`);
+    });
+  adminAddScorerSelect.innerHTML = options.join("");
+}
+
+function renderRoleMembers() {
+  const admins = getRoleMembersByRole("admin");
+  const scorers = getRoleMembersByRole("scorer");
+
+  adminMembersCount.textContent = `${admins.length} 人`;
+  scorerMembersCount.textContent = `${scorers.length} 人`;
+  adminPanelSummary.textContent = `当前共 ${admins.length} 位管理员，${scorers.length} 位记分员。`;
+
+  adminMembersList.innerHTML = admins.length
+    ? admins.map((member, index) => `
+      <div class="admin-member-card">
+        <div>
+          <strong>${escapeHtml(getAdminDisplayName(index))}</strong>
+        </div>
+      </div>
+    `).join("")
+    : '<p class="muted">暂无管理员</p>';
+
+  scorerMembersList.innerHTML = scorers.length
+    ? scorers.map((member, index) => `
+      <div class="admin-member-card">
+        <div>
+          <strong>${escapeHtml(getScorerDisplayName(member, index))}</strong>
+        </div>
+        ${canCurrentUserManageRoles()
+          ? `<button type="button" class="button-danger admin-remove-scorer-btn" data-role-member-id="${member.id}">移除</button>`
+          : ""
+        }
+      </div>
+    `).join("")
+    : '<p class="muted">暂无记分员</p>';
+
+  renderAccessScorerOptions();
+  renderAdminAddScorerOptions();
+}
+
+function getRoleAssignmentById(id) {
+  return roleMembers.find((member) => member.id === id) || null;
+}
+
+function validateStoredAccessSession() {
+  const stored = readStoredAccessSession();
+  if (stored.role === "admin") {
+    if (getRoleMembersByRole("admin").length) {
+      currentAccessSession = stored;
+      return;
+    }
+  }
+
+  if (stored.role === "scorer" && stored.memberId) {
+    const member = getRoleAssignmentById(stored.memberId);
+    if (member?.role === "scorer") {
+      currentAccessSession = {
+        role: "scorer",
+        memberId: member.id,
+        playerId: member.player_id || "",
+      };
+      return;
+    }
+  }
+
+  clearStoredAccessSession();
+}
+
+function applyRolePermissions() {
+  const canScore = isCurrentRoleScorer();
+  const isAdmin = isCurrentRoleAdmin();
+
+  if (adminModeBtn) {
+    adminModeBtn.hidden = !isAdmin;
+    adminModeBtn.textContent = isAdminPanelOpen ? "收起管理" : "管理员模式";
+  }
+
+  if (adminLogoTrigger) {
+    adminLogoTrigger.classList.toggle("league-brand-title-sub-admin", isAdmin);
+    adminLogoTrigger.setAttribute("aria-hidden", isAdmin ? "false" : "true");
+  }
+
+  resetSeasonBtn.hidden = true;
+  clearQueueBtn.hidden = true;
+  clearTodayPlayersBtn.hidden = true;
+
+  startMatchDayBtn.hidden = !canScore;
+  confirmQueueBtn.hidden = !canScore;
+  addTodayPlayerBtn.hidden = !canScore;
+  todayAddPlayerSelect.hidden = !canScore;
+  openMatchFormBtn.hidden = !canScore;
+  openBackfillFormBtn.hidden = !canScore;
+  recordMatchBtn.hidden = !canScore;
+  recordBackfillBtn.hidden = !canScore;
+  addRewardBtn.hidden = !canScore;
+  rewardPlayerSelect.disabled = !canScore;
+  rewardOutsideNameInput.disabled = !canScore;
+  rewardExtraInput.disabled = !canScore;
+  adminAddScorerBtn.disabled = !isAdmin;
+  adminAddScorerSelect.disabled = !isAdmin;
+  adminClearQueueBtn.disabled = !isAdmin;
+  adminClearTodayPlayersBtn.disabled = !isAdmin;
+  adminResetSeasonBtn.disabled = !isAdmin;
+
+  if (!canScore) {
+    setMatchFormOpen(false);
+    setBackfillFormOpen(false);
+  }
+
+  if (!isAdmin) {
+    setAdminPanelOpen(false);
+  }
+
+  renderSeasonPlayersPanel();
+  renderRecentMatches(recentMatchesData);
 }
 
 function escapeHtml(str) {
@@ -1723,6 +2000,7 @@ function updateRewardMinimumHint() {
 
 function renderRewardLogs() {
   rewardLogsList.innerHTML = "";
+  const canScore = isCurrentRoleScorer();
 
   if (!rewardLogs.length) {
     rewardLogsEmpty.style.display = "block";
@@ -1739,7 +2017,9 @@ function renderRewardLogs() {
       : `<span class="reward-log-amount">+${Number(log.amount ?? 0)}</span>`;
     const actionHtml = log.is_cancelled
       ? ""
-      : `<button class="button-danger cancel-reward-log-btn" type="button" data-donation-id="${log.id}" data-player-name="${escapeHtml(playerName)}">取消</button>`;
+      : (canScore
+        ? `<button class="button-danger cancel-reward-log-btn" type="button" data-donation-id="${log.id}" data-player-name="${escapeHtml(playerName)}">取消</button>`
+        : "");
 
     item.className = `reward-log-item${log.player_id ? "" : " reward-log-outside"}`;
     item.innerHTML = `
@@ -1776,6 +2056,7 @@ function renderSeasonPlayersPanel() {
   };
   const highestRewardIds = getHighestRewardPlayerIds(leaderboardPlayers);
   const hardcoreLoseIds = getHardcoreLoseTaggedPlayerIds(leaderboardPlayers);
+  const canScore = isCurrentRoleScorer();
 
   const renderPlayerCard = (player) => {
     const item = document.createElement("div");
@@ -1790,40 +2071,42 @@ function renderSeasonPlayersPanel() {
       <div class="season-player-main">
         <strong class="${nameClassName}">${escapeHtml(player.display_name)}</strong>
       </div>
-      <div class="season-player-actions">
-        <button
-          class="season-player-rank-btn${player.player_rank === "core" ? " season-player-rank-btn-active" : ""}"
-          type="button"
-          data-role="season-rank"
-          data-rank="core"
-          data-player-id="${player.id}"
-          data-player-name="${escapeHtml(player.display_name)}"
-        >
-          核心
-        </button>
-        <button
-          class="season-player-rank-btn${player.player_rank === "support" ? " season-player-rank-btn-active" : ""}"
-          type="button"
-          data-role="season-rank"
-          data-rank="support"
-          data-player-id="${player.id}"
-          data-player-name="${escapeHtml(player.display_name)}"
-        >
-          辅助
-        </button>
-        <button
-          class="season-player-rank-btn season-player-koi-btn${isCurrentKoi ? " season-player-koi-btn-active" : ""}"
-          type="button"
-          data-role="season-koi"
-          data-player-id="${player.id}"
-          data-player-name="${escapeHtml(player.display_name)}"
-          ${player.is_in_season ? "" : "disabled"}
-          title="${isCurrentKoi ? "取消锦鲤" : "设为锦鲤"}"
-          aria-pressed="${isCurrentKoi ? "true" : "false"}"
-        >
-          ✦
-        </button>
-      </div>
+      ${canScore ? `
+        <div class="season-player-actions">
+          <button
+            class="season-player-rank-btn${player.player_rank === "core" ? " season-player-rank-btn-active" : ""}"
+            type="button"
+            data-role="season-rank"
+            data-rank="core"
+            data-player-id="${player.id}"
+            data-player-name="${escapeHtml(player.display_name)}"
+          >
+            核心
+          </button>
+          <button
+            class="season-player-rank-btn${player.player_rank === "support" ? " season-player-rank-btn-active" : ""}"
+            type="button"
+            data-role="season-rank"
+            data-rank="support"
+            data-player-id="${player.id}"
+            data-player-name="${escapeHtml(player.display_name)}"
+          >
+            辅助
+          </button>
+          <button
+            class="season-player-rank-btn season-player-koi-btn${isCurrentKoi ? " season-player-koi-btn-active" : ""}"
+            type="button"
+            data-role="season-koi"
+            data-player-id="${player.id}"
+            data-player-name="${escapeHtml(player.display_name)}"
+            ${player.is_in_season ? "" : "disabled"}
+            title="${isCurrentKoi ? "取消锦鲤" : "设为锦鲤"}"
+            aria-pressed="${isCurrentKoi ? "true" : "false"}"
+          >
+            ✦
+          </button>
+        </div>
+      ` : ""}
     `;
     return item;
   };
@@ -2258,6 +2541,7 @@ function renderLeaderboard(data) {
 }
 
 async function addRewardExtra() {
+  if (!ensureScorerAccess("仅记分员或管理员可添加赞助。")) return;
   const playerId = rewardPlayerSelect.value;
   const outsideName = rewardOutsideNameInput.value.trim();
   const selectedPlayer = leaderboardPlayers.find(
@@ -2377,6 +2661,7 @@ async function loadRewardLogs() {
 }
 
 async function cancelRewardDonation(donationId, playerName, buttonEl) {
+  if (!ensureScorerAccess("仅记分员或管理员可取消赞助记录。")) return;
   const confirmed = window.confirm(`确认取消 ${playerName} 这条赞助记录吗？`);
 
   if (!confirmed) {
@@ -2574,6 +2859,7 @@ function renderRecentMatches(data) {
   recentMatchesList.innerHTML = "";
   const highestRewardIds = getHighestRewardPlayerIds(leaderboardPlayers);
   const hardcoreLoseIds = getHardcoreLoseTaggedPlayerIds(leaderboardPlayers);
+  const canScore = isCurrentRoleScorer();
 
   if (!recentMatchesData || recentMatchesData.length === 0) {
     recentMatchesEmpty.style.display = "block";
@@ -2661,6 +2947,7 @@ function renderRecentMatches(data) {
           <button
             type="button"
             class="recent-match-player"
+            ${canScore ? "" : "disabled"}
             data-role="saved-hero-picker"
             data-match-id="${match.match_id}"
             data-player-id="${player.player_id}"
@@ -2689,10 +2976,12 @@ function renderRecentMatches(data) {
             <strong class="${resultToneClass}">${winnerLabel}</strong>
             <span class="winner-badge">${getMatchStatusBadge(match.winner_team)}</span>
           </div>
-          <div class="queue-actions">
-            <button class="button-secondary edit-match-btn" data-match-id="${match.match_id}">修改记录</button>
-            <button class="button-danger delete-match-btn" data-match-id="${match.match_id}">删除记录</button>
-          </div>
+          ${canScore ? `
+            <div class="queue-actions">
+              <button class="button-secondary edit-match-btn" data-match-id="${match.match_id}">修改记录</button>
+              <button class="button-danger delete-match-btn" data-match-id="${match.match_id}">删除记录</button>
+            </div>
+          ` : ""}
         </div>
         <div class="recent-match-meta">
           <span class="muted">比赛日期：${escapeHtml(matchDateLabel)}</span>
@@ -2735,6 +3024,132 @@ async function loadActiveSeason() {
 
   activeSeason = data || null;
   updateSeasonInfo();
+}
+
+async function loadRoleMembers() {
+  const { data, error } = await db
+    .from("app_role_members")
+    .select("id, role, player_id, created_at")
+    .order("created_at", { ascending: true });
+
+  if (error) {
+    console.error("加载角色成员失败：", error);
+    roleMembers = [];
+    renderRoleMembers();
+    applyRolePermissions();
+    return;
+  }
+
+  const nameMap = new Map(seasonPlayers.map((player) => [player.id, player.display_name]));
+  roleMembers = (data || []).map((member) => ({
+    ...member,
+    display_name: member.player_id ? (nameMap.get(member.player_id) || "未命名选手") : "",
+  }));
+  validateStoredAccessSession();
+  renderRoleMembers();
+  applyRolePermissions();
+}
+
+async function addScorerRoleByPlayer(playerId) {
+  if (!ensureAdminAccess("仅管理员可新增记分员。")) return;
+  if (!playerId) {
+    setAdminPanelMessage("请先选择一位总表选手。", true);
+    return;
+  }
+
+  const existing = getRoleMembersByRole("scorer").find((member) => member.player_id === playerId);
+  if (existing) {
+    setAdminPanelMessage("该选手已经是记分员。", true);
+    return;
+  }
+
+  adminAddScorerBtn.disabled = true;
+  setAdminPanelMessage("正在新增记分员...");
+
+  const { error } = await db.from("app_role_members").insert([{ role: "scorer", player_id: playerId }]);
+
+  adminAddScorerBtn.disabled = false;
+
+  if (error) {
+    setAdminPanelMessage(`新增记分员失败：${error.message}`, true);
+    return;
+  }
+
+  adminAddScorerSelect.value = "";
+  setAdminPanelMessage("记分员已添加。");
+  await loadRoleMembers();
+}
+
+async function removeScorerRole(memberId) {
+  if (!ensureAdminAccess("仅管理员可移除记分员。")) return;
+  if (!memberId) return;
+
+  const member = getRoleAssignmentById(memberId);
+  const confirmed = window.confirm(`确认移除 ${member?.display_name || "该记分员"} 的记分权限吗？`);
+  if (!confirmed) return;
+
+  setAdminPanelMessage("正在移除记分员...");
+  const { error } = await db.from("app_role_members").delete().eq("id", memberId);
+
+  if (error) {
+    setAdminPanelMessage(`移除记分员失败：${error.message}`, true);
+    return;
+  }
+
+  if (currentAccessSession.memberId === memberId) {
+    clearStoredAccessSession();
+  }
+
+  setAdminPanelMessage("记分员已移除。");
+  await loadRoleMembers();
+}
+
+async function confirmAccessRole() {
+  const password = accessPasswordInput.value.trim();
+  const scorerMemberId = accessScorerSelect.value;
+
+  if (!password) {
+    setAccessMessage("请输入口令。", true);
+    return;
+  }
+
+  if (password === ADMIN_ACCESS_PASSWORD) {
+    writeStoredAccessSession({ role: "admin", memberId: "", playerId: "" });
+    setAccessMessage("管理员模式已启用。");
+    renderRoleMembers();
+    applyRolePermissions();
+    setAccessModalOpen(false);
+    return;
+  }
+
+  if (password === SCORER_ACCESS_PASSWORD) {
+    const scorerMember = getRoleAssignmentById(scorerMemberId);
+    if (!scorerMember || scorerMember.role !== "scorer") {
+      setAccessMessage("请选择已授权的记分员选手。", true);
+      return;
+    }
+
+    writeStoredAccessSession({
+      role: "scorer",
+      memberId: scorerMember.id,
+      playerId: scorerMember.player_id || "",
+    });
+    setAccessMessage("记分员身份已恢复。");
+    renderRoleMembers();
+    applyRolePermissions();
+    setAccessModalOpen(false);
+    return;
+  }
+
+  setAccessMessage("口令错误。", true);
+}
+
+function exitAccessRole() {
+  clearStoredAccessSession();
+  renderRoleMembers();
+  applyRolePermissions();
+  setAdminPanelOpen(false);
+  setMessage("已退出管理员模式。");
 }
 
 async function loadSeasons() {
@@ -2924,6 +3339,7 @@ async function loadTodayPlayers() {
 async function refreshPlayerDrivenViews() {
   await loadActiveMatchDay();
   await loadSeasonPlayers();
+  await loadRoleMembers();
   await loadSeasons();
   await loadTodayPlayers();
   renderQueue(queueEntries);
@@ -3023,6 +3439,7 @@ async function loadRecentMatches() {
 }
 
 async function resetCurrentSeason() {
+  if (!ensureAdminAccess("仅管理员可重置当前赛季。")) return;
   if (!activeSeason?.id) {
     setMessage("当前没有可重置的赛季。", true);
     return;
@@ -3087,6 +3504,7 @@ async function resetCurrentSeason() {
 }
 
 async function setSeasonPlayerRank(playerId, playerName, playerRank) {
+  if (!ensureScorerAccess("仅记分员或管理员可调整赛季选手身份。")) return;
   if (!activeSeason?.id) {
     setMessage("当前没有可操作的赛季。", true);
     return;
@@ -3125,6 +3543,7 @@ async function setSeasonPlayerRank(playerId, playerName, playerRank) {
 }
 
 async function setSeasonKoi(playerIdOverride = null, playerNameOverride = "") {
+  if (!ensureScorerAccess("仅记分员或管理员可设置锦鲤。")) return;
   if (!activeSeason?.id) {
     setMessage("当前没有可设置的赛季。", true);
     return;
@@ -3356,6 +3775,7 @@ async function reSignupByEntry(entryId, playerName, buttonEl) {
 }
 
 async function confirmQueueToTodayPlayers() {
+  if (!ensureScorerAccess("仅记分员或管理员可确认到齐。")) return;
   confirmQueueBtn.disabled = true;
   setMessage("正在确认已就位的选手...");
 
@@ -3377,6 +3797,7 @@ async function confirmQueueToTodayPlayers() {
 }
 
 async function clearSignupQueueForTesting() {
+  if (!ensureAdminAccess("仅管理员可测试清空报名队列。")) return;
   const confirmed = window.confirm("确认清空当前赛季的全部报名队列记录吗？这会删除报名中、已取消和已确认记录。");
 
   if (!confirmed) {
@@ -3402,6 +3823,7 @@ async function clearSignupQueueForTesting() {
 }
 
 async function clearTodayPlayersForTesting() {
+  if (!ensureAdminAccess("仅管理员可测试清空当日选手。")) return;
   const confirmed = window.confirm("确认清空当前赛季的当日选手名单吗？");
 
   if (!confirmed) {
@@ -3430,6 +3852,7 @@ async function clearTodayPlayersForTesting() {
 }
 
 async function startMatchDay() {
+  if (!ensureScorerAccess("仅记分员或管理员可发起比赛日。")) return;
   matchStartTimeInput.value = normalizeTimeInput(matchStartTimeInput.value);
   const startTime = matchStartTimeInput.value || "19:30";
 
@@ -3466,6 +3889,7 @@ async function startMatchDay() {
 }
 
 async function cancelMatchDay() {
+  if (!ensureScorerAccess("仅记分员或管理员可取消比赛日。")) return;
   const confirmed = window.confirm("确认取消当前已发起的比赛吗？这会清空当前赛季的报名队列和当日选手名单。");
 
   if (!confirmed) {
@@ -3496,6 +3920,7 @@ async function cancelMatchDay() {
 }
 
 async function addTodayPlayer() {
+  if (!ensureScorerAccess("仅记分员或管理员可临时添加选手。")) return;
   const playerId = todayAddPlayerSelect.value;
 
   if (!playerId) {
@@ -3611,6 +4036,7 @@ async function cancelQueuePlayerReady(entryId, playerName, buttonEl) {
 }
 
 async function removeTodayPlayer(entryId, buttonEl) {
+  if (!ensureScorerAccess("仅记分员或管理员可移出当日选手。")) return;
   if (!entryId) return;
 
   if (buttonEl) {
@@ -3871,6 +4297,7 @@ function validateBackfillPlayers(teamAIds, teamBIds) {
 }
 
 async function recordMatch() {
+  if (!ensureScorerAccess("仅记分员或管理员可登记比赛。")) return;
   const teamAIds = getSelectedTeamIds("teamA");
   const teamBIds = getSelectedTeamIds("teamB");
   const winner = winnerSelect.value || null;
@@ -3937,6 +4364,7 @@ async function recordMatch() {
 }
 
 async function recordBackfillMatch() {
+  if (!ensureScorerAccess("仅记分员或管理员可补录比赛。")) return;
   const teamAIds = [...backfillTeamSelections.teamA];
   const teamBIds = [...backfillTeamSelections.teamB];
   const winner = backfillWinnerSelect.value || null;
@@ -4025,6 +4453,7 @@ async function recordBackfillMatch() {
 }
 
 async function startEditingMatch(matchId) {
+  if (!ensureScorerAccess("仅记分员或管理员可修改比赛记录。")) return;
   rememberOpenRecentMatchGroups();
   const match = recentMatchesData.find((item) => item.match_id === matchId);
 
@@ -4085,6 +4514,7 @@ async function startEditingMatch(matchId) {
 }
 
 async function deleteMatch(matchId, buttonEl) {
+  if (!ensureScorerAccess("仅记分员或管理员可删除比赛记录。")) return;
   if (!matchId) return;
 
   const confirmed = window.confirm("确认删除这场比赛记录吗？删除后会按全部比赛记录重新计算积分。");
@@ -4145,6 +4575,15 @@ function subscribeRealtime() {
           leaderboard: true,
           rewardLogs: true,
           recentMatches: true,
+        });
+      }
+    )
+    .on(
+      "postgres_changes",
+      { event: "*", schema: "public", table: "app_role_members" },
+      () => {
+        scheduleRefresh({
+          playerDriven: true,
         });
       }
     )
@@ -4231,6 +4670,13 @@ function subscribeRealtime() {
 seasonToggleBtn.addEventListener("click", () => {
   setSeasonPanelOpen(!isSeasonPanelOpen);
 });
+adminModeBtn.addEventListener("click", () => {
+  if (!isCurrentRoleAdmin()) return;
+  setAdminPanelOpen(!isAdminPanelOpen);
+  applyRolePermissions();
+});
+adminExitModeBtn.addEventListener("click", exitAccessRole);
+closeAdminPanelBtn.addEventListener("click", () => setAdminPanelOpen(false));
 resetSeasonBtn.addEventListener("click", resetCurrentSeason);
 startMatchDayBtn.addEventListener("click", async () => {
   if (activeMatchDay) {
@@ -4244,6 +4690,10 @@ confirmQueueBtn.addEventListener("click", confirmQueueToTodayPlayers);
 clearQueueBtn.addEventListener("click", clearSignupQueueForTesting);
 addTodayPlayerBtn.addEventListener("click", addTodayPlayer);
 clearTodayPlayersBtn.addEventListener("click", clearTodayPlayersForTesting);
+adminClearQueueBtn.addEventListener("click", clearSignupQueueForTesting);
+adminClearTodayPlayersBtn.addEventListener("click", clearTodayPlayersForTesting);
+adminResetSeasonBtn.addEventListener("click", resetCurrentSeason);
+adminAddScorerBtn.addEventListener("click", () => addScorerRoleByPlayer(adminAddScorerSelect.value));
 recordMatchBtn.addEventListener("click", recordMatch);
 recordBackfillBtn.addEventListener("click", recordBackfillMatch);
 
@@ -4519,6 +4969,7 @@ todayPlayersList.addEventListener("click", async (event) => {
 recentMatchesList.addEventListener("click", async (event) => {
   const playerButton = event.target.closest('[data-role="saved-hero-picker"]');
   if (playerButton) {
+    if (!isCurrentRoleScorer()) return;
     openHeroPicker({
       matchId: playerButton.dataset.matchId,
       playerId: playerButton.dataset.playerId,
@@ -4542,6 +4993,7 @@ recentMatchesList.addEventListener("click", async (event) => {
 });
 
 seasonPlayersList.addEventListener("click", async (event) => {
+  if (!isCurrentRoleScorer()) return;
   const button = event.target.closest('[data-role="season-rank"]');
   if (button) {
     await setSeasonPlayerRank(button.dataset.playerId, button.dataset.playerName, button.dataset.rank);
@@ -4606,6 +5058,38 @@ rewardLogsList.addEventListener("click", async (event) => {
     button.dataset.playerName,
     button
   );
+});
+
+if (adminLogoTrigger) {
+  adminLogoTrigger.addEventListener("click", () => {
+    if (!isCurrentRoleAdmin()) return;
+    setAdminPanelOpen(!isAdminPanelOpen);
+  });
+
+  adminLogoTrigger.addEventListener("dblclick", (event) => {
+    if (isCurrentRoleAdmin()) return;
+    event.preventDefault();
+    renderAccessScorerOptions();
+    setAccessModalOpen(true);
+  });
+}
+
+if (accessModalBackdrop) {
+  accessModalBackdrop.addEventListener("click", () => setAccessModalOpen(false));
+}
+
+closeAccessModalBtn.addEventListener("click", () => setAccessModalOpen(false));
+confirmAccessBtn.addEventListener("click", confirmAccessRole);
+accessPasswordInput.addEventListener("keydown", async (event) => {
+  if (event.key !== "Enter") return;
+  event.preventDefault();
+  await confirmAccessRole();
+});
+
+scorerMembersList.addEventListener("click", async (event) => {
+  const button = event.target.closest(".admin-remove-scorer-btn");
+  if (!button) return;
+  await removeScorerRole(button.dataset.roleMemberId);
 });
 
 closeHeroPickerBtn.addEventListener("click", closeHeroPicker);

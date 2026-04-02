@@ -247,6 +247,15 @@ h1 {
   text-shadow: 0 0 12px rgba(183, 63, 44, 0.16);
 }
 
+.league-brand-title-sub-admin {
+  cursor: pointer;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 223, 220, 0.08),
+    inset 0 0 20px rgba(122, 27, 27, 0.14),
+    0 10px 26px rgba(15, 8, 12, 0.34),
+    0 0 18px rgba(210, 82, 62, 0.12);
+}
+
 .league-brand-loading {
   justify-items: center;
   text-align: center;
@@ -395,6 +404,45 @@ button.season-total {
 
 .season-panel h2 {
   margin: 0 0 6px;
+}
+
+.admin-panel-grid {
+  display: grid;
+  gap: 12px;
+}
+
+.admin-panel-card {
+  display: grid;
+  gap: 10px;
+  padding: 12px 14px;
+  border-radius: 14px;
+  border: 1px solid rgba(124, 165, 209, 0.18);
+  background: rgba(10, 24, 41, 0.5);
+}
+
+.admin-panel-card h3 {
+  margin: 0;
+}
+
+.admin-panel-actions {
+  align-items: stretch;
+}
+
+.admin-members-list {
+  display: grid;
+  gap: 8px;
+}
+
+.admin-member-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+  padding: 10px 12px;
+  border-radius: 12px;
+  border: 1px solid rgba(117, 155, 197, 0.18);
+  background: rgba(14, 31, 54, 0.62);
 }
 
 .season-players-list {
@@ -2271,6 +2319,10 @@ ol {
   background: linear-gradient(180deg, rgba(13, 30, 52, 0.96), rgba(8, 22, 40, 0.92));
   border: 1px solid var(--border-strong);
   box-shadow: var(--shadow);
+}
+
+.access-dialog {
+  width: min(420px, 100%);
 }
 
 .hero-picker-dialog select {
