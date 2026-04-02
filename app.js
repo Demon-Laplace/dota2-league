@@ -829,9 +829,12 @@ function setWinnerSelection(formType, winnerTeam = "") {
 
   [...panel.querySelectorAll('[data-role="winner-toggle"]')].forEach((button) => {
     const isActive = button.dataset.winner === select.value;
+    const isLoser = hasRecordedWinner(select.value) && button.dataset.winner !== select.value;
     button.classList.toggle("team-title-toggle-active", isActive);
+    button.classList.toggle("team-title-toggle-loser", isLoser);
     button.setAttribute("aria-pressed", String(isActive));
     button.closest(".team-panel")?.classList.toggle("team-panel-winner", isActive);
+    button.closest(".team-panel")?.classList.toggle("team-panel-loser", isLoser);
   });
 
   if (hint) {
