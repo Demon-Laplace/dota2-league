@@ -226,10 +226,13 @@ left join public.matches m on m.match_day_id = md.id
 group by md.id, md.season_id, md.match_date, md.started_at, md.closed_at, md.is_active
 order by md.match_date desc, md.started_at desc;
 
-create or replace view public.match_day_recent_matches as
+drop view if exists public.match_day_recent_matches;
+
+create view public.match_day_recent_matches as
 select
   m.id as match_id,
   m.match_day_id,
+  m.season_id,
   coalesce(m.match_date, md.match_date, public.get_beijing_match_date(m.created_at)) as match_date,
   coalesce(md.is_active, false) as day_is_active,
   m.winner_team,
@@ -252,6 +255,7 @@ left join public.match_days md on md.id = m.match_day_id
 group by
   m.id,
   m.match_day_id,
+  m.season_id,
   m.match_date,
   md.match_date,
   md.is_active,

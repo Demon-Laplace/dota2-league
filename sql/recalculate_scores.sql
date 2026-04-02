@@ -59,12 +59,12 @@ begin
   with player_totals as (
     select
       mr.player_id,
-      count(*)::integer as games_played,
-      count(*) filter (where mr.is_winner)::integer as wins,
-      count(*) filter (where not mr.is_winner)::integer as losses,
+      count(*) filter (where mr.is_winner is not null)::integer as games_played,
+      count(*) filter (where mr.is_winner is true)::integer as wins,
+      count(*) filter (where mr.is_winner is false)::integer as losses,
       sum(
         case
-          when mr.is_winner then
+          when mr.is_winner is true then
             case
               when s.koi_player_id is not null
                 and exists (
@@ -77,7 +77,8 @@ begin
               then 1.25
               else 1.00
             end
-          else -1.00
+          when mr.is_winner is false then -1.00
+          else 0.00
         end
       )::numeric(10,2) as score_delta
     from public.match_results mr
@@ -100,12 +101,12 @@ begin
     select
       m.season_id,
       mr.player_id,
-      count(*)::integer as games_played,
-      count(*) filter (where mr.is_winner)::integer as wins,
-      count(*) filter (where not mr.is_winner)::integer as losses,
+      count(*) filter (where mr.is_winner is not null)::integer as games_played,
+      count(*) filter (where mr.is_winner is true)::integer as wins,
+      count(*) filter (where mr.is_winner is false)::integer as losses,
       sum(
         case
-          when mr.is_winner then
+          when mr.is_winner is true then
             case
               when s.koi_player_id is not null
                 and exists (
@@ -118,7 +119,8 @@ begin
               then 1.25
               else 1.00
             end
-          else -1.00
+          when mr.is_winner is false then -1.00
+          else 0.00
         end
       )::numeric(10,2) as score_delta
     from public.match_results mr

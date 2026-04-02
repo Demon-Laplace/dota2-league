@@ -91,10 +91,12 @@ let leaderboardPlayers = [];
 let rewardLogs = [];
 let seasonPlayerRewardTotal = 0;
 let externalRewardTotal = 0;
+let recentMatchesData = [];
 let isMatchFormOpen = false;
 let isBackfillFormOpen = false;
 let isSeasonPanelOpen = false;
 let isRewardPanelOpen = false;
+let editingMatchId = null;
 let matchTeamSelections = {
   teamA: [],
   teamB: [],
@@ -704,6 +706,20 @@ function formatArchiveDate(value) {
   return `${year}-${month}-${day}`;
 }
 
+function hasRecordedWinner(value) {
+  return value === "A" || value === "B";
+}
+
+function getWinnerLabel(winnerTeam) {
+  if (winnerTeam === "A") return "天辉方获胜";
+  if (winnerTeam === "B") return "夜魇方获胜";
+  return "胜负未定";
+}
+
+function getMatchStatusBadge(winnerTeam) {
+  return hasRecordedWinner(winnerTeam) ? "比赛完成" : "待补胜负";
+}
+
 function getBeijingBusinessDateString() {
   const now = new Date();
   const beijing = new Date(
@@ -1182,6 +1198,7 @@ function renderBackfillForm() {
   backfillDateInput.disabled = !hasSeason;
   backfillMatchNoteInput.disabled = !hasSeason || !hasEnoughPlayers;
   recordBackfillBtn.disabled = !hasSeason || !hasEnoughPlayers || !backfillDateInput.value;
+  recordBackfillBtn.textContent = editingMatchId ? "保存修改" : "保存补录比赛";
 }
 
 function clearMatchForm() {
@@ -1197,6 +1214,7 @@ function clearMatchForm() {
 }
 
 function clearBackfillForm() {
+  editingMatchId = null;
   backfillTeamSelections = {
     teamA: [],
     teamB: [],
@@ -1548,9 +1566,10 @@ function parseRecentMatchPlayers(players) {
 }
 
 function renderRecentMatches(data) {
+  recentMatchesData = data || [];
   recentMatchesList.innerHTML = "";
 
-  if (!data || data.length === 0) {
+  if (!recentMatchesData || recentMatchesData.length === 0) {
     recentMatchesEmpty.style.display = "block";
     return;
   }
@@ -1559,7 +1578,7 @@ function renderRecentMatches(data) {
 
   const groups = new Map();
 
-  data.forEach((match) => {
+  recentMatchesData.forEach((match) => {
     const key = match.match_date || formatArchiveDate(match.created_at) || "历史比赛";
     if (!groups.has(key)) {
       groups.set(key, []);
@@ -1591,7 +1610,8 @@ function renderRecentMatches(data) {
       const players = parseRecentMatchPlayers(match.players);
       const teamAPlayers = players.filter((player) => player.team === "A");
       const teamBPlayers = players.filter((player) => player.team === "B");
-      const winnerLabel = match.winner_team === "A" ? "天辉方获胜" : "夜魇方获胜";
+      const winnerLabel = getWinnerLabel(match.winner_team);
+      const matchDateLabel = match.match_date || formatArchiveDate(match.created_at) || "未知日期";
       const renderPlayerList = (teamPlayers) => teamPlayers.map((player) => `
         <li>
           <button
@@ -1615,12 +1635,16 @@ function renderRecentMatches(data) {
         <div class="recent-match-head">
           <div class="recent-match-title">
             <strong>${winnerLabel}</strong>
-            <span class="winner-badge">比赛完成</span>
+            <span class="winner-badge">${getMatchStatusBadge(match.winner_team)}</span>
           </div>
           <div class="queue-actions">
-            <span class="muted">${escapeHtml(formatLocalTime(match.created_at))}</span>
+            <button class="button-secondary edit-match-btn" data-match-id="${match.match_id}">修改记录</button>
             <button class="button-danger delete-match-btn" data-match-id="${match.match_id}">删除记录</button>
           </div>
+        </div>
+        <div class="recent-match-meta">
+          <span class="muted">比赛日期：${escapeHtml(matchDateLabel)}</span>
+          <span class="muted">登记时间：${escapeHtml(formatLocalTime(match.created_at))}</span>
         </div>
         <div class="recent-match-teams">
           <div class="recent-match-team">
@@ -1898,7 +1922,7 @@ async function loadLeaderboard() {
 async function loadRecentMatches() {
   let query = db
     .from("match_day_recent_matches")
-    .select("match_id, match_day_id, match_date, day_is_active, winner_team, note, created_at, players")
+    .select("match_id, match_day_id, season_id, match_date, day_is_active, winner_team, note, created_at, players")
     .order("created_at", { ascending: false })
     .limit(100);
 
@@ -1918,6 +1942,7 @@ async function loadRecentMatches() {
 
   if (error) {
     console.error("加载最近比赛失败：", error);
+    recentMatchesData = [];
     renderRecentMatches([]);
     return;
   }
@@ -2706,10 +2731,6 @@ function getSelectedTeamIds(prefix) {
 }
 
 function validateMatchPlayers(teamAIds, teamBIds) {
-  if (!winnerSelect.value) {
-    return "请选择胜方。";
-  }
-
   if (todayPlayers.length < TEAM_SIZE * 2) {
     return "当日名单不足 10 人，无法记录比赛。";
   }
@@ -2737,10 +2758,6 @@ function validateBackfillPlayers(teamAIds, teamBIds) {
     return "请选择补录比赛日期。";
   }
 
-  if (!backfillWinnerSelect.value) {
-    return "请选择胜方。";
-  }
-
   if (backfillPlayers.length < TEAM_SIZE * 2) {
     return "该赛季选手不足 10 人，无法补录比赛。";
   }
@@ -2762,7 +2779,7 @@ function validateBackfillPlayers(teamAIds, teamBIds) {
 async function recordMatch() {
   const teamAIds = getSelectedTeamIds("teamA");
   const teamBIds = getSelectedTeamIds("teamB");
-  const winner = winnerSelect.value;
+  const winner = winnerSelect.value || null;
   const validationError = validateMatchPlayers(teamAIds, teamBIds);
 
   if (validationError) {
@@ -2811,7 +2828,7 @@ async function recordMatch() {
   clearMatchForm();
   setMatchFormOpen(false);
   renderMatchForm();
-  setMatchMessage("比赛记录成功，积分榜已刷新。");
+  setMatchMessage(winner ? "比赛记录成功，积分榜已刷新。" : "比赛记录已保存，当前未计分，补填胜负后才会变动积分。");
   requestImmediateRefresh({
     leaderboard: true,
     recentMatches: true,
@@ -2821,6 +2838,12 @@ async function recordMatch() {
 async function recordBackfillMatch() {
   const teamAIds = [...backfillTeamSelections.teamA];
   const teamBIds = [...backfillTeamSelections.teamB];
+  const winner = backfillWinnerSelect.value || null;
+  const isEditing = Boolean(editingMatchId);
+  const heroAssignments = [
+    ...teamAIds.map((playerId) => ({ player_id: playerId, hero_name: backfillHeroAssignments[playerId] || null })),
+    ...teamBIds.map((playerId) => ({ player_id: playerId, hero_name: backfillHeroAssignments[playerId] || null })),
+  ];
   const validationError = validateBackfillPlayers(teamAIds, teamBIds);
 
   if (validationError) {
@@ -2829,31 +2852,45 @@ async function recordBackfillMatch() {
   }
 
   recordBackfillBtn.disabled = true;
-  setBackfillMessage("正在补录比赛...");
+  setBackfillMessage(isEditing ? "正在保存比赛修改..." : "正在补录比赛...");
 
-  const { data: matchId, error } = await db.rpc("record_match_result_backfill", {
-    p_team_a_player_ids: teamAIds,
-    p_team_b_player_ids: teamBIds,
-    p_winner_team: backfillWinnerSelect.value,
-    p_note: backfillMatchNoteInput.value.trim() || null,
-    p_created_by: null,
-    p_season_id: backfillSeasonSelect.value,
-    p_match_date: backfillDateInput.value,
-  });
+  let matchId = editingMatchId;
+  let error = null;
+
+  if (isEditing) {
+    ({ error } = await db.rpc("update_match_result", {
+      p_match_id: editingMatchId,
+      p_team_a_player_ids: teamAIds,
+      p_team_b_player_ids: teamBIds,
+      p_winner_team: winner,
+      p_note: backfillMatchNoteInput.value.trim() || null,
+      p_created_by: null,
+      p_season_id: backfillSeasonSelect.value,
+      p_match_date: backfillDateInput.value,
+      p_assignments: heroAssignments,
+    }));
+  } else {
+    ({ data: matchId, error } = await db.rpc("record_match_result_backfill", {
+      p_team_a_player_ids: teamAIds,
+      p_team_b_player_ids: teamBIds,
+      p_winner_team: winner,
+      p_note: backfillMatchNoteInput.value.trim() || null,
+      p_created_by: null,
+      p_season_id: backfillSeasonSelect.value,
+      p_match_date: backfillDateInput.value,
+    }));
+  }
 
   recordBackfillBtn.disabled = false;
 
   if (error) {
-    setBackfillMessage(`补录比赛失败：${error.message}。请先在 Supabase 执行对应 SQL。`, true);
+    setBackfillMessage(`${isEditing ? "修改比赛失败" : "补录比赛失败"}：${error.message}。请先在 Supabase 执行对应 SQL。`, true);
     return;
   }
 
-  const backfillHeroRows = [
-    ...teamAIds.map((playerId) => ({ player_id: playerId, hero_name: backfillHeroAssignments[playerId] || null })),
-    ...teamBIds.map((playerId) => ({ player_id: playerId, hero_name: backfillHeroAssignments[playerId] || null })),
-  ].filter((item) => item.hero_name);
+  const backfillHeroRows = heroAssignments.filter((item) => item.hero_name);
 
-  if (backfillHeroRows.length) {
+  if (!isEditing && backfillHeroRows.length) {
     const { error: heroError } = await db.rpc("update_match_result_heroes", {
       p_match_id: matchId,
       p_assignments: backfillHeroRows,
@@ -2867,11 +2904,61 @@ async function recordBackfillMatch() {
   clearBackfillForm();
   setBackfillFormOpen(false);
   renderBackfillForm();
-  setMessage("历史比赛补录成功。");
+  setMessage(
+    isEditing
+      ? (winner ? "比赛修改成功，积分已按全部记录重算。" : "比赛修改成功，当前未计分，补填胜负后才会变动积分。")
+      : (winner ? "历史比赛补录成功。" : "历史比赛已归档，当前未计分，补填胜负后才会变动积分。")
+  );
   requestImmediateRefresh({
     leaderboard: true,
     recentMatches: true,
   });
+}
+
+async function startEditingMatch(matchId) {
+  const match = recentMatchesData.find((item) => item.match_id === matchId);
+
+  if (!match) {
+    setMessage("未找到要编辑的比赛记录。", true);
+    return;
+  }
+
+  if (!match.season_id) {
+    setMessage("这条比赛记录缺少赛季信息，暂时无法编辑。请先执行最新 SQL。", true);
+    return;
+  }
+
+  const players = parseRecentMatchPlayers(match.players);
+  const teamAIds = players.filter((player) => player.team === "A").map((player) => player.player_id);
+  const teamBIds = players.filter((player) => player.team === "B").map((player) => player.player_id);
+
+  if (teamAIds.length !== TEAM_SIZE || teamBIds.length !== TEAM_SIZE) {
+    setMessage("这条比赛记录的队伍人数异常，暂时无法编辑。", true);
+    return;
+  }
+
+  backfillSeasonSelect.value = match.season_id;
+  backfillDateInput.value = match.match_date || formatArchiveDate(match.created_at) || "";
+  await loadPlayersForSeason(match.season_id);
+
+  clearBackfillForm();
+  editingMatchId = matchId;
+  backfillSeasonSelect.value = match.season_id;
+  backfillDateInput.value = match.match_date || formatArchiveDate(match.created_at) || "";
+  backfillWinnerSelect.value = match.winner_team || "";
+  backfillMatchNoteInput.value = match.note || "";
+  backfillTeamSelections = {
+    teamA: teamAIds,
+    teamB: teamBIds,
+  };
+  backfillHeroAssignments = Object.fromEntries(
+    players.map((player) => [player.player_id, player.hero_name || ""])
+  );
+
+  setBackfillFormOpen(true);
+  setMatchFormOpen(false);
+  renderBackfillForm();
+  setBackfillMessage("已载入比赛记录，可以直接修改并保存。");
 }
 
 async function deleteMatch(matchId, buttonEl) {
@@ -3188,6 +3275,12 @@ recentMatchesList.addEventListener("click", async (event) => {
       currentHero: playerButton.dataset.heroName || "",
       isSavedMatch: true,
     });
+    return;
+  }
+
+  const editButton = event.target.closest(".edit-match-btn");
+  if (editButton) {
+    await startEditingMatch(editButton.dataset.matchId);
     return;
   }
 
