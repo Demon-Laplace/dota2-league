@@ -1158,6 +1158,19 @@ button:disabled {
   gap: 10px;
   align-items: center;
   flex-wrap: wrap;
+  min-width: 0;
+  flex: 1 1 360px;
+}
+
+.match-day-player-list {
+  min-width: 0;
+  max-width: min(100%, 720px);
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  color: rgba(216, 228, 244, 0.76);
+  font-size: 12px;
+  letter-spacing: 0.01em;
 }
 
 .match-day-content {

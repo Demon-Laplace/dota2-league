@@ -2383,6 +2383,29 @@ function getMatchNoteLines(match) {
     .filter(Boolean);
 }
 
+function stripPlayerNameMeta(name) {
+  return String(name || "")
+    .replace(/\s*（[^）]*）/g, "")
+    .replace(/\s*\([^)]*\)/g, "")
+    .trim();
+}
+
+function getMatchDayPlayerNames(matches) {
+  const seen = new Set();
+  const names = [];
+
+  (matches || []).forEach((match) => {
+    parseRecentMatchPlayers(match.players).forEach((player) => {
+      const normalizedName = stripPlayerNameMeta(player.display_name);
+      if (!normalizedName || seen.has(normalizedName)) return;
+      seen.add(normalizedName);
+      names.push(normalizedName);
+    });
+  });
+
+  return names;
+}
+
 function renderRecentMatches(data) {
   recentMatchesData = data || [];
   recentMatchesList.innerHTML = "";
@@ -2407,6 +2430,8 @@ function renderRecentMatches(data) {
   groups.forEach((matches, matchDate) => {
     const details = document.createElement("details");
     const isActiveDay = matches.some((match) => match.day_is_active);
+    const matchDayPlayerNames = getMatchDayPlayerNames(matches);
+    const matchDayPlayerText = matchDayPlayerNames.join(" · ");
     details.dataset.matchDate = matchDate;
     details.className = "match-day-group";
     details.open = isActiveDay || openRecentMatchGroups.has(matchDate);
@@ -2425,7 +2450,10 @@ function renderRecentMatches(data) {
         <div class="match-day-summary">
           <strong>${escapeHtml(matchDate)}</strong>
           <span class="queue-slot">${matches.length} 场</span>
-          <span class="winner-badge match-day-summary-badge">${isActiveDay ? "进行中" : "已归档"}</span>
+          ${matchDayPlayerText
+            ? `<span class="match-day-player-list" title="${escapeHtml(matchDayPlayerText)}">${escapeHtml(matchDayPlayerText)}</span>`
+            : ""
+          }
         </div>
         <span class="match-day-toggle">
           <span class="match-day-toggle-icon" aria-hidden="true"></span>
