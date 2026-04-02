@@ -396,6 +396,56 @@ const HERO_PINYIN_INITIALS = {
   "Wraith King": "mhdd",
   "Zeus": "zs"
 };
+const HERO_ALIASES = {
+  "Ancient Apparition": ["冰魂"],
+  "Beastmaster": ["兽王"],
+  "Bounty Hunter": ["赏金"],
+  "Clockwerk": ["发条"],
+  "Dark Willow": ["小仙女"],
+  "Death Prophet": ["死灵龙", "死亡"],
+  "Earth Spirit": ["土猫"],
+  "Earthshaker": ["小牛"],
+  "Elder Titan": ["大牛"],
+  "Ember Spirit": ["火猫"],
+  "Faceless Void": ["虚空"],
+  "Gyrocopter": ["飞机"],
+  "Hoodwink": ["小松鼠"],
+  "Invoker": ["卡尔"],
+  "Juggernaut": ["剑圣"],
+  "Largo": ["青蛙"],
+  "Lifestealer": ["小狗"],
+  "Lone Druid": ["熊德"],
+  "Mirana": ["白虎"],
+  "Morphling": ["水人"],
+  "Nature's Prophet": ["先知"],
+  "Night Stalker": ["夜魔"],
+  "Nyx Assassin": ["小强"],
+  "Outworld Destroyer": ["黑鸟"],
+  "Phantom Assassin": ["幻刺"],
+  "Phantom Lancer": ["幻长矛", "猴子幻象"],
+  "Puck": ["仙女龙"],
+  "Pudge": ["屠夫"],
+  "Queen of Pain": ["女王"],
+  "Riki": ["隐刺"],
+  "Sand King": ["蝎子"],
+  "Shadow Fiend": ["影魔", "魂守"],
+  "Shadow Shaman": ["小y"],
+  "Skywrath Mage": ["天怒"],
+  "Slark": ["小鱼人"],
+  "Sniper": ["火枪"],
+  "Spirit Bear": ["熊灵"],
+  "Spirit Breaker": ["白牛"],
+  "Storm Spirit": ["蓝猫"],
+  "Templar Assassin": ["圣堂"],
+  "Tidehunter": ["潮汐"],
+  "Tinker": ["修补", "地精"],
+  "Tiny": ["小小"],
+  "Treant Protector": ["大树"],
+  "Ursa": ["拍拍熊"],
+  "Void Spirit": ["紫猫"],
+  "Windranger": ["风行"],
+  "Zeus": ["众神之王"]
+};
 const refreshState = {
   seasonContext: false,
   playerDriven: false,
@@ -640,12 +690,14 @@ function getEnglishInitials(heroName) {
 function getHeroSearchKeywords(heroName) {
   const english = heroName.toLowerCase();
   const chinese = getHeroDisplayName(heroName);
+  const aliases = HERO_ALIASES[heroName] || [];
   return [
     english,
     english.replace(/[^a-z0-9]+/g, ""),
     getEnglishInitials(heroName),
     chinese,
     (HERO_PINYIN_INITIALS[heroName] || "").toLowerCase(),
+    ...aliases,
   ].filter(Boolean);
 }
 
