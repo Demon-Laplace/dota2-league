@@ -2,6 +2,12 @@ const SUPABASE_URL = "https://snqzcnaymukposcbosyq.supabase.co";
 const SUPABASE_ANON_KEY = "sb_publishable_Ap-srffzI3MkOjmYAH0lag_kiP_1Ifm";
 const TEAM_SIZE = 5;
 const LOADING_SCREEN_MIN_MS = 900;
+const DAY_MS = 24 * 60 * 60 * 1000;
+const HARDCORE_TAG_MIN_GAMES = 10;
+const HARDCORE_TAG_LOVE_CAP_GAMES = 20;
+const HARDCORE_TAG_WIN_RATE_MAX = 40;
+const HARDCORE_TAG_QUANTILE = 0.35;
+const HARDCORE_TAG_SHOW_THRESHOLD = 0.35;
 
 const db = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
@@ -813,6 +819,92 @@ function formatArchiveDate(value) {
   const month = String(date.getMonth() + 1).padStart(2, "0");
   const day = String(date.getDate()).padStart(2, "0");
   return `${year}-${month}-${day}`;
+}
+
+function parseSeasonStartDate(value) {
+  if (!value) return null;
+  if (typeof value === "string") {
+    const matched = value.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+    if (matched) {
+      const [, year, month, day] = matched;
+      return new Date(Number(year), Number(month) - 1, Number(day));
+    }
+  }
+
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? null : date;
+}
+
+function hasSeasonReachedDay(startDateValue, dayNumber) {
+  const startDate = parseSeasonStartDate(startDateValue);
+  if (!startDate || dayNumber <= 1) return false;
+
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  startDate.setHours(0, 0, 0, 0);
+  return Math.floor((today.getTime() - startDate.getTime()) / DAY_MS) >= dayNumber - 1;
+}
+
+function clampNumber(value, min, max) {
+  return Math.min(Math.max(value, min), max);
+}
+
+function getQuantile(values, quantile) {
+  const sortedValues = values
+    .map((value) => Number(value))
+    .filter((value) => Number.isFinite(value))
+    .sort((a, b) => a - b);
+  if (!sortedValues.length) return null;
+  if (sortedValues.length === 1) return sortedValues[0];
+
+  const position = (sortedValues.length - 1) * clampNumber(quantile, 0, 1);
+  const lowerIndex = Math.floor(position);
+  const upperIndex = Math.ceil(position);
+  const lowerValue = sortedValues[lowerIndex];
+  const upperValue = sortedValues[upperIndex];
+
+  if (lowerIndex === upperIndex) return lowerValue;
+  return lowerValue + (upperValue - lowerValue) * (position - lowerIndex);
+}
+
+function getHardcoreLoseMetrics(data) {
+  const effectivePlayers = (data || []).map((player) => {
+    const gamesPlayed = Number(player.games_played ?? 0);
+    const wins = Number(player.wins ?? 0);
+    const parsedWinRate = Number(player.win_rate);
+    return {
+      ...player,
+      gamesPlayed,
+      score: Number(player.score ?? 0),
+      winRate: Number.isFinite(parsedWinRate)
+        ? parsedWinRate
+        : (gamesPlayed > 0 ? (wins / gamesPlayed) * 100 : 0),
+    };
+  }).filter((player) => player.gamesPlayed >= HARDCORE_TAG_MIN_GAMES);
+
+  if (effectivePlayers.length < 3) {
+    return {
+      canEvaluate: false,
+      winRateReference: null,
+      scoreReference: null,
+      minScore: null,
+    };
+  }
+
+  const winRateReference = Math.min(
+    getQuantile(effectivePlayers.map((player) => player.winRate), HARDCORE_TAG_QUANTILE) ?? HARDCORE_TAG_WIN_RATE_MAX,
+    HARDCORE_TAG_WIN_RATE_MAX
+  );
+  const scoreValues = effectivePlayers.map((player) => player.score);
+  const scoreReference = getQuantile(scoreValues, HARDCORE_TAG_QUANTILE);
+  const minScore = scoreValues.reduce((min, value) => (value < min ? value : min), Number.POSITIVE_INFINITY);
+
+  return {
+    canEvaluate: Number.isFinite(winRateReference) && Number.isFinite(scoreReference) && Number.isFinite(minScore),
+    winRateReference,
+    scoreReference,
+    minScore,
+  };
 }
 
 function hasRecordedWinner(value) {
@@ -1942,24 +2034,37 @@ function renderLeaderboard(data) {
     const rewardPoints = Number(player.reward_points ?? 0);
     return rewardPoints > max ? rewardPoints : max;
   }, 0);
-  const playersWithGames = data.filter((player) => Number(player.games_played ?? 0) > 0);
-  const lowestAverageScore = playersWithGames.reduce((min, player) => {
-    const averageScore = Number(player.score ?? 0) / Number(player.games_played ?? 1);
-    return averageScore < min ? averageScore : min;
-  }, Number.POSITIVE_INFINITY);
-  const lowestAveragePlayers = playersWithGames.filter((player) => (
-    (Number(player.score ?? 0) / Number(player.games_played ?? 1)) === lowestAverageScore
-  ));
-  const maxGamesAmongLowestAverage = lowestAveragePlayers.reduce((max, player) => {
-    const gamesPlayed = Number(player.games_played ?? 0);
-    return gamesPlayed > max ? gamesPlayed : max;
-  }, 0);
+  const canShowHardcoreLoseTag = hasSeasonReachedDay(activeSeason?.start_date, 8);
+  const hardcoreLoseMetrics = getHardcoreLoseMetrics(data);
 
   data.forEach((player, idx) => {
     const tr = document.createElement("tr");
     const rank = idx + 1;
     const playerId = player.player_id || player.id || "";
     const tags = [];
+    const gamesPlayed = Number(player.games_played ?? 0);
+    const score = Number(player.score ?? 0);
+    const wins = Number(player.wins ?? 0);
+    const parsedWinRate = Number(player.win_rate);
+    const winRate = Number.isFinite(parsedWinRate)
+      ? parsedWinRate
+      : (gamesPlayed > 0 ? (wins / gamesPlayed) * 100 : 0);
+    const lovePlayScore = clampNumber(gamesPlayed / HARDCORE_TAG_LOVE_CAP_GAMES, 0, 1);
+    const winRateBadness = hardcoreLoseMetrics.canEvaluate && Number.isFinite(hardcoreLoseMetrics.winRateReference) && hardcoreLoseMetrics.winRateReference > 0
+      ? clampNumber((hardcoreLoseMetrics.winRateReference - winRate) / hardcoreLoseMetrics.winRateReference, 0, 1)
+      : 0;
+    const scoreSpread = hardcoreLoseMetrics.canEvaluate && Number.isFinite(hardcoreLoseMetrics.scoreReference) && Number.isFinite(hardcoreLoseMetrics.minScore)
+      ? Math.max(hardcoreLoseMetrics.scoreReference - hardcoreLoseMetrics.minScore, 0)
+      : 0;
+    const scoreBadness = hardcoreLoseMetrics.canEvaluate && Number.isFinite(hardcoreLoseMetrics.scoreReference)
+      ? (
+        scoreSpread > 0
+          ? clampNumber((hardcoreLoseMetrics.scoreReference - score) / scoreSpread, 0, 1)
+          : (score <= hardcoreLoseMetrics.scoreReference ? 1 : 0)
+      )
+      : 0;
+    const poorPerformanceScore = Math.max(winRateBadness, scoreBadness);
+    const hardcoreTagScore = poorPerformanceScore * lovePlayScore;
 
     if (highestReward > 0 && Number(player.reward_points ?? 0) === highestReward) {
       tags.push({ icon: "¤", label: "金主", tone: "gold" });
@@ -1970,9 +2075,10 @@ function renderLeaderboard(data) {
     }
 
     if (
-      Number(player.games_played ?? 0) > 0 &&
-      (Number(player.score ?? 0) / Number(player.games_played ?? 1)) === lowestAverageScore &&
-      Number(player.games_played ?? 0) === maxGamesAmongLowestAverage
+      canShowHardcoreLoseTag &&
+      hardcoreLoseMetrics.canEvaluate &&
+      gamesPlayed >= HARDCORE_TAG_MIN_GAMES &&
+      hardcoreTagScore >= HARDCORE_TAG_SHOW_THRESHOLD
     ) {
       tags.push({ icon: "☄", label: "又菜又爱玩", tone: "slate" });
     }
@@ -2634,7 +2740,7 @@ async function refreshPlayerDrivenViews() {
 async function loadLeaderboard() {
   let result = await db
     .from("current_season_leaderboard")
-    .select("player_id, display_name, score, games_played, reward_points, reward_minimum, reward_extra_points")
+    .select("player_id, display_name, score, games_played, wins, losses, win_rate, reward_points, reward_minimum, reward_extra_points")
     .order("score", { ascending: false })
     .order("reward_points", { ascending: false })
     .order("display_name", { ascending: true });
@@ -2642,7 +2748,7 @@ async function loadLeaderboard() {
   if (result.error) {
     result = await db
       .from("leaderboard")
-      .select("id, display_name, score, games_played, reward_points")
+      .select("id, display_name, score, games_played, wins, losses, win_rate, reward_points")
       .order("score", { ascending: false })
       .order("reward_points", { ascending: false })
       .order("display_name", { ascending: true });
@@ -2651,7 +2757,7 @@ async function loadLeaderboard() {
   if (result.error) {
     result = await db
       .from("players")
-      .select("id, display_name, score, games_played, reward_points, reward_floor_bonus, reward_double_bonus, reward_extra_points")
+      .select("id, display_name, score, games_played, wins, losses, reward_points, reward_floor_bonus, reward_double_bonus, reward_extra_points")
       .order("score", { ascending: false })
       .order("reward_points", { ascending: false })
       .order("display_name", { ascending: true });
