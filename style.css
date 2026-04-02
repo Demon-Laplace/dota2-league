@@ -1154,6 +1154,15 @@ button:disabled {
     inset 0 0 0 1px rgba(240, 195, 106, 0.06);
 }
 
+.match-effect-log-line-danger {
+  border-color: rgba(190, 74, 74, 0.32);
+  background: linear-gradient(135deg, rgba(86, 24, 24, 0.42), rgba(35, 13, 13, 0.46));
+  color: #ffd7d7;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 205, 205, 0.03),
+    inset 0 0 0 1px rgba(190, 74, 74, 0.08);
+}
+
 .match-extra-logs {
   display: grid;
   gap: 4px;

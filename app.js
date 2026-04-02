@@ -2191,9 +2191,9 @@ function getTeamLabel(team) {
   return team === "A" ? "天辉方" : team === "B" ? "夜魇方" : "未知方";
 }
 
-function getMatchEffectLogLines(match, players, doubleDowns) {
+function getMatchEffectLogsByTeam(match, players, doubleDowns) {
   const playerMap = new Map(players.map((player) => [player.player_id, player]));
-  const effectLines = [];
+  const logsByTeam = { A: [], B: [] };
 
   doubleDowns.forEach((item) => {
     const userName = playerMap.get(item.user_player_id)?.display_name || "未知选手";
@@ -2209,6 +2209,7 @@ function getMatchEffectLogLines(match, players, doubleDowns) {
     const hasExtraPenalty = targetPlayers.some((player) => Number(player.score_change ?? 0) <= -2);
     const hasFloorProtection = targetPlayers.some((player) => Number(player.score_change ?? 0) === -1);
     let effectText = "";
+    let tone = "gold";
 
     if (!hasWinner) {
       effectText = "，待补胜负后生效";
@@ -2216,34 +2217,44 @@ function getMatchEffectLogLines(match, players, doubleDowns) {
       effectText = "，胜场双倍加成";
     } else if (hasExtraPenalty && hasFloorProtection) {
       effectText = "，负场额外扣分，部分受到保底效果";
+      tone = "danger";
     } else if (hasExtraPenalty) {
       effectText = "，负场额外扣分";
+      tone = "danger";
     } else if (hasFloorProtection) {
       effectText = "，受到保底效果";
     }
 
     if (item.mode === "team") {
-      effectLines.push(`${userName}使用团队双倍${sideText}${effectText}`);
+      if (targetTeam && logsByTeam[targetTeam]) {
+        logsByTeam[targetTeam].push({ text: `${userName}使用团队双倍${sideText}${effectText}`, tone });
+      }
       return;
     }
 
     const targetName = playerMap.get(item.target_player_id)?.display_name || "未知选手";
-    effectLines.push(
-      item.user_player_id === item.target_player_id
-        ? `${userName}对自己使用个人双倍${sideText}${effectText}`
-        : `${userName}对${targetName}使用个人双倍${sideText}${effectText}`
-    );
+    if (targetTeam && logsByTeam[targetTeam]) {
+      logsByTeam[targetTeam].push({
+        text: item.user_player_id === item.target_player_id
+          ? `${userName}对自己使用个人双倍${sideText}${effectText}`
+          : `${userName}对${targetName}使用个人双倍${sideText}${effectText}`,
+        tone,
+      });
+    }
   });
 
   const koiPlayerId = getSeasonKoiPlayerId(match.season_id);
   if (koiPlayerId && hasRecordedWinner(match.winner_team)) {
     const koiPlayer = players.find((player) => player.player_id === koiPlayerId && player.team === match.winner_team);
     if (koiPlayer) {
-      effectLines.push(`${koiPlayer.display_name || "锦鲤"}触发锦鲤加成，对${getTeamLabel(match.winner_team)}起效`);
+      logsByTeam[match.winner_team].push({
+        text: `${koiPlayer.display_name || "锦鲤"}触发锦鲤加成，对${getTeamLabel(match.winner_team)}起效`,
+        tone: "gold",
+      });
     }
   }
 
-  return effectLines;
+  return logsByTeam;
 }
 
 function getMatchNoteLines(match) {
@@ -2320,13 +2331,13 @@ function renderRecentMatches(data) {
       const winnerLabel = getWinnerLabel(match.winner_team);
       const matchDateLabel = match.match_date || formatArchiveDate(match.created_at) || "未知日期";
       const doubleDowns = parseRecentMatchPlayers(match.double_downs);
-      const effectLogLines = getMatchEffectLogLines(match, players, doubleDowns);
+      const effectLogsByTeam = getMatchEffectLogsByTeam(match, players, doubleDowns);
       const noteLines = getMatchNoteLines(match);
-      const effectLogHtml = effectLogLines.length
-        ? `<div class="match-effect-logs">${effectLogLines.map((line) => `<p class="match-effect-log-line">${escapeHtml(line)}</p>`).join("")}</div>`
-        : "";
       const noteLogHtml = noteLines.length
         ? `<div class="match-extra-logs">${noteLines.map((line) => `<p class="muted match-extra-log-line">${escapeHtml(line)}</p>`).join("")}</div>`
+        : "";
+      const buildEffectLogHtml = (team) => effectLogsByTeam[team]?.length
+        ? `<div class="match-effect-logs">${effectLogsByTeam[team].map((item) => `<p class="match-effect-log-line match-effect-log-line-${item.tone}">${escapeHtml(item.text)}</p>`).join("")}</div>`
         : "";
       const renderPlayerList = (teamPlayers) => teamPlayers.map((player) => `
         <li>
@@ -2366,13 +2377,14 @@ function renderRecentMatches(data) {
           <div class="recent-match-team${match.winner_team === "A" ? " recent-match-team-winner" : ""}">
             <h3>天辉方</h3>
             <ul>${renderPlayerList(teamAPlayers)}</ul>
+            ${buildEffectLogHtml("A")}
           </div>
           <div class="recent-match-team${match.winner_team === "B" ? " recent-match-team-winner" : ""}">
             <h3>夜魇方</h3>
             <ul>${renderPlayerList(teamBPlayers)}</ul>
+            ${buildEffectLogHtml("B")}
           </div>
         </div>
-        ${effectLogHtml}
         ${noteLogHtml}
       `;
       content.appendChild(card);
