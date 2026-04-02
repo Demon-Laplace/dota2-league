@@ -2457,6 +2457,14 @@ function getTeamLabel(team) {
 function getMatchEffectLogsByTeam(match, players, doubleDowns) {
   const playerMap = new Map(players.map((player) => [player.player_id, player]));
   const logsByTeam = { A: [], B: [] };
+  const formatEffectText = (hasWinner, hasPositiveGain, hasExtraPenalty, hasFloorProtection) => {
+    if (!hasWinner) return "结果待补";
+    if (hasPositiveGain) return "积分 +100%";
+    if (hasExtraPenalty && hasFloorProtection) return "积分 -100%，部分保底";
+    if (hasExtraPenalty) return "积分 -100%";
+    if (hasFloorProtection) return "保底生效，仅正常扣分";
+    return "结果待补";
+  };
 
   doubleDowns.forEach((item) => {
     const userName = playerMap.get(item.user_player_id)?.display_name || "未知选手";
@@ -2466,29 +2474,22 @@ function getMatchEffectLogsByTeam(match, players, doubleDowns) {
     const targetTeam = item.mode === "team"
       ? item.target_team
       : targetPlayers[0]?.team || null;
-    const sideText = targetTeam ? `，对${getTeamLabel(targetTeam)}起效` : "";
     const hasWinner = hasRecordedWinner(match.winner_team);
     const hasPositiveGain = targetPlayers.some((player) => Number(player.score_change ?? 0) > 1);
     const hasExtraPenalty = targetPlayers.some((player) => Number(player.score_change ?? 0) <= -2);
     const hasFloorProtection = targetPlayers.some((player) => Number(player.score_change ?? 0) === -1);
-    let effectText = "待补胜负";
+    const effectText = formatEffectText(hasWinner, hasPositiveGain, hasExtraPenalty, hasFloorProtection);
     let tone = "gold";
 
-    if (hasWinner && hasPositiveGain) {
-      effectText = "+100%";
-    } else if (hasExtraPenalty && hasFloorProtection) {
-      effectText = "-100%，部分保底";
+    if (hasExtraPenalty && hasFloorProtection) {
       tone = "danger";
     } else if (hasExtraPenalty) {
-      effectText = "-100%";
       tone = "danger";
-    } else if (hasFloorProtection) {
-      effectText = "保底，仅正常扣分";
     }
 
     if (item.mode === "team") {
       if (targetTeam && logsByTeam[targetTeam]) {
-        logsByTeam[targetTeam].push({ text: `${userName}团队双倍${sideText} ${effectText}`, tone });
+        logsByTeam[targetTeam].push({ text: `${userName}团队双倍，${effectText}`, tone });
       }
       return;
     }
@@ -2497,8 +2498,8 @@ function getMatchEffectLogsByTeam(match, players, doubleDowns) {
     if (targetTeam && logsByTeam[targetTeam]) {
       logsByTeam[targetTeam].push({
         text: item.user_player_id === item.target_player_id
-          ? `${userName}个人双倍(自己)${sideText} ${effectText}`
-          : `${userName}个人双倍(${targetName})${sideText} ${effectText}`,
+          ? `${userName}个人双倍(自己)，${effectText}`
+          : `${userName}个人双倍(${targetName})，${effectText}`,
         tone,
       });
     }
@@ -2509,7 +2510,7 @@ function getMatchEffectLogsByTeam(match, players, doubleDowns) {
     const koiPlayer = players.find((player) => player.player_id === koiPlayerId && player.team === match.winner_team);
     if (koiPlayer) {
       logsByTeam[match.winner_team].push({
-        text: `${koiPlayer.display_name || "锦鲤"}锦鲤加成，对${getTeamLabel(match.winner_team)}起效 +25%`,
+        text: `${koiPlayer.display_name || "锦鲤"}锦鲤效果，积分 +25%`,
         tone: "gold",
       });
     }

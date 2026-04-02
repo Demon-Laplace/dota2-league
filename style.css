@@ -1196,20 +1196,26 @@ button:disabled {
   color: #d8deee;
   border-color: rgba(74, 92, 132, 0.34);
   background:
-    linear-gradient(120deg, rgba(15, 20, 37, 0.9) 0%, rgba(28, 28, 52, 0.9) 38%, rgba(18, 39, 66, 0.88) 55%, rgba(13, 18, 34, 0.9) 100%);
-  background-size: 220% 100%;
+    repeating-linear-gradient(
+      120deg,
+      rgba(108, 128, 188, 0.08) 0 10px,
+      rgba(27, 35, 70, 0) 10px 24px,
+      rgba(78, 93, 148, 0.1) 24px 34px
+    ),
+    linear-gradient(120deg, rgba(15, 20, 37, 0.92) 0%, rgba(28, 28, 52, 0.92) 38%, rgba(18, 39, 66, 0.9) 55%, rgba(13, 18, 34, 0.92) 100%);
+  background-size: 34px 100%, 100% 100%;
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.03),
     inset 0 0 18px rgba(26, 36, 69, 0.18);
-  animation: hero-pill-night-flow 5.6s linear infinite;
+  animation: hero-pill-night-flow 7.2s linear infinite;
 }
 
 @keyframes hero-pill-night-flow {
   0% {
-    background-position: 0% 50%;
+    background-position: 0 50%, 0 0;
   }
   100% {
-    background-position: 100% 50%;
+    background-position: 34px 50%, 0 0;
   }
 }
 
