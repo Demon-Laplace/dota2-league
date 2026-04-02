@@ -256,6 +256,10 @@ h1 {
     0 0 18px rgba(210, 82, 62, 0.12);
 }
 
+.league-brand-title-sub-scorer {
+  cursor: pointer;
+}
+
 .league-brand-loading {
   justify-items: center;
   text-align: center;
@@ -2323,6 +2327,44 @@ ol {
 
 .access-dialog {
   width: min(420px, 100%);
+}
+
+.access-scorer-picker {
+  display: grid;
+  gap: 8px;
+}
+
+.access-scorer-picker-title {
+  margin: 0;
+}
+
+.access-scorer-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.access-scorer-chip {
+  padding: 6px 10px;
+  border-radius: 999px;
+  border: 1px solid rgba(117, 155, 197, 0.22);
+  background: rgba(14, 31, 54, 0.72);
+  color: #dce8f7;
+  font-size: 13px;
+  line-height: 1.25;
+  box-shadow: none;
+}
+
+.access-scorer-chip:hover {
+  border-color: rgba(153, 195, 244, 0.38);
+  background: rgba(18, 41, 70, 0.86);
+}
+
+.access-scorer-chip-active {
+  color: #f3fbff;
+  border-color: rgba(117, 230, 214, 0.48);
+  background: linear-gradient(135deg, rgba(25, 89, 100, 0.92), rgba(18, 53, 80, 0.92));
+  box-shadow: 0 0 0 1px rgba(117, 230, 214, 0.12), 0 10px 20px rgba(9, 25, 39, 0.24);
 }
 
 .hero-picker-dialog select {

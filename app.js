@@ -8,8 +8,8 @@ const HARDCORE_TAG_LOVE_CAP_GAMES = 20;
 const HARDCORE_TAG_WIN_RATE_MAX = 40;
 const HARDCORE_TAG_QUANTILE = 0.35;
 const HARDCORE_TAG_SHOW_THRESHOLD = 0.35;
-const ADMIN_ACCESS_PASSWORD = "admin-nd-2026";
-const SCORER_ACCESS_PASSWORD = "scorer-nd-2026";
+const ADMIN_ACCESS_PASSWORD = "我是大魔导师";
+const SCORER_ACCESS_PASSWORD = "夜神夜神夜神";
 const ACCESS_SESSION_STORAGE_KEY = "nd_dota_access_session_v1";
 
 const db = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
@@ -120,6 +120,7 @@ const accessModalBackdrop = document.getElementById("accessModalBackdrop");
 const closeAccessModalBtn = document.getElementById("closeAccessModalBtn");
 const accessPasswordInput = document.getElementById("accessPasswordInput");
 const accessScorerSelect = document.getElementById("accessScorerSelect");
+const accessScorerChips = document.getElementById("accessScorerChips");
 const confirmAccessBtn = document.getElementById("confirmAccessBtn");
 const accessMessage = document.getElementById("accessMessage");
 
@@ -914,6 +915,11 @@ function setAccessModalOpen(isOpen) {
   if (!isOpen) {
     accessPasswordInput.value = "";
     accessScorerSelect.value = "";
+    if (accessScorerChips) {
+      accessScorerChips.querySelectorAll(".access-scorer-chip").forEach((chip) => {
+        chip.classList.remove("access-scorer-chip-active");
+      });
+    }
     setAccessMessage("");
   }
 }
@@ -928,6 +934,19 @@ function renderAccessScorerOptions() {
     options.push(`<option value="${member.id}">${escapeHtml(member.display_name || "未命名记分员")}</option>`);
   });
   accessScorerSelect.innerHTML = options.join("");
+  if (accessScorerChips) {
+    accessScorerChips.innerHTML = scorers.length
+      ? scorers.map((member) => `
+        <button
+          type="button"
+          class="access-scorer-chip${accessScorerSelect.value === member.id ? " access-scorer-chip-active" : ""}"
+          data-role-member-id="${member.id}"
+        >
+          ${escapeHtml(member.display_name || "未命名记分员")}
+        </button>
+      `).join("")
+      : '<p class="muted">当前还没有可用的记分员身份。</p>';
+  }
 }
 
 function renderAdminAddScorerOptions() {
@@ -1018,7 +1037,8 @@ function applyRolePermissions() {
 
   if (adminLogoTrigger) {
     adminLogoTrigger.classList.toggle("league-brand-title-sub-admin", isAdmin);
-    adminLogoTrigger.setAttribute("aria-hidden", isAdmin ? "false" : "true");
+    adminLogoTrigger.classList.toggle("league-brand-title-sub-scorer", !isAdmin && canScore);
+    adminLogoTrigger.setAttribute("aria-hidden", (isAdmin || canScore) ? "false" : "true");
   }
 
   resetSeasonBtn.hidden = true;
@@ -3151,11 +3171,12 @@ async function confirmAccessRole() {
 }
 
 function exitAccessRole() {
+  const previousRole = currentAccessSession.role;
   clearStoredAccessSession();
   renderRoleMembers();
   applyRolePermissions();
   setAdminPanelOpen(false);
-  setMessage("已退出管理员模式。");
+  setMessage(previousRole === "admin" ? "已退出管理员模式。" : "已退出记分员身份。");
 }
 
 async function loadSeasons() {
@@ -5068,12 +5089,17 @@ rewardLogsList.addEventListener("click", async (event) => {
 
 if (adminLogoTrigger) {
   adminLogoTrigger.addEventListener("click", () => {
-    if (!isCurrentRoleAdmin()) return;
-    setAdminPanelOpen(!isAdminPanelOpen);
+    if (isCurrentRoleAdmin()) {
+      setAdminPanelOpen(!isAdminPanelOpen);
+      return;
+    }
+    if (currentAccessSession.role === "scorer") {
+      exitAccessRole();
+    }
   });
 
   adminLogoTrigger.addEventListener("dblclick", (event) => {
-    if (isCurrentRoleAdmin()) return;
+    if (isCurrentRoleAdmin() || currentAccessSession.role === "scorer") return;
     event.preventDefault();
     renderAccessScorerOptions();
     setAccessModalOpen(true);
@@ -5086,6 +5112,17 @@ if (accessModalBackdrop) {
 
 closeAccessModalBtn.addEventListener("click", () => setAccessModalOpen(false));
 confirmAccessBtn.addEventListener("click", confirmAccessRole);
+if (accessScorerChips) {
+  accessScorerChips.addEventListener("click", (event) => {
+    const chip = event.target.closest(".access-scorer-chip");
+    if (!chip) return;
+    const memberId = chip.dataset.roleMemberId || "";
+    accessScorerSelect.value = memberId;
+    accessScorerChips.querySelectorAll(".access-scorer-chip").forEach((item) => {
+      item.classList.toggle("access-scorer-chip-active", item === chip);
+    });
+  });
+}
 accessPasswordInput.addEventListener("keydown", async (event) => {
   if (event.key !== "Enter") return;
   event.preventDefault();

@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Dota2 宁德联赛</title>
-  <link rel="stylesheet" href="style.css?v=20260402-17" />
+  <link rel="stylesheet" href="style.css?v=20260402-18" />
 </head>
   <body>
   <div id="loadingScreen" class="loading-screen" aria-live="polite">
@@ -298,16 +298,18 @@
     <div class="hero-picker-dialog access-dialog" role="dialog" aria-modal="true" aria-labelledby="accessModalTitle">
       <div class="section-head">
         <div>
-          <h2 id="accessModalTitle">身份验证</h2>
-          <p id="accessModalHint" class="muted">输入对应口令，记分员需选择已授权选手。</p>
+          <h2 id="accessModalTitle">你居然找到了阿哈利姆的迷宫入口！</h2>
+          <p id="accessModalHint" class="muted">请输入口令。若为记分员，请在下方点选对应选手后再提交。</p>
         </div>
         <button id="closeAccessModalBtn" class="button-secondary" type="button">关闭</button>
       </div>
       <div class="row">
         <input id="accessPasswordInput" type="password" placeholder="请输入口令" />
       </div>
-      <div class="row">
-        <select id="accessScorerSelect">
+      <div class="access-scorer-picker">
+        <p class="muted access-scorer-picker-title">记分员身份选择</p>
+        <div id="accessScorerChips" class="access-scorer-chips"></div>
+        <select id="accessScorerSelect" hidden>
           <option value="">若为记分员，请选择对应选手</option>
         </select>
       </div>
