@@ -1552,6 +1552,7 @@ function renderRewardPlayerOptions() {
 }
 
 function renderKoiPlayerOptions() {
+  if (!koiPlayerSelect) return;
   const options = ['<option value="">不设置锦鲤</option>'];
   const participants = seasonPlayers
     .filter((player) => player.is_in_season)
@@ -1640,13 +1641,10 @@ function renderSeasonPlayersPanel() {
   const renderPlayerCard = (player) => {
     const item = document.createElement("div");
     item.className = `season-player-item${player.is_in_season ? " season-player-item-active" : ""}`;
-    const statusBadge = player.is_in_season
-      ? `<span class="queue-slot">${player.player_rank === "core" ? "核心" : "辅助"}</span>`
-      : '<span class="muted">未参赛</span>';
+    const isCurrentKoi = activeSeason?.koi_player_id === player.id;
     item.innerHTML = `
       <div class="season-player-main">
         <strong>${escapeHtml(player.display_name)}</strong>
-        ${statusBadge}
       </div>
       <div class="season-player-actions">
         <button
@@ -1668,6 +1666,18 @@ function renderSeasonPlayersPanel() {
           data-player-name="${escapeHtml(player.display_name)}"
         >
           辅助
+        </button>
+        <button
+          class="season-player-rank-btn season-player-koi-btn${isCurrentKoi ? " season-player-koi-btn-active" : ""}"
+          type="button"
+          data-role="season-koi"
+          data-player-id="${player.id}"
+          data-player-name="${escapeHtml(player.display_name)}"
+          ${player.is_in_season ? "" : "disabled"}
+          title="${isCurrentKoi ? "取消锦鲤" : "设为锦鲤"}"
+          aria-pressed="${isCurrentKoi ? "true" : "false"}"
+        >
+          ✦
         </button>
       </div>
     `;
@@ -2957,15 +2967,22 @@ async function setSeasonPlayerRank(playerId, playerName, playerRank) {
   });
 }
 
-async function setSeasonKoi() {
+async function setSeasonKoi(playerIdOverride = null, playerNameOverride = "") {
   if (!activeSeason?.id) {
     setMessage("当前没有可设置的赛季。", true);
     return;
   }
 
-  const playerId = koiPlayerSelect.value || null;
-  const playerName = seasonPlayers.find((player) => player.id === playerId)?.display_name || "本赛季锦鲤";
-  const isCurrentKoi = !playerId;
+  const currentKoiPlayerId = activeSeason?.koi_player_id || null;
+  const playerId = playerIdOverride !== null
+    ? (playerIdOverride || null)
+    : (koiPlayerSelect?.value || null);
+  const nextPlayerId = playerId && playerId === currentKoiPlayerId ? null : playerId;
+  const playerName = playerNameOverride
+    || seasonPlayers.find((player) => player.id === nextPlayerId)?.display_name
+    || seasonPlayers.find((player) => player.id === currentKoiPlayerId)?.display_name
+    || "本赛季锦鲤";
+  const isCurrentKoi = !nextPlayerId;
   const confirmed = window.confirm(
     isCurrentKoi
       ? "确认取消当前赛季锦鲤吗？"
@@ -2981,7 +2998,7 @@ async function setSeasonKoi() {
   );
 
   const { error } = await db.rpc("set_season_koi", {
-    p_player_id: playerId,
+    p_player_id: nextPlayerId,
     p_season_id: activeSeason.id,
   });
 
@@ -4364,9 +4381,15 @@ recentMatchesList.addEventListener("click", async (event) => {
 
 seasonPlayersList.addEventListener("click", async (event) => {
   const button = event.target.closest('[data-role="season-rank"]');
-  if (!button) return;
+  if (button) {
+    await setSeasonPlayerRank(button.dataset.playerId, button.dataset.playerName, button.dataset.rank);
+    return;
+  }
 
-  await setSeasonPlayerRank(button.dataset.playerId, button.dataset.playerName, button.dataset.rank);
+  const koiButton = event.target.closest('[data-role="season-koi"]');
+  if (!koiButton) return;
+
+  await setSeasonKoi(koiButton.dataset.playerId, koiButton.dataset.playerName);
 });
 
 seasonRewardTotal.addEventListener("click", () => {
@@ -4398,7 +4421,9 @@ rewardOutsideNameInput.addEventListener("input", () => {
 
 addRewardBtn.addEventListener("click", addRewardExtra);
 
-setKoiBtn.addEventListener("click", setSeasonKoi);
+if (setKoiBtn) {
+  setKoiBtn.addEventListener("click", () => setSeasonKoi());
+}
 
 rewardExtraInput.addEventListener("keydown", async (event) => {
   if (event.key !== "Enter") return;

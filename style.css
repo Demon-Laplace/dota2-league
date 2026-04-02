@@ -448,6 +448,13 @@ button.season-total {
   flex: 1;
 }
 
+.season-player-main strong {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .season-player-actions {
   display: flex;
   gap: 6px;
@@ -472,6 +479,28 @@ button.season-total {
 .season-player-rank-btn-active {
   background: rgba(86, 166, 255, 0.16);
   border-color: rgba(86, 166, 255, 0.45);
+}
+
+.season-player-koi-btn {
+  min-width: 30px;
+  padding: 4px 0;
+  font-size: 13px;
+  color: #f1ddb0;
+  border-color: rgba(240, 195, 106, 0.26);
+  background: rgba(73, 53, 20, 0.38);
+}
+
+.season-player-koi-btn:hover:not(:disabled) {
+  background: rgba(110, 79, 28, 0.42);
+}
+
+.season-player-koi-btn-active {
+  color: #2d2205;
+  border-color: rgba(240, 195, 106, 0.46);
+  background: linear-gradient(135deg, rgba(240, 195, 106, 0.96), rgba(186, 136, 45, 0.92));
+  box-shadow:
+    0 8px 18px rgba(112, 76, 17, 0.18),
+    0 0 16px rgba(240, 195, 106, 0.14);
 }
 
 .signup-player-grid {
