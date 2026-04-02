@@ -73,10 +73,12 @@ const todayPlayersCount = document.getElementById("todayPlayersCount");
 const leaderboardBody = document.getElementById("leaderboardBody");
 const openMatchFormBtn = document.getElementById("openMatchFormBtn");
 const openBackfillFormBtn = document.getElementById("openBackfillFormBtn");
+const recordEntrySection = document.getElementById("recordEntrySection");
 const closeMatchFormBtn = document.getElementById("closeMatchFormBtn");
 const closeBackfillFormBtn = document.getElementById("closeBackfillFormBtn");
 const matchFormPanel = document.getElementById("matchFormPanel");
 const backfillFormPanel = document.getElementById("backfillFormPanel");
+const recordEntryTitle = document.getElementById("recordEntryTitle");
 const matchMessageEl = document.getElementById("matchMessage");
 const backfillMessageEl = document.getElementById("backfillMessage");
 const seasonInfoEl = document.getElementById("seasonInfo");
@@ -1022,6 +1024,12 @@ function applyRolePermissions() {
   resetSeasonBtn.hidden = true;
   clearQueueBtn.hidden = true;
   clearTodayPlayersBtn.hidden = true;
+  if (recordEntrySection) {
+    recordEntrySection.hidden = !canScore;
+  }
+  if (recordEntryTitle) {
+    recordEntryTitle.textContent = "记录比赛";
+  }
 
   startMatchDayBtn.hidden = !canScore;
   confirmQueueBtn.hidden = !canScore;
@@ -1031,10 +1039,10 @@ function applyRolePermissions() {
   openBackfillFormBtn.hidden = !canScore;
   recordMatchBtn.hidden = !canScore;
   recordBackfillBtn.hidden = !canScore;
-  addRewardBtn.hidden = !canScore;
-  rewardPlayerSelect.disabled = !canScore;
-  rewardOutsideNameInput.disabled = !canScore;
-  rewardExtraInput.disabled = !canScore;
+  addRewardBtn.hidden = false;
+  rewardPlayerSelect.disabled = false;
+  rewardOutsideNameInput.disabled = false;
+  rewardExtraInput.disabled = false;
   adminAddScorerBtn.disabled = !isAdmin;
   adminAddScorerSelect.disabled = !isAdmin;
   adminClearQueueBtn.disabled = !isAdmin;
@@ -2541,7 +2549,6 @@ function renderLeaderboard(data) {
 }
 
 async function addRewardExtra() {
-  if (!ensureScorerAccess("仅记分员或管理员可添加赞助。")) return;
   const playerId = rewardPlayerSelect.value;
   const outsideName = rewardOutsideNameInput.value.trim();
   const selectedPlayer = leaderboardPlayers.find(
@@ -2947,7 +2954,6 @@ function renderRecentMatches(data) {
           <button
             type="button"
             class="recent-match-player"
-            ${canScore ? "" : "disabled"}
             data-role="saved-hero-picker"
             data-match-id="${match.match_id}"
             data-player-id="${player.player_id}"
