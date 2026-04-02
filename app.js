@@ -2,10 +2,12 @@ const SUPABASE_URL = "https://snqzcnaymukposcbosyq.supabase.co";
 const SUPABASE_ANON_KEY = "sb_publishable_Ap-srffzI3MkOjmYAH0lag_kiP_1Ifm";
 const TEAM_SIZE = 5;
 const LOADING_SCREEN_MIN_MS = 900;
+const PROJECT_ROOT_CREATED_AT = "2026-04-01T13:30:59.086655492+02:00";
 
 const db = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 const loadingScreen = document.getElementById("loadingScreen");
+const projectStartedText = document.getElementById("projectStartedText");
 const lastUpdatedText = document.getElementById("lastUpdatedText");
 const signupPlayerGrid = document.getElementById("signupPlayerGrid");
 const signupEmpty = document.getElementById("signupEmpty");
@@ -773,6 +775,23 @@ function formatLocalTime(value) {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return "";
   return date.toLocaleString("zh-CN", { hour12: false });
+}
+
+function formatBeijingTime(value) {
+  if (!value) return "";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+  return date.toLocaleString("zh-CN", {
+    hour12: false,
+    timeZone: "Asia/Shanghai",
+  });
+}
+
+function renderProjectStartedTime() {
+  if (!projectStartedText) return;
+
+  const formatted = formatBeijingTime(PROJECT_ROOT_CREATED_AT);
+  projectStartedText.textContent = formatted ? `北京时间${formatted}` : "未知";
 }
 
 function renderLastUpdatedTime() {
@@ -3956,6 +3975,7 @@ document.addEventListener("click", (event) => {
 
 async function init() {
   try {
+    renderProjectStartedTime();
     renderLastUpdatedTime();
     setMatchFormOpen(false);
     setBackfillFormOpen(false);
