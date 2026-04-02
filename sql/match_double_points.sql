@@ -734,6 +734,7 @@ declare
   v_player record;
   v_koi_player_id uuid;
   v_day_lowest_score numeric(10,2);
+  v_day_second_lowest_score numeric(10,2);
   v_base_delta numeric(10,2);
   v_final_delta numeric(10,2);
   v_is_winner boolean;
@@ -814,6 +815,13 @@ begin
     into v_day_lowest_score
     from public.players;
 
+    select min(score)
+    into v_day_second_lowest_score
+    from public.players
+    where score > v_day_lowest_score;
+
+    v_day_second_lowest_score := coalesce(v_day_second_lowest_score, v_day_lowest_score);
+
     for v_player in
       select
         mr.player_id,
@@ -872,7 +880,7 @@ begin
         if v_base_delta > 0 then
           v_final_delta := v_base_delta * 2;
         elsif v_base_delta < 0 then
-          if v_player.current_score = v_day_lowest_score then
+          if v_player.current_score <= v_day_second_lowest_score then
             v_final_delta := -1.00;
           else
             v_final_delta := -2.00;

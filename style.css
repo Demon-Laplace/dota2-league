@@ -1871,6 +1871,40 @@ td {
   border-color: rgba(245, 158, 11, 0.35);
 }
 
+.leaderboard-row-bottom2 {
+  background:
+    linear-gradient(90deg, rgba(34, 197, 156, 0.1), rgba(31, 41, 55, 0.08) 32%, rgba(31, 41, 55, 0.05));
+}
+
+.leaderboard-row-bottom2 td {
+  background:
+    linear-gradient(90deg, rgba(34, 197, 156, 0.1), rgba(16, 35, 48, 0.82) 34%, rgba(13, 31, 53, 0.74));
+}
+
+.leaderboard-row-bottom2 .leaderboard-rank {
+  color: #e7fffa;
+  background: linear-gradient(135deg, #189f86, #0f5d58);
+  border-color: rgba(94, 234, 212, 0.34);
+  box-shadow: 0 0 0 1px rgba(45, 212, 191, 0.1), 0 8px 20px rgba(15, 93, 88, 0.24);
+}
+
+.leaderboard-row-bottom1 {
+  background:
+    linear-gradient(90deg, rgba(45, 212, 191, 0.14), rgba(31, 41, 55, 0.1) 32%, rgba(31, 41, 55, 0.05));
+}
+
+.leaderboard-row-bottom1 td {
+  background:
+    linear-gradient(90deg, rgba(45, 212, 191, 0.12), rgba(14, 36, 47, 0.84) 34%, rgba(13, 31, 53, 0.76));
+}
+
+.leaderboard-row-bottom1 .leaderboard-rank {
+  color: #f0fffb;
+  background: linear-gradient(135deg, #22c55e, #0f766e);
+  border-color: rgba(110, 231, 183, 0.38);
+  box-shadow: 0 0 0 1px rgba(110, 231, 183, 0.12), 0 10px 24px rgba(15, 118, 110, 0.24);
+}
+
 ol {
   padding-left: 22px;
 }

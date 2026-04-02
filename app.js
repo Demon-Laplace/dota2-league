@@ -2187,6 +2187,7 @@ function renderLeaderboard(data) {
   data.forEach((player, idx) => {
     const tr = document.createElement("tr");
     const rank = idx + 1;
+    const isBottomTwo = data.length >= 2 && rank >= data.length - 1;
     const playerId = player.player_id || player.id || "";
     const tags = [];
     const nameClassName = getPlayerNameStyleClass(playerId, {
@@ -2230,6 +2231,9 @@ function renderLeaderboard(data) {
       tr.className = "leaderboard-row-top23";
     } else if (rank <= 5) {
       tr.className = "leaderboard-row-top45";
+    }
+    if (isBottomTwo) {
+      tr.classList.add(rank === data.length ? "leaderboard-row-bottom1" : "leaderboard-row-bottom2");
     }
     tr.innerHTML = `
       <td><span class="leaderboard-rank">${rank}</span></td>
