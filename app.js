@@ -3005,10 +3005,16 @@ async function loadRecentMatches() {
     console.error("加载最近比赛失败：", error);
     recentMatchesData = [];
     renderRecentMatches([]);
+    if (leaderboardPlayers?.length) {
+      renderLeaderboard(leaderboardPlayers);
+    }
     return;
   }
 
   renderRecentMatches(data || []);
+  if (leaderboardPlayers?.length) {
+    renderLeaderboard(leaderboardPlayers);
+  }
 }
 
 async function resetCurrentSeason() {
