@@ -92,6 +92,7 @@ let rewardLogs = [];
 let seasonPlayerRewardTotal = 0;
 let externalRewardTotal = 0;
 let recentMatchesData = [];
+let openRecentMatchGroups = new Set();
 let isMatchFormOpen = false;
 let isBackfillFormOpen = false;
 let isSeasonPanelOpen = false;
@@ -718,6 +719,27 @@ function getWinnerLabel(winnerTeam) {
 
 function getMatchStatusBadge(winnerTeam) {
   return hasRecordedWinner(winnerTeam) ? "比赛完成" : "待补胜负";
+}
+
+function rememberOpenRecentMatchGroups() {
+  openRecentMatchGroups = new Set(
+    [...recentMatchesList.querySelectorAll(".match-day-group[open]")]
+      .map((element) => element.dataset.matchDate)
+      .filter(Boolean)
+  );
+}
+
+function updateRecentMatchHeroLocally(matchId, playerId, heroName) {
+  const targetMatch = recentMatchesData.find((match) => match.match_id === matchId);
+  if (!targetMatch) return;
+
+  const players = parseRecentMatchPlayers(targetMatch.players).map((player) => (
+    player.player_id === playerId
+      ? { ...player, hero_name: heroName || null }
+      : player
+  ));
+
+  targetMatch.players = players;
 }
 
 function getBeijingBusinessDateString() {
@@ -1589,8 +1611,16 @@ function renderRecentMatches(data) {
   groups.forEach((matches, matchDate) => {
     const details = document.createElement("details");
     const isActiveDay = matches.some((match) => match.day_is_active);
+    details.dataset.matchDate = matchDate;
     details.className = "match-day-group";
-    details.open = isActiveDay;
+    details.open = isActiveDay || openRecentMatchGroups.has(matchDate);
+    details.addEventListener("toggle", () => {
+      if (details.open) {
+        openRecentMatchGroups.add(matchDate);
+      } else {
+        openRecentMatchGroups.delete(matchDate);
+      }
+    });
 
     details.innerHTML = `
       <summary>
@@ -2699,8 +2729,10 @@ async function saveHeroSelection(heroName) {
       return;
     }
 
+    rememberOpenRecentMatchGroups();
+    updateRecentMatchHeroLocally(heroPickerState.matchId, heroPickerState.playerId, normalizedHero);
     closeHeroPicker();
-    requestImmediateRefresh({ recentMatches: true });
+    renderRecentMatches(recentMatchesData);
     return;
   }
 
@@ -2916,6 +2948,7 @@ async function recordBackfillMatch() {
 }
 
 async function startEditingMatch(matchId) {
+  rememberOpenRecentMatchGroups();
   const match = recentMatchesData.find((item) => item.match_id === matchId);
 
   if (!match) {
@@ -2959,6 +2992,7 @@ async function startEditingMatch(matchId) {
   setMatchFormOpen(false);
   renderBackfillForm();
   setBackfillMessage("已载入比赛记录，可以直接修改并保存。");
+  backfillFormPanel.scrollIntoView({ behavior: "smooth", block: "start" });
 }
 
 async function deleteMatch(matchId, buttonEl) {
