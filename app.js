@@ -2223,26 +2223,24 @@ function getMatchEffectLogsByTeam(match, players, doubleDowns) {
     const hasPositiveGain = targetPlayers.some((player) => Number(player.score_change ?? 0) > 1);
     const hasExtraPenalty = targetPlayers.some((player) => Number(player.score_change ?? 0) <= -2);
     const hasFloorProtection = targetPlayers.some((player) => Number(player.score_change ?? 0) === -1);
-    let effectText = "";
+    let effectText = "待补胜负";
     let tone = "gold";
 
-    if (!hasWinner) {
-      effectText = "，待补胜负后生效";
-    } else if (hasPositiveGain) {
-      effectText = "，胜场双倍加成";
+    if (hasWinner && hasPositiveGain) {
+      effectText = "+100%";
     } else if (hasExtraPenalty && hasFloorProtection) {
-      effectText = "，负场额外扣分，部分受到保底效果";
+      effectText = "-100%，部分保底";
       tone = "danger";
     } else if (hasExtraPenalty) {
-      effectText = "，负场额外扣分";
+      effectText = "-100%";
       tone = "danger";
     } else if (hasFloorProtection) {
-      effectText = "，受到保底效果";
+      effectText = "保底，仅正常扣分";
     }
 
     if (item.mode === "team") {
       if (targetTeam && logsByTeam[targetTeam]) {
-        logsByTeam[targetTeam].push({ text: `${userName}使用团队双倍${sideText}${effectText}`, tone });
+        logsByTeam[targetTeam].push({ text: `${userName}团队双倍${sideText} ${effectText}`, tone });
       }
       return;
     }
@@ -2251,8 +2249,8 @@ function getMatchEffectLogsByTeam(match, players, doubleDowns) {
     if (targetTeam && logsByTeam[targetTeam]) {
       logsByTeam[targetTeam].push({
         text: item.user_player_id === item.target_player_id
-          ? `${userName}对自己使用个人双倍${sideText}${effectText}`
-          : `${userName}对${targetName}使用个人双倍${sideText}${effectText}`,
+          ? `${userName}个人双倍(自己)${sideText} ${effectText}`
+          : `${userName}个人双倍(${targetName})${sideText} ${effectText}`,
         tone,
       });
     }
@@ -2263,7 +2261,7 @@ function getMatchEffectLogsByTeam(match, players, doubleDowns) {
     const koiPlayer = players.find((player) => player.player_id === koiPlayerId && player.team === match.winner_team);
     if (koiPlayer) {
       logsByTeam[match.winner_team].push({
-        text: `${koiPlayer.display_name || "锦鲤"}触发锦鲤加成，对${getTeamLabel(match.winner_team)}起效`,
+        text: `${koiPlayer.display_name || "锦鲤"}锦鲤加成，对${getTeamLabel(match.winner_team)}起效 +25%`,
         tone: "gold",
       });
     }
