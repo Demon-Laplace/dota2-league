@@ -985,6 +985,48 @@ function getPlayerNameStyleClass(playerId, options = {}) {
   return "player-name-display";
 }
 
+function getMvpPlayerIds() {
+  // Reserved for future MVP logic.
+  return new Set();
+}
+
+function getActiveWinStreakPlayerIds(matches, minStreak = 3) {
+  const streakMap = new Map();
+  const finishedPlayers = new Set();
+
+  (matches || []).forEach((match) => {
+    if (!hasRecordedWinner(match.winner_team)) return;
+
+    parseRecentMatchPlayers(match.players).forEach((player) => {
+      const playerId = player.player_id || player.id;
+      if (!playerId || finishedPlayers.has(playerId)) return;
+
+      const isWinner = player.team === match.winner_team;
+      const currentStreak = streakMap.get(playerId) || 0;
+
+      if (isWinner) {
+        streakMap.set(playerId, currentStreak + 1);
+        return;
+      }
+
+      finishedPlayers.add(playerId);
+    });
+  });
+
+  return new Set(
+    [...streakMap.entries()]
+      .filter(([playerId, streak]) => !finishedPlayers.has(playerId) && streak >= minStreak)
+      .map(([playerId]) => playerId)
+  );
+}
+
+function getLeaderboardNameRankClass(rank) {
+  if (rank === 1) return "leaderboard-player-name-rank1";
+  if (rank <= 3) return "leaderboard-player-name-rank23";
+  if (rank <= 5) return "leaderboard-player-name-rank45";
+  return "";
+}
+
 function hasRecordedWinner(value) {
   return value === "A" || value === "B";
 }
@@ -2122,6 +2164,8 @@ function renderLeaderboard(data) {
 
   const highestRewardIds = getHighestRewardPlayerIds(data);
   const hardcoreLoseIds = getHardcoreLoseTaggedPlayerIds(data);
+  const winStreakIds = getActiveWinStreakPlayerIds(recentMatchesData, 3);
+  const mvpIds = getMvpPlayerIds();
 
   data.forEach((player, idx) => {
     const tr = document.createElement("tr");
@@ -2146,6 +2190,14 @@ function renderLeaderboard(data) {
       tags.push({ icon: "☄", label: "又菜又爱玩", tone: "slate" });
     }
 
+    if (winStreakIds.has(playerId)) {
+      tags.push({ icon: "▲", label: "连胜中", tone: "ember" });
+    }
+
+    if (mvpIds.has(playerId)) {
+      tags.push({ icon: "★", label: "MVP", tone: "royal" });
+    }
+
     const tagsHtml = tags.length
       ? `<div class="leaderboard-player-tags">${tags.map((tag) => `
         <span class="leaderboard-tag leaderboard-tag-${tag.tone}">
@@ -2166,7 +2218,9 @@ function renderLeaderboard(data) {
       <td><span class="leaderboard-rank">${rank}</span></td>
       <td>
         <div class="leaderboard-player-cell">
-          <strong class="leaderboard-player-name ${nameClassName}">${escapeHtml(player.display_name)}</strong>
+          <strong class="leaderboard-player-name ${getLeaderboardNameRankClass(rank)}" data-name="${escapeHtml(player.display_name)}">
+            <span class="${nameClassName}">${escapeHtml(player.display_name)}</span>
+          </strong>
           ${tagsHtml}
         </div>
       </td>

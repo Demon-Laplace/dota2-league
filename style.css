@@ -1567,9 +1567,64 @@ td {
 }
 
 .leaderboard-player-name {
+  position: relative;
+  display: inline-grid;
   font-size: 17px;
   line-height: 1.2;
   letter-spacing: 0.04em;
+}
+
+.leaderboard-player-name > .player-name-display {
+  grid-area: 1 / 1;
+}
+
+.leaderboard-player-name::after {
+  content: attr(data-name);
+  grid-area: 1 / 1;
+  pointer-events: none;
+  font: inherit;
+  letter-spacing: inherit;
+  line-height: inherit;
+  opacity: 0;
+}
+
+.leaderboard-player-name::before {
+  content: "";
+  grid-area: 1 / 1;
+  pointer-events: none;
+  opacity: 0;
+}
+
+.leaderboard-player-name-rank1::after {
+  opacity: 0.6;
+  color: #8a6931;
+  text-shadow:
+    0 0 16px rgba(209, 173, 96, 0.16),
+    0 10px 24px rgba(58, 38, 12, 0.3);
+}
+
+.leaderboard-player-name-rank1::before {
+  opacity: 0.42;
+  background:
+    linear-gradient(180deg, rgba(255, 246, 220, 0.34), rgba(255, 246, 220, 0) 46%),
+    radial-gradient(circle at 50% 26%, rgba(214, 181, 104, 0.18), transparent 56%);
+  filter: blur(6px);
+}
+
+.leaderboard-player-name-rank23::after {
+  opacity: 0.48;
+  color: #d7e0ec;
+  text-shadow:
+    0 0 12px rgba(203, 219, 236, 0.18),
+    0 8px 20px rgba(34, 44, 58, 0.22);
+}
+
+.leaderboard-player-name-rank45::after {
+  opacity: 0.46;
+  color: #b98645;
+  text-shadow:
+    0 0 12px rgba(193, 137, 73, 0.16),
+    0 8px 20px rgba(63, 39, 14, 0.22);
 }
 
 .leaderboard-player-tags {
@@ -1636,6 +1691,33 @@ td {
 .leaderboard-tag-slate .leaderboard-tag-icon {
   background: rgba(148, 163, 184, 0.14);
   color: #e2e8f0;
+}
+
+.leaderboard-tag-ember {
+  color: #fff0de;
+  border-color: rgba(239, 68, 68, 0.34);
+  background:
+    linear-gradient(135deg, rgba(132, 28, 28, 0.46), rgba(99, 24, 24, 0.34));
+  box-shadow:
+    inset 0 1px 0 rgba(255, 236, 214, 0.06),
+    0 0 16px rgba(239, 68, 68, 0.1);
+}
+
+.leaderboard-tag-ember .leaderboard-tag-icon {
+  background: linear-gradient(135deg, rgba(248, 113, 113, 0.24), rgba(220, 38, 38, 0.24));
+  color: #ffe2d7;
+  box-shadow: 0 0 10px rgba(239, 68, 68, 0.14);
+}
+
+.leaderboard-tag-royal {
+  color: #ece8ff;
+  border-color: rgba(167, 139, 250, 0.26);
+  background: rgba(62, 45, 112, 0.3);
+}
+
+.leaderboard-tag-royal .leaderboard-tag-icon {
+  background: rgba(167, 139, 250, 0.16);
+  color: #ddd6fe;
 }
 
 .leaderboard-score {
