@@ -11,6 +11,7 @@ const HARDCORE_TAG_SHOW_THRESHOLD = 0.35;
 const ADMIN_ACCESS_PASSWORD = "我是大魔导师";
 const SCORER_ACCESS_PASSWORD = "夜神夜神夜神";
 const ACCESS_SESSION_STORAGE_KEY = "nd_dota_access_session_v1";
+const REMEMBERED_SCORER_PLAYER_KEY = "nd_dota_remembered_scorer_player_v1";
 const ADMIN_ACTION_LOGS_STORAGE_PREFIX = "nd_dota_admin_action_logs_";
 
 const db = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
@@ -905,6 +906,27 @@ function readStoredAccessSession() {
   }
 }
 
+function readRememberedScorerPlayerId() {
+  try {
+    return window.localStorage.getItem(REMEMBERED_SCORER_PLAYER_KEY) || "";
+  } catch (error) {
+    console.warn("读取本地记分员身份失败：", error);
+    return "";
+  }
+}
+
+function writeRememberedScorerPlayerId(playerId) {
+  try {
+    if (!playerId) {
+      window.localStorage.removeItem(REMEMBERED_SCORER_PLAYER_KEY);
+      return;
+    }
+    window.localStorage.setItem(REMEMBERED_SCORER_PLAYER_KEY, String(playerId));
+  } catch (error) {
+    console.warn("写入本地记分员身份失败：", error);
+  }
+}
+
 function writeStoredAccessSession(session) {
   currentAccessSession = {
     role: session?.role || "viewer",
@@ -926,6 +948,23 @@ function clearStoredAccessSession() {
   } catch (error) {
     console.warn("清理本地身份失败：", error);
   }
+}
+
+function tryReconnectRememberedScorer() {
+  const rememberedPlayerId = readRememberedScorerPlayerId();
+  if (!rememberedPlayerId) return false;
+  const scorerMember = getRoleMembersByRole("scorer").find((member) => member.player_id === rememberedPlayerId);
+  if (!scorerMember) return false;
+
+  writeStoredAccessSession({
+    role: "scorer",
+    memberId: scorerMember.id,
+    playerId: scorerMember.player_id || rememberedPlayerId,
+  });
+  renderRoleMembers();
+  applyRolePermissions();
+  setMessage(`${scorerMember.display_name || "记分员"} 已自动重连。`);
+  return true;
 }
 
 function isCurrentRoleScorer() {
@@ -1104,6 +1143,7 @@ function validateStoredAccessSession() {
         memberId: member.id,
         playerId: member.player_id || "",
       };
+      writeRememberedScorerPlayerId(member.player_id || "");
       return;
     }
   }
@@ -1155,7 +1195,12 @@ function applyRolePermissions() {
   adminClearTodayPlayersBtn.disabled = !isAdmin;
   adminResetSeasonBtn.disabled = !isAdmin;
 
-  if (!canScore) {
+  if (canScore) {
+    setMatchFormOpen(isMatchFormOpen);
+    setBackfillFormOpen(isBackfillFormOpen);
+    renderMatchForm();
+    renderBackfillForm();
+  } else {
     setMatchFormOpen(false);
     setBackfillFormOpen(false);
   }
@@ -3094,7 +3139,7 @@ function renderRecentMatches(data) {
             <span class="winner-badge">${getMatchStatusBadge(match.winner_team)}</span>
           </div>
           ${canScore ? `
-            <div class="queue-actions">
+            <div class="recent-match-actions">
               <button class="button-secondary edit-match-btn" data-match-id="${match.match_id}">修改记录</button>
               <button class="button-danger delete-match-btn" data-match-id="${match.match_id}">删除记录</button>
             </div>
@@ -3217,6 +3262,9 @@ async function removeScorerRole(memberId) {
   if (currentAccessSession.memberId === memberId) {
     clearStoredAccessSession();
   }
+  if (readRememberedScorerPlayerId() === (member?.player_id || "")) {
+    writeRememberedScorerPlayerId("");
+  }
 
   setAdminPanelMessage("记分员已移除。");
   appendAdminActionLog(`移除了记分员 ${member?.display_name || "该选手"}。`);
@@ -3272,6 +3320,7 @@ async function confirmAccessRole() {
       memberId: scorerMember.id,
       playerId: scorerMember.player_id || selectedPlayerId || "",
     });
+    writeRememberedScorerPlayerId(scorerMember.player_id || selectedPlayerId || "");
     setAccessMessage("记分员身份已启用。");
     renderRoleMembers();
     applyRolePermissions();
@@ -3284,6 +3333,10 @@ async function confirmAccessRole() {
 
 function exitAccessRole() {
   const previousRole = currentAccessSession.role;
+  if (previousRole === "scorer") {
+    const confirmed = window.confirm("确认退出当前记分员身份吗？");
+    if (!confirmed) return;
+  }
   clearStoredAccessSession();
   renderRoleMembers();
   applyRolePermissions();
@@ -5223,6 +5276,9 @@ if (adminLogoTrigger) {
   adminLogoTrigger.addEventListener("dblclick", (event) => {
     if (isCurrentRoleAdmin() || currentAccessSession.role === "scorer") return;
     event.preventDefault();
+    if (tryReconnectRememberedScorer()) {
+      return;
+    }
     renderAccessScorerOptions();
     setAccessModalOpen(true);
   });
