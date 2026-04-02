@@ -59,6 +59,10 @@ const teamAFields = document.getElementById("teamAFields");
 const teamBFields = document.getElementById("teamBFields");
 const backfillTeamAFields = document.getElementById("backfillTeamAFields");
 const backfillTeamBFields = document.getElementById("backfillTeamBFields");
+const matchTeamADoubleSlot = document.getElementById("matchTeamADoubleSlot");
+const matchTeamBDoubleSlot = document.getElementById("matchTeamBDoubleSlot");
+const backfillTeamADoubleSlot = document.getElementById("backfillTeamADoubleSlot");
+const backfillTeamBDoubleSlot = document.getElementById("backfillTeamBDoubleSlot");
 const winnerSelect = document.getElementById("winnerSelect");
 const backfillWinnerSelect = document.getElementById("backfillWinnerSelect");
 const winnerToggleHint = document.getElementById("winnerToggleHint");
@@ -122,6 +126,10 @@ let backfillDoubleState = {
   teamAUserId: "",
   teamBUserId: "",
   singles: [],
+};
+let teamDoublePickerOpen = {
+  match: { A: false, B: false },
+  backfill: { A: false, B: false },
 };
 let heroPickerState = null;
 let realtimeChannel = null;
@@ -992,6 +1000,51 @@ function getDoubleStateByFormType(formType) {
   return formType === "backfill" ? backfillDoubleState : matchDoubleState;
 }
 
+function renderInlineTeamDoubleControls(formType, disabled = false) {
+  const selectedPlayers = getSelectedPlayersByFormType(formType);
+  const doubleState = getDoubleStateByFormType(formType);
+  const slotMap = formType === "backfill"
+    ? { A: backfillTeamADoubleSlot, B: backfillTeamBDoubleSlot }
+    : { A: matchTeamADoubleSlot, B: matchTeamBDoubleSlot };
+
+  ["A", "B"].forEach((team) => {
+    const slot = slotMap[team];
+    if (!slot) return;
+
+    const players = selectedPlayers.filter((player) => player.team === team);
+    const currentValue = team === "A" ? doubleState.teamAUserId : doubleState.teamBUserId;
+    const isOpen = teamDoublePickerOpen[formType][team] || Boolean(currentValue);
+    const placeholder = `${team === "A" ? "天辉" : "夜魇"}无团队双倍`;
+    const options = [`<option value="">${placeholder}</option>`]
+      .concat(players.map((player) => (
+        `<option value="${player.id}"${player.id === currentValue ? " selected" : ""}>${escapeHtml(player.display_name)}</option>`
+      )))
+      .join("");
+
+    slot.innerHTML = `
+      <button
+        type="button"
+        class="team-double-toggle${currentValue ? " team-double-toggle-active" : ""}"
+        data-role="team-double-toggle"
+        data-form-type="${formType}"
+        data-team="${team}"
+        ${disabled ? "disabled" : ""}
+        aria-expanded="${String(isOpen)}"
+        title="${team === "A" ? "天辉" : "夜魇"}团队双倍"
+      >◉</button>
+      <select
+        class="team-double-select${isOpen ? " team-double-select-open" : ""}"
+        data-role="double-team-user"
+        data-form-type="${formType}"
+        data-team="${team}"
+        ${disabled || !isOpen ? "disabled" : ""}
+      >
+        ${options}
+      </select>
+    `;
+  });
+}
+
 function renderDoublePanel(formType) {
   const panel = formType === "backfill" ? backfillDoublePanel : matchDoublePanel;
   if (!panel) return;
@@ -1013,22 +1066,8 @@ function renderDoublePanel(formType) {
     <div class="double-panel-head">
       <div>
         <h4>双倍积分</h4>
-        <p class="muted">团队双倍与单人双倍互斥。单人双倍可跨队使用，团队双倍必须本队使用。</p>
+        <p class="muted">团队双倍请点队伍名旁金币设置使用者。单人双倍可跨队使用，团队双倍必须本队使用。</p>
       </div>
-    </div>
-    <div class="double-team-grid">
-      <label class="double-field">
-        <span>天辉团队双倍使用者</span>
-        <select data-role="double-team-user" data-form-type="${formType}" data-team="A">
-          ${buildOptions(teamAPlayers, doubleState.teamAUserId, "天辉不使用团队双倍")}
-        </select>
-      </label>
-      <label class="double-field">
-        <span>夜魇团队双倍使用者</span>
-        <select data-role="double-team-user" data-form-type="${formType}" data-team="B">
-          ${buildOptions(teamBPlayers, doubleState.teamBUserId, "夜魇不使用团队双倍")}
-        </select>
-      </label>
     </div>
     <div class="double-single-list">
       <div class="double-single-head">
@@ -1583,6 +1622,7 @@ function renderMatchForm() {
   renderDoublePanel("match");
 
   const hasEnoughPlayers = Boolean(activeMatchDay) && todayPlayers.length >= TEAM_SIZE * 2;
+  renderInlineTeamDoubleControls("match", !hasEnoughPlayers);
   winnerSelect.disabled = !hasEnoughPlayers;
   matchNoteInput.disabled = !hasEnoughPlayers;
   recordMatchBtn.disabled = !hasEnoughPlayers;
@@ -1600,6 +1640,7 @@ function renderBackfillForm() {
   backfillSeasonSelect.innerHTML = buildSeasonOptions(allSeasons, backfillSeasonSelect.value);
   const hasEnoughPlayers = backfillPlayers.length >= TEAM_SIZE * 2;
   const hasSeason = Boolean(backfillSeasonSelect.value);
+  renderInlineTeamDoubleControls("backfill", !hasSeason || !hasEnoughPlayers);
   backfillWinnerSelect.disabled = !hasSeason || !hasEnoughPlayers;
   backfillDateInput.disabled = !hasSeason;
   backfillMatchNoteInput.disabled = !hasSeason || !hasEnoughPlayers;
@@ -1612,6 +1653,7 @@ function renderBackfillForm() {
 }
 
 function clearMatchForm() {
+  teamDoublePickerOpen.match = { A: false, B: false };
   matchTeamSelections = {
     teamA: [],
     teamB: [],
@@ -1631,6 +1673,7 @@ function clearMatchForm() {
 
 function clearBackfillForm() {
   editingMatchId = null;
+  teamDoublePickerOpen.backfill = { A: false, B: false };
   backfillTeamSelections = {
     teamA: [],
     teamB: [],
@@ -3664,6 +3707,15 @@ matchFormPanel.addEventListener("click", (event) => {
     return;
   }
 
+  const teamDoubleToggle = event.target.closest('[data-role="team-double-toggle"]');
+  if (teamDoubleToggle) {
+    const formType = teamDoubleToggle.dataset.formType || "match";
+    const team = teamDoubleToggle.dataset.team || "A";
+    teamDoublePickerOpen[formType][team] = !teamDoublePickerOpen[formType][team];
+    renderInlineTeamDoubleControls(formType, !activeMatchDay || todayPlayers.length < TEAM_SIZE * 2);
+    return;
+  }
+
   const addDoubleBtn = event.target.closest('[data-role="double-add"]');
   if (addDoubleBtn) {
     matchDoubleState.singles.push(createEmptySingleDoubleEntry());
@@ -3698,7 +3750,10 @@ matchFormPanel.addEventListener("click", (event) => {
 
 matchFormPanel.addEventListener("change", (event) => {
   if (event.target.matches('[data-role="double-team-user"]')) {
-    matchDoubleState[event.target.dataset.team === "A" ? "teamAUserId" : "teamBUserId"] = event.target.value || "";
+    const team = event.target.dataset.team === "A" ? "A" : "B";
+    matchDoubleState[team === "A" ? "teamAUserId" : "teamBUserId"] = event.target.value || "";
+    teamDoublePickerOpen.match[team] = Boolean(event.target.value);
+    renderInlineTeamDoubleControls("match", !activeMatchDay || todayPlayers.length < TEAM_SIZE * 2);
     return;
   }
 
@@ -3721,7 +3776,10 @@ backfillFormPanel.addEventListener("change", async (event) => {
   }
 
   if (event.target.matches('[data-role="double-team-user"]')) {
-    backfillDoubleState[event.target.dataset.team === "A" ? "teamAUserId" : "teamBUserId"] = event.target.value || "";
+    const team = event.target.dataset.team === "A" ? "A" : "B";
+    backfillDoubleState[team === "A" ? "teamAUserId" : "teamBUserId"] = event.target.value || "";
+    teamDoublePickerOpen.backfill[team] = Boolean(event.target.value);
+    renderInlineTeamDoubleControls("backfill", !backfillSeasonSelect.value || backfillPlayers.length < TEAM_SIZE * 2);
     return;
   }
 
@@ -3740,6 +3798,15 @@ backfillFormPanel.addEventListener("click", (event) => {
   const winnerToggle = event.target.closest('[data-role="winner-toggle"]');
   if (winnerToggle) {
     toggleWinnerSelection(winnerToggle.dataset.formType || "backfill", winnerToggle.dataset.winner || "");
+    return;
+  }
+
+  const teamDoubleToggle = event.target.closest('[data-role="team-double-toggle"]');
+  if (teamDoubleToggle) {
+    const formType = teamDoubleToggle.dataset.formType || "backfill";
+    const team = teamDoubleToggle.dataset.team || "A";
+    teamDoublePickerOpen[formType][team] = !teamDoublePickerOpen[formType][team];
+    renderInlineTeamDoubleControls(formType, !backfillSeasonSelect.value || backfillPlayers.length < TEAM_SIZE * 2);
     return;
   }
 
