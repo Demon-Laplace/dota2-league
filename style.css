@@ -587,6 +587,54 @@ button:disabled {
   margin-bottom: 14px;
 }
 
+.winner-picker {
+  display: grid;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid rgba(124, 165, 209, 0.18);
+  border-radius: 12px;
+  background: rgba(11, 27, 46, 0.45);
+}
+
+.winner-picker-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  flex-wrap: wrap;
+  font-size: 13px;
+}
+
+.winner-toggle-group {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.winner-toggle {
+  min-width: 0;
+  background: rgba(14, 31, 54, 0.82);
+  border: 1px solid var(--border);
+  color: var(--text);
+  box-shadow: none;
+}
+
+.winner-toggle:hover:not(:disabled) {
+  background: rgba(26, 57, 96, 0.92);
+}
+
+.winner-toggle-active {
+  background: linear-gradient(135deg, rgba(99, 213, 208, 0.32), rgba(39, 116, 154, 0.86));
+  border-color: rgba(126, 224, 216, 0.45);
+  color: #efffff;
+  box-shadow: 0 10px 22px rgba(11, 53, 73, 0.24);
+}
+
+.winner-toggle-hint {
+  margin: 0;
+  font-size: 12px;
+}
+
 .match-form-actions {
   margin-top: 4px;
 }
@@ -785,6 +833,26 @@ button:disabled {
   background: rgba(20, 43, 73, 0.62);
 }
 
+.match-day-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.match-day-toggle-icon {
+  width: 0;
+  height: 0;
+  border-top: 5px solid transparent;
+  border-bottom: 5px solid transparent;
+  border-left: 7px solid rgba(191, 216, 245, 0.86);
+  transition: transform 0.18s ease;
+  transform-origin: 35% 50%;
+}
+
+.match-day-group[open] .match-day-toggle-icon {
+  transform: rotate(90deg);
+}
+
 .match-day-group summary::-webkit-details-marker {
   display: none;
 }
@@ -829,6 +897,17 @@ button:disabled {
   border-radius: 10px;
   padding: 10px 12px;
   background: rgba(18, 39, 66, 0.48);
+}
+
+.recent-match-team-winner {
+  border-color: rgba(99, 213, 208, 0.42);
+  background:
+    linear-gradient(135deg, rgba(44, 107, 114, 0.34), rgba(18, 39, 66, 0.58));
+  box-shadow: inset 0 0 0 1px rgba(99, 213, 208, 0.08);
+}
+
+.recent-match-team-winner h3 {
+  color: #d8fbf3;
 }
 
 .recent-match-team h3 {

@@ -61,6 +61,8 @@ const backfillTeamAFields = document.getElementById("backfillTeamAFields");
 const backfillTeamBFields = document.getElementById("backfillTeamBFields");
 const winnerSelect = document.getElementById("winnerSelect");
 const backfillWinnerSelect = document.getElementById("backfillWinnerSelect");
+const winnerToggleHint = document.getElementById("winnerToggleHint");
+const backfillWinnerToggleHint = document.getElementById("backfillWinnerToggleHint");
 const matchNoteInput = document.getElementById("matchNote");
 const matchDoublePanel = document.getElementById("matchDoublePanel");
 const backfillSeasonSelect = document.getElementById("backfillSeasonSelect");
@@ -815,6 +817,46 @@ function getMatchStatusBadge(winnerTeam) {
   return hasRecordedWinner(winnerTeam) ? "比赛完成" : "待补胜负";
 }
 
+function getWinnerToggleState(formType) {
+  return formType === "backfill"
+    ? { select: backfillWinnerSelect, hint: backfillWinnerToggleHint, panel: backfillFormPanel }
+    : { select: winnerSelect, hint: winnerToggleHint, panel: matchFormPanel };
+}
+
+function setWinnerSelection(formType, winnerTeam = "") {
+  const { select, hint, panel } = getWinnerToggleState(formType);
+  select.value = winnerTeam || "";
+
+  [...panel.querySelectorAll('[data-role="winner-toggle"]')].forEach((button) => {
+    const isActive = button.dataset.winner === select.value;
+    button.classList.toggle("winner-toggle-active", isActive);
+    button.setAttribute("aria-pressed", String(isActive));
+  });
+
+  if (hint) {
+    hint.textContent = hasRecordedWinner(select.value)
+      ? `${select.value === "A" ? "天辉方" : "夜魇方"}已设为胜方，再次点击可取消`
+      : "未选择则先保存为暂不计入胜负";
+  }
+}
+
+function toggleWinnerSelection(formType, winnerTeam) {
+  const { select } = getWinnerToggleState(formType);
+  setWinnerSelection(formType, select.value === winnerTeam ? "" : winnerTeam);
+}
+
+function updateRecentMatchGroupSummary(details, isActiveDay) {
+  const badge = details.querySelector(".winner-badge");
+  if (badge) {
+    badge.textContent = isActiveDay ? "进行中" : "已归档";
+  }
+
+  const toggleText = details.querySelector(".match-day-toggle-text");
+  if (toggleText) {
+    toggleText.textContent = details.open ? "点击收起" : "点击展开";
+  }
+}
+
 function rememberOpenRecentMatchGroups() {
   openRecentMatchGroups = new Set(
     [...recentMatchesList.querySelectorAll(".match-day-group[open]")]
@@ -1540,6 +1582,10 @@ function renderMatchForm() {
   recordMatchBtn.disabled = !hasEnoughPlayers;
   closeMatchFormBtn.disabled = false;
   openMatchFormBtn.disabled = isMatchFormOpen || !hasEnoughPlayers;
+  [...matchFormPanel.querySelectorAll('[data-role="winner-toggle"]')].forEach((button) => {
+    button.disabled = !hasEnoughPlayers;
+  });
+  setWinnerSelection("match", winnerSelect.value);
 }
 
 function renderBackfillForm() {
@@ -1553,6 +1599,10 @@ function renderBackfillForm() {
   backfillMatchNoteInput.disabled = !hasSeason || !hasEnoughPlayers;
   recordBackfillBtn.disabled = !hasSeason || !hasEnoughPlayers || !backfillDateInput.value;
   recordBackfillBtn.textContent = editingMatchId ? "保存修改" : "保存补录比赛";
+  [...backfillFormPanel.querySelectorAll('[data-role="winner-toggle"]')].forEach((button) => {
+    button.disabled = !hasSeason || !hasEnoughPlayers;
+  });
+  setWinnerSelection("backfill", backfillWinnerSelect.value);
 }
 
 function clearMatchForm() {
@@ -1566,7 +1616,7 @@ function clearMatchForm() {
     teamBUserId: "",
     singles: [],
   };
-  winnerSelect.value = "";
+  setWinnerSelection("match", "");
   matchNoteInput.value = "";
   refreshMatchSelectOptions();
   renderDoublePanel("match");
@@ -1585,7 +1635,7 @@ function clearBackfillForm() {
     teamBUserId: "",
     singles: [],
   };
-  backfillWinnerSelect.value = "";
+  setWinnerSelection("backfill", "");
   backfillMatchNoteInput.value = "";
   refreshBackfillSelectOptions();
   renderDoublePanel("backfill");
@@ -1964,6 +2014,7 @@ function renderRecentMatches(data) {
       } else {
         openRecentMatchGroups.delete(matchDate);
       }
+      updateRecentMatchGroupSummary(details, isActiveDay);
     });
 
     details.innerHTML = `
@@ -1973,10 +2024,14 @@ function renderRecentMatches(data) {
           <span class="queue-slot">${matches.length} 场</span>
           <span class="winner-badge">${isActiveDay ? "进行中" : "已归档"}</span>
         </div>
-        <span class="muted">${isActiveDay ? "点击收起" : "点击展开"}</span>
+        <span class="match-day-toggle">
+          <span class="match-day-toggle-icon" aria-hidden="true"></span>
+          <span class="muted match-day-toggle-text">${details.open ? "点击收起" : "点击展开"}</span>
+        </span>
       </summary>
       <div class="match-day-content"></div>
     `;
+    updateRecentMatchGroupSummary(details, isActiveDay);
 
     const content = details.querySelector(".match-day-content");
 
@@ -2025,11 +2080,11 @@ function renderRecentMatches(data) {
           <span class="muted">登记时间：${escapeHtml(formatLocalTime(match.created_at))}</span>
         </div>
         <div class="recent-match-teams">
-          <div class="recent-match-team">
+          <div class="recent-match-team${match.winner_team === "A" ? " recent-match-team-winner" : ""}">
             <h3>天辉方</h3>
             <ul>${renderPlayerList(teamAPlayers)}</ul>
           </div>
-          <div class="recent-match-team">
+          <div class="recent-match-team${match.winner_team === "B" ? " recent-match-team-winner" : ""}">
             <h3>夜魇方</h3>
             <ul>${renderPlayerList(teamBPlayers)}</ul>
           </div>
@@ -2738,13 +2793,9 @@ async function clearTodayPlayersForTesting() {
 
 async function startMatchDay() {
   matchStartTimeInput.value = normalizeTimeInput(matchStartTimeInput.value);
+  const startTime = matchStartTimeInput.value || "19:30";
 
-  if (!matchStartTimeInput.value) {
-    setMessage("请先填写开始时间。", true);
-    return;
-  }
-
-  if (!/^\d{2}:\d{2}$/.test(matchStartTimeInput.value)) {
+  if (!/^\d{2}:\d{2}$/.test(startTime)) {
     setMessage("请按 24 小时制填写开始时间，例如 19:30。", true);
     return;
   }
@@ -2766,8 +2817,9 @@ async function startMatchDay() {
   writeStoredMatchDayStartTime({
     seasonId: activeSeason?.id || null,
     matchDate: getBeijingBusinessDateString(),
-    startTime: formatTime24(matchStartTimeInput.value),
+    startTime: formatTime24(startTime),
   });
+  matchStartTimeInput.value = "";
   setMessage("当日比赛已发起，可以开始报名和记录比赛。");
   requestImmediateRefresh({
     playerDriven: true,
@@ -3366,7 +3418,7 @@ async function startEditingMatch(matchId) {
   editingMatchId = matchId;
   backfillSeasonSelect.value = match.season_id;
   backfillDateInput.value = match.match_date || formatArchiveDate(match.created_at) || "";
-  backfillWinnerSelect.value = match.winner_team || "";
+  setWinnerSelection("backfill", match.winner_team || "");
   backfillMatchNoteInput.value = match.note || "";
   backfillTeamSelections = {
     teamA: teamAIds,
@@ -3589,6 +3641,12 @@ closeBackfillFormBtn.addEventListener("click", () => {
 });
 
 matchFormPanel.addEventListener("click", (event) => {
+  const winnerToggle = event.target.closest('[data-role="winner-toggle"]');
+  if (winnerToggle) {
+    toggleWinnerSelection(winnerToggle.dataset.formType || "match", winnerToggle.dataset.winner || "");
+    return;
+  }
+
   const addDoubleBtn = event.target.closest('[data-role="double-add"]');
   if (addDoubleBtn) {
     matchDoubleState.singles.push(createEmptySingleDoubleEntry());
@@ -3662,6 +3720,12 @@ backfillFormPanel.addEventListener("change", async (event) => {
 });
 
 backfillFormPanel.addEventListener("click", (event) => {
+  const winnerToggle = event.target.closest('[data-role="winner-toggle"]');
+  if (winnerToggle) {
+    toggleWinnerSelection(winnerToggle.dataset.formType || "backfill", winnerToggle.dataset.winner || "");
+    return;
+  }
+
   const addDoubleBtn = event.target.closest('[data-role="double-add"]');
   if (addDoubleBtn) {
     backfillDoubleState.singles.push(createEmptySingleDoubleEntry());

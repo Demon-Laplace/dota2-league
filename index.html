@@ -72,7 +72,7 @@
             <span id="matchDayStatus" class="muted">未发起</span>
           </div>
           <div class="row">
-            <input id="matchStartTimeInput" type="text" inputmode="numeric" placeholder="输入开始时间，例如 19:30" maxlength="5" />
+            <input id="matchStartTimeInput" type="text" inputmode="numeric" placeholder="可留空，默认 19:30" maxlength="5" />
             <button id="startMatchDayBtn">发起当日比赛</button>
           </div>
           <p id="matchStartTimeDisplay" class="muted"></p>
@@ -157,7 +157,18 @@
               </div>
             </div>
             <div class="match-meta-grid">
-              <select id="winnerSelect">
+              <div class="winner-picker" data-form-type="match">
+                <div class="winner-picker-head">
+                  <span>胜负结果</span>
+                  <span class="muted">可不选，后续补填</span>
+                </div>
+                <div class="winner-toggle-group">
+                  <button type="button" class="winner-toggle" data-role="winner-toggle" data-form-type="match" data-winner="A">天辉胜</button>
+                  <button type="button" class="winner-toggle" data-role="winner-toggle" data-form-type="match" data-winner="B">夜魇胜</button>
+                </div>
+                <p class="winner-toggle-hint muted" id="winnerToggleHint">未选择则先保存为暂不计入胜负</p>
+              </div>
+              <select id="winnerSelect" hidden>
                 <option value="">胜负未定，先保存不计分</option>
                 <option value="A">天辉方获胜</option>
                 <option value="B">夜魇方获胜</option>
@@ -196,7 +207,18 @@
               </div>
             </div>
             <div class="match-meta-grid">
-              <select id="backfillWinnerSelect">
+              <div class="winner-picker" data-form-type="backfill">
+                <div class="winner-picker-head">
+                  <span>胜负结果</span>
+                  <span class="muted">可不选，后续补填</span>
+                </div>
+                <div class="winner-toggle-group">
+                  <button type="button" class="winner-toggle" data-role="winner-toggle" data-form-type="backfill" data-winner="A">天辉胜</button>
+                  <button type="button" class="winner-toggle" data-role="winner-toggle" data-form-type="backfill" data-winner="B">夜魇胜</button>
+                </div>
+                <p class="winner-toggle-hint muted" id="backfillWinnerToggleHint">未选择则先保存为暂不计入胜负</p>
+              </div>
+              <select id="backfillWinnerSelect" hidden>
                 <option value="">胜负未定，先保存不计分</option>
                 <option value="A">天辉方获胜</option>
                 <option value="B">夜魇方获胜</option>
