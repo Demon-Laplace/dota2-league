@@ -3115,14 +3115,19 @@ async function setSeasonKoi(playerIdOverride = null, playerNameOverride = "") {
     return;
   }
 
-  const currentKoiPlayerId = activeSeason?.koi_player_id || null;
+  const currentKoiPlayerId = activeSeason?.koi_player_id ?? null;
+  const normalizePlayerId = (value) => {
+    if (value === null || value === undefined || value === "") return null;
+    return String(value);
+  };
+  const currentKoiPlayerIdValue = normalizePlayerId(currentKoiPlayerId);
   const playerId = playerIdOverride !== null
-    ? (playerIdOverride || null)
-    : (koiPlayerSelect?.value || null);
-  const nextPlayerId = playerId && playerId === currentKoiPlayerId ? null : playerId;
+    ? normalizePlayerId(playerIdOverride)
+    : normalizePlayerId(koiPlayerSelect?.value || null);
+  const nextPlayerId = playerId && playerId === currentKoiPlayerIdValue ? null : playerId;
   const playerName = playerNameOverride
-    || seasonPlayers.find((player) => player.id === nextPlayerId)?.display_name
-    || seasonPlayers.find((player) => player.id === currentKoiPlayerId)?.display_name
+    || seasonPlayers.find((player) => normalizePlayerId(player.id) === nextPlayerId)?.display_name
+    || seasonPlayers.find((player) => normalizePlayerId(player.id) === currentKoiPlayerIdValue)?.display_name
     || "本赛季锦鲤";
   const isCurrentKoi = !nextPlayerId;
   const confirmed = window.confirm(

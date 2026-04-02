@@ -1631,6 +1631,55 @@ td {
   background-clip: text;
 }
 
+.player-name-display.player-name-display-koi.player-name-display-rank1 {
+  background: linear-gradient(180deg, #fffdf8 4%, #ffe9d6 24%, #ffd2b2 48%, #ee9566 72%, #c64747 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  text-shadow:
+    0 0 12px rgba(255, 211, 165, 0.18),
+    0 0 20px rgba(255, 123, 96, 0.16),
+    0 8px 22px rgba(86, 24, 20, 0.24);
+}
+
+.player-name-display.player-name-display-koi.player-name-display-rank23 {
+  background: linear-gradient(180deg, #fffdf9 4%, #ffe9e4 26%, #ffcfd0 50%, #e07d84 76%, #bf5460 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  text-shadow:
+    0 0 10px rgba(255, 240, 240, 0.18),
+    0 0 18px rgba(198, 225, 255, 0.12),
+    0 8px 20px rgba(79, 26, 33, 0.22);
+}
+
+.player-name-display.player-name-display-gold.player-name-display-rank1 {
+  background: linear-gradient(180deg, #fffbea 4%, #efdca8 28%, #c59a46 58%, #7f5921 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  text-shadow:
+    0 0 12px rgba(255, 238, 192, 0.18),
+    0 0 20px rgba(189, 140, 60, 0.16),
+    0 8px 22px rgba(72, 48, 14, 0.24);
+}
+
+.player-name-display.player-name-display-gold.player-name-display-rank23 {
+  background: linear-gradient(180deg, #fffdf5 4%, #f0e6cc 30%, #c4b49a 60%, #8a7d67 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  text-shadow:
+    0 0 10px rgba(255, 247, 226, 0.16),
+    0 0 18px rgba(210, 224, 240, 0.12),
+    0 8px 20px rgba(61, 51, 37, 0.22);
+}
+
+.player-name-display.player-name-display-gold.player-name-display-rank45 {
+  background: linear-gradient(180deg, #f9edd7 4%, #d9b37d 34%, #9f6d35 62%, #6d4417 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  text-shadow:
+    0 0 10px rgba(214, 169, 103, 0.16),
+    0 8px 20px rgba(68, 42, 14, 0.22);
+}
+
 .leaderboard-player-tags {
   display: flex;
   flex-wrap: wrap;
