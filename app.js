@@ -31,9 +31,7 @@ const adminPanel = document.getElementById("adminPanel");
 const closeAdminPanelBtn = document.getElementById("closeAdminPanelBtn");
 const adminExitModeBtn = document.getElementById("adminExitModeBtn");
 const adminPanelSummary = document.getElementById("adminPanelSummary");
-const adminMembersCount = document.getElementById("adminMembersCount");
 const scorerMembersCount = document.getElementById("scorerMembersCount");
-const adminMembersList = document.getElementById("adminMembersList");
 const scorerMembersList = document.getElementById("scorerMembersList");
 const adminActionLogsList = document.getElementById("adminActionLogsList");
 const adminActionLogsEmpty = document.getElementById("adminActionLogsEmpty");
@@ -867,7 +865,7 @@ function getFilteredHeroes(searchTerm = "") {
 function setMatchFormOpen(isOpen) {
   isMatchFormOpen = isOpen && isCurrentRoleScorer();
   matchFormPanel.hidden = !isMatchFormOpen;
-  openMatchFormBtn.textContent = isMatchFormOpen ? "正在录入比赛" : "添加一场比赛记录";
+  openMatchFormBtn.textContent = isMatchFormOpen ? "正在录入比赛" : "添加当日比赛";
   openMatchFormBtn.disabled = !isCurrentRoleScorer() || isMatchFormOpen || !activeMatchDay || todayPlayers.length < TEAM_SIZE * 2;
 }
 
@@ -1152,19 +1150,8 @@ function renderRoleMembers() {
   const admins = getRoleMembersByRole("admin");
   const scorers = getRoleMembersByRole("scorer");
 
-  adminMembersCount.textContent = `${admins.length} 人`;
   scorerMembersCount.textContent = `${scorers.length} 人`;
-  adminPanelSummary.textContent = `当前共 ${admins.length} 位管理员，${scorers.length} 位记分员。`;
-
-  adminMembersList.innerHTML = admins.length
-    ? admins.map((member, index) => `
-      <div class="admin-member-card">
-        <div>
-          <strong>${escapeHtml(getAdminDisplayName(index))}</strong>
-        </div>
-      </div>
-    `).join("")
-    : '<p class="muted">暂无管理员</p>';
+  adminPanelSummary.textContent = `管理员 ${admins.length} 人 · 记分员 ${scorers.length} 人`;
 
   scorerMembersList.innerHTML = scorers.length
     ? scorers.map((member, index) => `
@@ -1230,9 +1217,9 @@ function applyRolePermissions() {
   }
 
   if (adminLogoTrigger) {
-    adminLogoTrigger.classList.toggle("league-brand-title-sub-admin", isAdmin);
-    adminLogoTrigger.classList.toggle("league-brand-title-sub-scorer", !isAdmin && canScore);
-    adminLogoTrigger.setAttribute("aria-hidden", (isAdmin || canScore) ? "false" : "true");
+    adminLogoTrigger.classList.remove("league-brand-title-sub-admin");
+    adminLogoTrigger.classList.toggle("league-brand-title-sub-scorer", canScore);
+    adminLogoTrigger.setAttribute("aria-hidden", canScore ? "false" : "true");
   }
 
   resetSeasonBtn.hidden = true;
@@ -5409,10 +5396,6 @@ rewardLogsList.addEventListener("click", async (event) => {
 
 if (adminLogoTrigger) {
   adminLogoTrigger.addEventListener("click", () => {
-    if (isCurrentRoleAdmin()) {
-      setAdminPanelOpen(!isAdminPanelOpen);
-      return;
-    }
     if (currentAccessSession.role === "scorer") {
       exitAccessRole();
     }
@@ -5431,10 +5414,7 @@ if (adminLogoTrigger) {
 
 if (adminSecretTrigger) {
   adminSecretTrigger.addEventListener("dblclick", (event) => {
-    if (isCurrentRoleAdmin()) {
-      setAdminPanelOpen(!isAdminPanelOpen);
-      return;
-    }
+    if (isCurrentRoleAdmin()) return;
     event.preventDefault();
     setAccessModalOpen(true, "admin");
   });
