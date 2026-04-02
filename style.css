@@ -809,9 +809,8 @@ button:disabled {
 }
 
 .match-picked-list {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
+  display: grid;
+  gap: 8px;
   min-height: 24px;
 }
 
@@ -826,6 +825,75 @@ button:disabled {
   background: rgba(47, 95, 174, 0.24);
   border: 1px solid rgba(86, 166, 255, 0.28);
   box-shadow: none;
+}
+
+.match-picked-player-row {
+  display: grid;
+  gap: 8px;
+  padding: 8px 10px;
+  border-radius: 12px;
+  border: 1px solid rgba(124, 165, 209, 0.16);
+  background: rgba(11, 27, 46, 0.38);
+}
+
+.match-picked-player-row-main {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.match-picked-player-name {
+  min-width: 72px;
+  font-weight: 600;
+  color: #eef6ff;
+}
+
+.player-double-toggle {
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  border-radius: 999px;
+  border: 1px solid rgba(240, 195, 106, 0.3);
+  background: linear-gradient(135deg, rgba(122, 87, 28, 0.9), rgba(82, 58, 18, 0.9));
+  color: #ffe8ad;
+  box-shadow: none;
+  font-size: 15px;
+  line-height: 1;
+}
+
+.player-double-toggle-active {
+  border-color: rgba(255, 223, 137, 0.46);
+  background: linear-gradient(135deg, rgba(240, 195, 106, 0.96), rgba(173, 122, 37, 0.94));
+  color: #3a2500;
+  box-shadow: 0 8px 18px rgba(112, 76, 17, 0.24);
+}
+
+.player-double-options {
+  display: none;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.player-double-options-open {
+  display: flex;
+}
+
+.player-double-option {
+  padding: 4px 8px;
+  min-height: 28px;
+  border-radius: 999px;
+  border: 1px solid rgba(124, 165, 209, 0.18);
+  background: rgba(14, 31, 54, 0.78);
+  color: var(--text-dim);
+  box-shadow: none;
+  font-size: 12px;
+}
+
+.player-double-option-active {
+  border-color: rgba(240, 195, 106, 0.4);
+  background: rgba(104, 73, 27, 0.42);
+  color: #fff1c8;
 }
 
 .match-player-pool {
@@ -1077,6 +1145,16 @@ button:disabled {
   filter: none;
   text-decoration: underline;
   text-decoration-color: rgba(150, 206, 255, 0.5);
+}
+
+.match-extra-logs {
+  display: grid;
+  gap: 4px;
+  margin-top: 10px;
+}
+
+.match-extra-log-line {
+  margin: 0;
 }
 
 .winner-badge {
