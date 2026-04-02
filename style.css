@@ -704,25 +704,14 @@ button:disabled {
     0 0 18px rgba(240, 195, 106, 0.16);
 }
 
-.team-double-select {
-  min-width: 0;
-  width: 0;
-  max-width: 0;
-  padding: 0;
-  opacity: 0;
-  border-width: 0;
-  overflow: hidden;
-  pointer-events: none;
-  transition: max-width 0.22s ease, opacity 0.18s ease, width 0.22s ease, padding 0.22s ease;
+.team-double-options {
+  display: none;
+  flex-wrap: wrap;
+  gap: 6px;
 }
 
-.team-double-select-open {
-  width: 164px;
-  max-width: 164px;
-  padding: 8px 10px;
-  opacity: 1;
-  border-width: 1px;
-  pointer-events: auto;
+.team-double-options-open {
+  display: flex;
 }
 
 .team-panel-winner {

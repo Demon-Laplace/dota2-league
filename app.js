@@ -1071,6 +1071,22 @@ function setSingleDoubleTarget(formType, userPlayerId, targetPlayerId) {
   });
 }
 
+function buildTeamDoubleOptionsHtml(formType, team, players) {
+  const doubleState = getDoubleStateByFormType(formType);
+  const currentValue = team === "A" ? doubleState.teamAUserId : doubleState.teamBUserId;
+
+  return players.map((player) => `
+    <button
+      type="button"
+      class="player-double-option${player.id === currentValue ? " player-double-option-active" : ""}"
+      data-role="team-double-target"
+      data-form-type="${formType}"
+      data-team="${team}"
+      data-player-id="${player.id}"
+    >${escapeHtml(player.display_name)}</button>
+  `).join("");
+}
+
 function renderInlineTeamDoubleControls(formType, disabled = false) {
   normalizeDoubleState(formType);
   const selectedPlayers = getSelectedPlayersByFormType(formType);
@@ -1086,12 +1102,6 @@ function renderInlineTeamDoubleControls(formType, disabled = false) {
     const players = selectedPlayers.filter((player) => player.team === team);
     const currentValue = team === "A" ? doubleState.teamAUserId : doubleState.teamBUserId;
     const isOpen = teamDoublePickerOpen[formType][team] || Boolean(currentValue);
-    const placeholder = `${team === "A" ? "天辉" : "夜魇"}无团队双倍`;
-    const options = [`<option value="">${placeholder}</option>`]
-      .concat(players.map((player) => (
-        `<option value="${player.id}"${player.id === currentValue ? " selected" : ""}>${escapeHtml(player.display_name)}</option>`
-      )))
-      .join("");
 
     slot.innerHTML = `
       <button
@@ -1104,15 +1114,17 @@ function renderInlineTeamDoubleControls(formType, disabled = false) {
         aria-expanded="${String(isOpen)}"
         title="${team === "A" ? "天辉" : "夜魇"}团队双倍"
       >◉</button>
-      <select
-        class="team-double-select${isOpen ? " team-double-select-open" : ""}"
-        data-role="double-team-user"
-        data-form-type="${formType}"
-        data-team="${team}"
-        ${disabled || !isOpen ? "disabled" : ""}
-      >
-        ${options}
-      </select>
+      <div class="team-double-options${isOpen ? " team-double-options-open" : ""}">
+        <button
+          type="button"
+          class="player-double-option${!currentValue ? " player-double-option-active" : ""}"
+          data-role="team-double-clear"
+          data-form-type="${formType}"
+          data-team="${team}"
+          ${disabled || !isOpen ? "disabled" : ""}
+        >不使用</button>
+        ${buildTeamDoubleOptionsHtml(formType, team, players)}
+      </div>
     `;
   });
 }
@@ -1302,7 +1314,7 @@ function renderTeamSelectionUI({
             >◉</button>
           </div>
           <div class="player-double-options${singleDoublePickerOpen[formType][player.id] || getSingleDoubleTargetByUser(formType, player.id) ? " player-double-options-open" : ""}">
-            ${buildSingleDoubleOptionsHtml(formType, player, players.filter((candidate) => selectedIds.has(candidate.id) || oppositeIds.has(candidate.id)))}
+            ${buildSingleDoubleOptionsHtml(formType, player, getSelectedPlayersByFormType(formType))}
           </div>
         </div>
       `).join("")
@@ -3891,6 +3903,26 @@ matchFormPanel.addEventListener("click", (event) => {
     return;
   }
 
+  const teamDoubleClear = event.target.closest('[data-role="team-double-clear"]');
+  if (teamDoubleClear) {
+    const team = teamDoubleClear.dataset.team === "A" ? "A" : "B";
+    matchDoubleState[team === "A" ? "teamAUserId" : "teamBUserId"] = "";
+    teamDoublePickerOpen.match[team] = true;
+    renderInlineTeamDoubleControls("match", !activeMatchDay || todayPlayers.length < TEAM_SIZE * 2);
+    return;
+  }
+
+  const teamDoubleTarget = event.target.closest('[data-role="team-double-target"]');
+  if (teamDoubleTarget) {
+    const team = teamDoubleTarget.dataset.team === "A" ? "A" : "B";
+    const playerId = teamDoubleTarget.dataset.playerId || "";
+    const currentValue = matchDoubleState[team === "A" ? "teamAUserId" : "teamBUserId"];
+    matchDoubleState[team === "A" ? "teamAUserId" : "teamBUserId"] = currentValue === playerId ? "" : playerId;
+    teamDoublePickerOpen.match[team] = true;
+    renderInlineTeamDoubleControls("match", !activeMatchDay || todayPlayers.length < TEAM_SIZE * 2);
+    return;
+  }
+
   const playerDoubleToggle = event.target.closest('[data-role="player-double-toggle"]');
   if (playerDoubleToggle) {
     const playerId = playerDoubleToggle.dataset.playerId || "";
@@ -3928,27 +3960,12 @@ matchFormPanel.addEventListener("click", (event) => {
   togglePlayerSelection(chip.dataset.formType || "match", chip.dataset.team, chip.dataset.playerId);
 });
 
-matchFormPanel.addEventListener("change", (event) => {
-  if (event.target.matches('[data-role="double-team-user"]')) {
-    const team = event.target.dataset.team === "A" ? "A" : "B";
-    matchDoubleState[team === "A" ? "teamAUserId" : "teamBUserId"] = event.target.value || "";
-    teamDoublePickerOpen.match[team] = Boolean(event.target.value);
-    renderInlineTeamDoubleControls("match", !activeMatchDay || todayPlayers.length < TEAM_SIZE * 2);
-  }
-});
+matchFormPanel.addEventListener("change", () => {});
 
 backfillFormPanel.addEventListener("change", async (event) => {
   if (event.target === backfillSeasonSelect) {
     clearBackfillForm();
     await loadPlayersForSeason(backfillSeasonSelect.value);
-    return;
-  }
-
-  if (event.target.matches('[data-role="double-team-user"]')) {
-    const team = event.target.dataset.team === "A" ? "A" : "B";
-    backfillDoubleState[team === "A" ? "teamAUserId" : "teamBUserId"] = event.target.value || "";
-    teamDoublePickerOpen.backfill[team] = Boolean(event.target.value);
-    renderInlineTeamDoubleControls("backfill", !backfillSeasonSelect.value || backfillPlayers.length < TEAM_SIZE * 2);
   }
 });
 
@@ -3965,6 +3982,26 @@ backfillFormPanel.addEventListener("click", (event) => {
     const team = teamDoubleToggle.dataset.team || "A";
     teamDoublePickerOpen[formType][team] = !teamDoublePickerOpen[formType][team];
     renderInlineTeamDoubleControls(formType, !backfillSeasonSelect.value || backfillPlayers.length < TEAM_SIZE * 2);
+    return;
+  }
+
+  const teamDoubleClear = event.target.closest('[data-role="team-double-clear"]');
+  if (teamDoubleClear) {
+    const team = teamDoubleClear.dataset.team === "A" ? "A" : "B";
+    backfillDoubleState[team === "A" ? "teamAUserId" : "teamBUserId"] = "";
+    teamDoublePickerOpen.backfill[team] = true;
+    renderInlineTeamDoubleControls("backfill", !backfillSeasonSelect.value || backfillPlayers.length < TEAM_SIZE * 2);
+    return;
+  }
+
+  const teamDoubleTarget = event.target.closest('[data-role="team-double-target"]');
+  if (teamDoubleTarget) {
+    const team = teamDoubleTarget.dataset.team === "A" ? "A" : "B";
+    const playerId = teamDoubleTarget.dataset.playerId || "";
+    const currentValue = backfillDoubleState[team === "A" ? "teamAUserId" : "teamBUserId"];
+    backfillDoubleState[team === "A" ? "teamAUserId" : "teamBUserId"] = currentValue === playerId ? "" : playerId;
+    teamDoublePickerOpen.backfill[team] = true;
+    renderInlineTeamDoubleControls("backfill", !backfillSeasonSelect.value || backfillPlayers.length < TEAM_SIZE * 2);
     return;
   }
 
