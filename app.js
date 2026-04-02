@@ -145,6 +145,7 @@ let rewardLogs = [];
 let seasonPlayerRewardTotal = 0;
 let externalRewardTotal = 0;
 let recentMatchesData = [];
+let roleMembersSupportAutoReconnect = true;
 let openRecentMatchGroups = new Set();
 let isMatchFormOpen = false;
 let isBackfillFormOpen = false;
@@ -1009,6 +1010,30 @@ function tryReconnectRememberedScorer() {
   return true;
 }
 
+function getPrimaryAdminMember() {
+  return getRoleMembersByRole("admin")[0] || null;
+}
+
+function tryReconnectRememberedAdmin() {
+  const adminMember = getPrimaryAdminMember();
+  if (!adminMember || !adminMember.allow_auto_reconnect) return false;
+
+  const localDeviceId = getOrCreateLocalDeviceId();
+  if (!adminMember.auto_reconnect_device_id || adminMember.auto_reconnect_device_id !== localDeviceId) {
+    return false;
+  }
+
+  writeStoredAccessSession({
+    role: "admin",
+    memberId: adminMember.id,
+    playerId: "",
+  });
+  renderRoleMembers();
+  applyRolePermissions();
+  setMessage("管理员已自动重连。");
+  return true;
+}
+
 function isCurrentRoleScorer() {
   return currentAccessSession.role === "scorer" || currentAccessSession.role === "admin";
 }
@@ -1167,8 +1192,10 @@ function renderRoleMembers() {
           </div>
           ${canCurrentUserManageRoles()
             ? `<div class="admin-member-actions">
-                <button type="button" class="button-secondary admin-toggle-scorer-reconnect-btn" data-role-member-id="${member.id}" data-allow-auto-reconnect="${member.allow_auto_reconnect ? "true" : "false"}">
-                  ${member.allow_auto_reconnect ? "关闭永久自动重连" : "启用永久自动重连"}
+                <button type="button" class="button-secondary admin-toggle-scorer-reconnect-btn" data-role-member-id="${member.id}" data-allow-auto-reconnect="${member.allow_auto_reconnect ? "true" : "false"}" ${roleMembersSupportAutoReconnect ? "" : "disabled"}>
+                  ${roleMembersSupportAutoReconnect
+                    ? (member.allow_auto_reconnect ? "关闭永久自动重连" : "启用永久自动重连")
+                    : "需执行 SQL 更新"}
                 </button>
                 <button type="button" class="button-danger admin-remove-scorer-btn" data-role-member-id="${member.id}">移除</button>
               </div>`
@@ -3254,12 +3281,14 @@ async function loadActiveSeason() {
 }
 
 async function loadRoleMembers() {
+  roleMembersSupportAutoReconnect = true;
   let { data, error } = await db
     .from("app_role_members")
     .select("id, role, player_id, allow_auto_reconnect, auto_reconnect_device_id, created_at")
     .order("created_at", { ascending: true });
 
   if (error && (String(error.message || "").includes("allow_auto_reconnect") || String(error.message || "").includes("auto_reconnect_device_id"))) {
+    roleMembersSupportAutoReconnect = false;
     ({ data, error } = await db
       .from("app_role_members")
       .select("id, role, player_id, created_at")
@@ -3348,6 +3377,10 @@ async function removeScorerRole(memberId) {
 async function toggleScorerAutoReconnect(memberId, shouldAllow) {
   if (!ensureAdminAccess("仅管理员可调整记分员自动重连。")) return;
   if (!memberId) return;
+  if (!roleMembersSupportAutoReconnect) {
+    setAdminPanelMessage("永久自动重连字段尚未同步到 Supabase，请先执行最新的 sql/access_roles.sql。", true);
+    return;
+  }
 
   const member = getRoleAssignmentById(memberId);
   if (!member || member.role !== "scorer") return;
@@ -3390,6 +3423,28 @@ async function bindScorerAutoReconnectDevice(member) {
   member.auto_reconnect_device_id = localDeviceId;
 }
 
+async function bindAdminAutoReconnectDevice(member) {
+  if (!member?.id) return;
+  const localDeviceId = getOrCreateLocalDeviceId();
+  if (member.allow_auto_reconnect && member.auto_reconnect_device_id === localDeviceId) return;
+
+  const { error } = await db
+    .from("app_role_members")
+    .update({
+      allow_auto_reconnect: true,
+      auto_reconnect_device_id: localDeviceId,
+    })
+    .eq("id", member.id);
+
+  if (error) {
+    console.error("绑定管理员自动重连设备失败：", error);
+    return;
+  }
+
+  member.allow_auto_reconnect = true;
+  member.auto_reconnect_device_id = localDeviceId;
+}
+
 async function confirmAccessRole() {
   const password = normalizeAccessPassword(accessPasswordInput.value);
   const selectedPlayerId = accessScorerSelect.value;
@@ -3404,7 +3459,9 @@ async function confirmAccessRole() {
       setAccessMessage("口令错误。", true);
       return;
     }
-    writeStoredAccessSession({ role: "admin", memberId: "", playerId: "" });
+    const adminMember = getPrimaryAdminMember();
+    writeStoredAccessSession({ role: "admin", memberId: adminMember?.id || "", playerId: "" });
+    await bindAdminAutoReconnectDevice(adminMember);
     setAccessMessage("管理员模式已启用。");
     renderRoleMembers();
     applyRolePermissions();
@@ -5422,6 +5479,9 @@ if (adminSecretTrigger) {
   adminSecretTrigger.addEventListener("dblclick", (event) => {
     if (isCurrentRoleAdmin()) return;
     event.preventDefault();
+    if (tryReconnectRememberedAdmin()) {
+      return;
+    }
     setAccessModalOpen(true, "admin");
   });
 }
