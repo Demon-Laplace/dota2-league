@@ -486,22 +486,42 @@ button.season-total {
   min-width: 30px;
   padding: 4px 0;
   font-size: 13px;
-  color: #f1ddb0;
-  border-color: rgba(240, 195, 106, 0.26);
-  background: rgba(73, 53, 20, 0.38);
+  color: #ffd8d8;
+  border-color: rgba(255, 118, 118, 0.24);
+  background: rgba(86, 20, 20, 0.26);
 }
 
 .season-player-koi-btn:hover:not(:disabled) {
-  background: rgba(110, 79, 28, 0.42);
+  background: rgba(123, 32, 32, 0.34);
 }
 
 .season-player-koi-btn-active {
-  color: #2d2205;
-  border-color: rgba(240, 195, 106, 0.46);
-  background: linear-gradient(135deg, rgba(240, 195, 106, 0.96), rgba(186, 136, 45, 0.92));
+  color: #fff8f8;
+  border-color: rgba(255, 152, 152, 0.46);
+  background: linear-gradient(135deg, rgba(255, 227, 227, 0.94), rgba(255, 180, 180, 0.9) 42%, rgba(212, 73, 73, 0.92));
   box-shadow:
-    0 8px 18px rgba(112, 76, 17, 0.18),
-    0 0 16px rgba(240, 195, 106, 0.14);
+    0 8px 18px rgba(86, 20, 20, 0.2),
+    0 0 16px rgba(255, 118, 118, 0.16);
+}
+
+.season-rank-count {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 2px 8px 2px 6px;
+  border-radius: 999px;
+  border: 1px solid rgba(99, 213, 208, 0.24);
+  background: rgba(16, 71, 78, 0.28);
+  color: #d8fbf3;
+  font-size: 11px;
+  line-height: 1.4;
+  white-space: nowrap;
+}
+
+.season-rank-count::before {
+  content: "◉";
+  font-size: 10px;
+  color: rgba(99, 213, 208, 0.92);
 }
 
 .signup-player-grid {
@@ -1157,9 +1177,40 @@ button:disabled {
   padding: 1px 6px;
   border-radius: 999px;
   font-size: 11px;
-  color: #fff2d2;
-  background: rgba(104, 73, 27, 0.36);
-  border: 1px solid rgba(240, 195, 106, 0.34);
+  color: #eaf7ff;
+  border: 1px solid rgba(124, 165, 209, 0.26);
+  background: rgba(21, 39, 63, 0.46);
+}
+
+.match-picked-hero-a {
+  color: #effdff;
+  border-color: rgba(122, 236, 229, 0.36);
+  background: linear-gradient(135deg, rgba(64, 154, 173, 0.34), rgba(28, 63, 88, 0.46));
+  box-shadow:
+    inset 0 1px 0 rgba(232, 255, 255, 0.08),
+    0 0 12px rgba(122, 236, 229, 0.16),
+    0 0 24px rgba(67, 172, 203, 0.1);
+}
+
+.match-picked-hero-b {
+  color: #d8deee;
+  border-color: rgba(74, 92, 132, 0.34);
+  background:
+    linear-gradient(120deg, rgba(15, 20, 37, 0.9) 0%, rgba(28, 28, 52, 0.9) 38%, rgba(18, 39, 66, 0.88) 55%, rgba(13, 18, 34, 0.9) 100%);
+  background-size: 220% 100%;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.03),
+    inset 0 0 18px rgba(26, 36, 69, 0.18);
+  animation: hero-pill-night-flow 5.6s linear infinite;
+}
+
+@keyframes hero-pill-night-flow {
+  0% {
+    background-position: 0% 50%;
+  }
+  100% {
+    background-position: 100% 50%;
+  }
 }
 
 .team-fields select {
@@ -1174,10 +1225,27 @@ button:disabled {
 }
 
 .recent-match-card {
+  position: relative;
   border: 1px solid var(--border);
-  border-radius: 12px;
-  padding: 14px;
-  background: var(--panel-soft);
+  border-radius: 14px;
+  padding: 15px 15px 14px;
+  background:
+    linear-gradient(180deg, rgba(16, 34, 56, 0.92), rgba(12, 27, 45, 0.9));
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.03),
+    0 14px 28px rgba(5, 18, 33, 0.18);
+  overflow: hidden;
+}
+
+.recent-match-card::before {
+  content: "";
+  position: absolute;
+  inset: 0 0 auto;
+  height: 64px;
+  pointer-events: none;
+  background:
+    linear-gradient(90deg, rgba(122, 236, 229, 0.06), transparent 34%, rgba(240, 195, 106, 0.08) 68%, transparent),
+    radial-gradient(circle at 14% 0%, rgba(122, 236, 229, 0.16), transparent 34%);
 }
 
 .match-day-group {
@@ -1345,6 +1413,15 @@ button:disabled {
   flex-wrap: wrap;
 }
 
+.recent-match-title strong {
+  font-size: 16px;
+  letter-spacing: 0.04em;
+  color: #f4fbff;
+  text-shadow:
+    0 8px 22px rgba(7, 20, 34, 0.24),
+    0 0 14px rgba(118, 213, 255, 0.1);
+}
+
 .recent-match-teams {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -1352,10 +1429,15 @@ button:disabled {
 }
 
 .recent-match-team {
+  position: relative;
   border: 1px solid var(--border);
-  border-radius: 10px;
-  padding: 10px 12px;
-  background: rgba(18, 39, 66, 0.48);
+  border-radius: 12px;
+  padding: 11px 12px 12px;
+  background:
+    linear-gradient(180deg, rgba(20, 42, 68, 0.62), rgba(14, 31, 53, 0.56));
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.03),
+    inset 0 -1px 0 rgba(126, 224, 216, 0.04);
 }
 
 .recent-match-team-winner {
@@ -1382,13 +1464,50 @@ button:disabled {
 }
 
 .recent-match-team h3 {
-  margin: 0 0 8px;
-  font-size: 14px;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  margin: 0 0 10px;
+  padding: 3px 10px 3px 8px;
+  border-radius: 999px;
+  font-size: 13px;
+  line-height: 1.4;
+  letter-spacing: 0.05em;
+  background: rgba(13, 29, 48, 0.58);
+  border: 1px solid rgba(96, 130, 165, 0.18);
+}
+
+.recent-match-teams > .recent-match-team:first-child h3 {
+  color: #ecfeff;
+  background: linear-gradient(135deg, rgba(44, 108, 128, 0.34), rgba(14, 42, 61, 0.46));
+  border-color: rgba(122, 236, 229, 0.22);
+  box-shadow: 0 0 16px rgba(84, 193, 214, 0.08);
+}
+
+.recent-match-teams > .recent-match-team:first-child h3::before {
+  content: "◈";
+  color: rgba(166, 248, 241, 0.92);
+  font-size: 11px;
+}
+
+.recent-match-teams > .recent-match-team:last-child h3 {
+  color: #e6ecf8;
+  background: linear-gradient(135deg, rgba(39, 41, 77, 0.42), rgba(15, 20, 39, 0.5));
+  border-color: rgba(101, 114, 164, 0.22);
+  box-shadow: inset 0 0 22px rgba(35, 43, 82, 0.18);
+}
+
+.recent-match-teams > .recent-match-team:last-child h3::before {
+  content: "◆";
+  color: rgba(163, 177, 223, 0.88);
+  font-size: 11px;
 }
 
 .recent-match-team ul {
   margin: 0;
   padding-left: 18px;
+  display: grid;
+  gap: 6px;
 }
 
 .recent-match-meta {
@@ -1401,7 +1520,7 @@ button:disabled {
 .recent-match-player {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+  gap: 7px;
   padding: 0;
   color: var(--text);
   background: transparent;
@@ -1424,7 +1543,7 @@ button:disabled {
 .match-effect-logs {
   display: grid;
   gap: 6px;
-  margin-top: 10px;
+  margin-top: 12px;
 }
 
 .match-effect-log-line {
@@ -1450,12 +1569,16 @@ button:disabled {
 
 .match-extra-logs {
   display: grid;
-  gap: 4px;
-  margin-top: 10px;
+  gap: 5px;
+  margin-top: 12px;
+  padding-top: 10px;
+  border-top: 1px solid rgba(95, 130, 171, 0.14);
 }
 
 .match-extra-log-line {
   margin: 0;
+  padding-left: 2px;
+  color: rgba(206, 220, 238, 0.74);
 }
 
 .winner-badge {

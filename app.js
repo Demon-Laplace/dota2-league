@@ -1840,7 +1840,7 @@ function renderSeasonPlayersPanel() {
     section.innerHTML = `
       <div class="season-rank-head">
         <h3>${title}</h3>
-        <span class="queue-slot">${groups[key].length} 人</span>
+        <span class="season-rank-count" title="${title}人数">${groups[key].length} 人</span>
       </div>
       <div class="season-rank-list"></div>
       <p class="muted season-rank-empty"${groups[key].length ? ' hidden' : ''}>${empty}</p>
@@ -1858,7 +1858,7 @@ function renderSeasonPlayersPanel() {
   idleSection.innerHTML = `
     <div class="season-rank-head">
       <h3>未参赛</h3>
-      <span class="queue-slot">${groups.idle.length} 人</span>
+      <span class="season-rank-count" title="未参赛人数">${groups.idle.length} 人</span>
     </div>
     <div class="season-unranked-list"></div>
     <p class="muted season-rank-empty"${groups.idle.length ? ' hidden' : ''}>当前所有选手都已设置身份</p>
@@ -2652,7 +2652,7 @@ function renderRecentMatches(data) {
       const buildEffectLogHtml = (team) => effectLogsByTeam[team]?.length
         ? `<div class="match-effect-logs">${effectLogsByTeam[team].map((item) => `<p class="match-effect-log-line match-effect-log-line-${item.tone}">${escapeHtml(item.text)}</p>`).join("")}</div>`
         : "";
-      const renderPlayerList = (teamPlayers) => teamPlayers.map((player) => `
+      const renderPlayerList = (teamPlayers, teamKey) => teamPlayers.map((player) => `
         <li>
           <button
             type="button"
@@ -2671,7 +2671,7 @@ function renderRecentMatches(data) {
               rank: getLeaderboardRankByPlayerId(player.player_id, leaderboardPlayers),
               wrapperClassName: "player-name-stack recent-match-player-name",
             })}
-            ${player.hero_name ? `<span class="match-picked-hero">${escapeHtml(getHeroDisplayName(player.hero_name))}</span>` : '<span class="muted">未选英雄</span>'}
+            ${player.hero_name ? `<span class="match-picked-hero match-picked-hero-${teamKey}">${escapeHtml(getHeroDisplayName(player.hero_name))}</span>` : '<span class="muted">未选英雄</span>'}
           </button>
         </li>
       `).join("");
@@ -2696,12 +2696,12 @@ function renderRecentMatches(data) {
         <div class="recent-match-teams">
           <div class="recent-match-team${match.winner_team === "A" ? " recent-match-team-winner" : ""}">
             <h3>天辉方</h3>
-            <ul>${renderPlayerList(teamAPlayers)}</ul>
+            <ul>${renderPlayerList(teamAPlayers, "a")}</ul>
             ${buildEffectLogHtml("A")}
           </div>
           <div class="recent-match-team${match.winner_team === "B" ? " recent-match-team-winner" : ""}">
             <h3>夜魇方</h3>
-            <ul>${renderPlayerList(teamBPlayers)}</ul>
+            <ul>${renderPlayerList(teamBPlayers, "b")}</ul>
             ${buildEffectLogHtml("B")}
           </div>
         </div>
