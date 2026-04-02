@@ -553,6 +553,22 @@ button.season-total {
   font-size: 16px;
 }
 
+.season-player-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 16px;
+}
+
+.season-player-name .player-name-display {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  vertical-align: top;
+}
+
 .season-player-actions {
   display: flex;
   gap: 6px;
@@ -828,13 +844,13 @@ button:disabled {
 #openMatchFormBtn,
 #addRewardBtn {
   background:
-    linear-gradient(135deg, rgba(27, 45, 69, 0.97), rgba(15, 27, 46, 0.99) 56%, rgba(52, 29, 26, 0.95)),
-    linear-gradient(180deg, rgba(214, 180, 142, 0.08), transparent 56%);
-  border-color: rgba(171, 128, 97, 0.24);
+    linear-gradient(135deg, rgba(29, 47, 70, 0.97), rgba(15, 28, 47, 0.99) 56%, rgba(44, 42, 34, 0.95)),
+    linear-gradient(180deg, rgba(202, 185, 148, 0.08), transparent 56%);
+  border-color: rgba(157, 145, 112, 0.22);
   box-shadow:
     inset 0 1px 0 rgba(230, 238, 248, 0.05),
     inset 16px 0 22px rgba(47, 96, 148, 0.05),
-    inset -16px 0 22px rgba(139, 86, 62, 0.05),
+    inset -16px 0 22px rgba(132, 120, 83, 0.05),
     0 12px 28px rgba(9, 20, 35, 0.24);
   color: #eef4fb;
 }
@@ -847,9 +863,9 @@ button:disabled {
   box-shadow:
     inset 0 1px 0 rgba(240, 246, 255, 0.08),
     inset 18px 0 26px rgba(59, 118, 182, 0.07),
-    inset -18px 0 26px rgba(179, 111, 83, 0.07),
+    inset -18px 0 26px rgba(168, 151, 98, 0.07),
     0 14px 30px rgba(12, 24, 41, 0.3),
-    0 0 14px rgba(170, 127, 88, 0.08);
+    0 0 14px rgba(164, 152, 103, 0.08);
 }
 
 #openBackfillFormBtn,
@@ -867,14 +883,14 @@ button:disabled {
 
 .delete-match-btn {
   background:
-    linear-gradient(135deg, rgba(61, 28, 37, 0.98), rgba(34, 16, 24, 0.99)),
-    linear-gradient(180deg, rgba(209, 170, 176, 0.06), transparent 62%);
-  border-color: rgba(145, 83, 96, 0.18);
+    linear-gradient(135deg, rgba(53, 31, 43, 0.98), rgba(31, 20, 30, 0.99)),
+    linear-gradient(180deg, rgba(181, 168, 188, 0.05), transparent 62%);
+  border-color: rgba(117, 97, 129, 0.18);
   box-shadow:
-    inset 0 1px 0 rgba(243, 214, 218, 0.05),
+    inset 0 1px 0 rgba(233, 223, 240, 0.05),
     inset 0 -12px 24px rgba(17, 7, 11, 0.22),
     0 10px 24px rgba(32, 10, 16, 0.2);
-  color: #f3dde2;
+  color: #eee5f4;
 }
 
 #rewardPanel .row,
@@ -914,13 +930,13 @@ button:disabled {
 
 #startMatchDayBtn {
   background:
-    linear-gradient(135deg, rgba(39, 53, 77, 0.97), rgba(19, 31, 51, 0.99) 52%, rgba(74, 45, 31, 0.97)),
-    linear-gradient(180deg, rgba(220, 188, 140, 0.1), transparent 62%);
-  border-color: rgba(183, 144, 97, 0.28);
+    linear-gradient(135deg, rgba(38, 53, 77, 0.97), rgba(18, 31, 51, 0.99) 52%, rgba(58, 54, 35, 0.97)),
+    linear-gradient(180deg, rgba(212, 194, 150, 0.1), transparent 62%);
+  border-color: rgba(169, 152, 108, 0.26);
   box-shadow:
     inset 0 1px 0 rgba(238, 232, 216, 0.07),
     inset 16px 0 24px rgba(58, 108, 162, 0.06),
-    inset -16px 0 24px rgba(176, 132, 76, 0.08),
+    inset -16px 0 24px rgba(162, 146, 91, 0.08),
     0 14px 30px rgba(11, 23, 38, 0.28);
 }
 
@@ -928,9 +944,9 @@ button:disabled {
   box-shadow:
     inset 0 1px 0 rgba(248, 240, 224, 0.1),
     inset 16px 0 26px rgba(72, 132, 197, 0.08),
-    inset -16px 0 26px rgba(194, 146, 84, 0.1),
+    inset -16px 0 26px rgba(182, 164, 101, 0.1),
     0 16px 34px rgba(13, 25, 42, 0.31),
-    0 0 16px rgba(184, 143, 92, 0.1);
+    0 0 16px rgba(173, 157, 101, 0.1);
 }
 
 .message {

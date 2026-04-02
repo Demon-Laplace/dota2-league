@@ -2221,14 +2221,16 @@ function renderSeasonPlayersPanel() {
     const item = document.createElement("div");
     item.className = `season-player-item${player.is_in_season ? " season-player-item-active" : ""}`;
     const isCurrentKoi = activeSeason?.koi_player_id === player.id;
-    const nameClassName = getPlayerNameStyleClass(player.id, {
-      players: leaderboardPlayers,
-      highestRewardIds,
-      hardcoreLoseIds,
-    });
     item.innerHTML = `
       <div class="season-player-main">
-        <strong class="${nameClassName}">${escapeHtml(player.display_name)}</strong>
+        <div class="season-player-name">
+          ${buildDecoratedPlayerNameHtml(player.id, player.display_name, {
+            players: leaderboardPlayers,
+            highestRewardIds,
+            hardcoreLoseIds,
+            rank: getLeaderboardRankByPlayerId(player.id, leaderboardPlayers),
+          })}
+        </div>
       </div>
       ${canScore ? `
         <div class="season-player-actions">
