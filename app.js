@@ -1244,12 +1244,26 @@ function buildHeroBadge(heroName) {
 }
 
 function buildSingleDoubleOptionsHtml(formType, player, allSelectedPlayers) {
+  const { teamMap } = getSelectedPlayersWithTeams(formType);
   const currentTargetId = getSingleDoubleTargetByUser(formType, player.id);
-  const options = allSelectedPlayers.filter((candidate) => (
-    candidate.id === player.id || candidate.team !== player.team
-  ));
+  const playerTeam = teamMap.get(player.id);
+  const options = allSelectedPlayers.filter((candidate) => {
+    const candidateTeam = teamMap.get(candidate.id);
+    if (!candidateTeam || !playerTeam) return false;
+    return candidate.id === player.id || candidateTeam !== playerTeam;
+  });
 
-  return options.map((candidate) => {
+  return [
+    `
+      <button
+        type="button"
+        class="player-double-option${!currentTargetId ? " player-double-option-active" : ""}"
+        data-role="player-double-clear"
+        data-form-type="${formType}"
+        data-user-player-id="${player.id}"
+      >取消</button>
+    `,
+    ...options.map((candidate) => {
     const isActive = candidate.id === currentTargetId;
     const label = candidate.id === player.id ? "自己" : candidate.display_name;
     return `
@@ -1262,7 +1276,8 @@ function buildSingleDoubleOptionsHtml(formType, player, allSelectedPlayers) {
         data-target-player-id="${candidate.id}"
       >${escapeHtml(label)}</button>
     `;
-  }).join("");
+    }),
+  ].join("");
 }
 
 function renderTeamSelectionUI({
@@ -3979,6 +3994,15 @@ matchFormPanel.addEventListener("click", (event) => {
     return;
   }
 
+  const playerDoubleClear = event.target.closest('[data-role="player-double-clear"]');
+  if (playerDoubleClear) {
+    const userPlayerId = playerDoubleClear.dataset.userPlayerId || "";
+    setSingleDoubleTarget("match", userPlayerId, "");
+    singleDoublePickerOpen.match[userPlayerId] = true;
+    refreshMatchSelectOptions();
+    return;
+  }
+
   const playerDoubleTarget = event.target.closest('[data-role="player-double-target"]');
   if (playerDoubleTarget) {
     const userPlayerId = playerDoubleTarget.dataset.userPlayerId || "";
@@ -4057,6 +4081,15 @@ backfillFormPanel.addEventListener("click", (event) => {
   if (playerDoubleToggle) {
     const playerId = playerDoubleToggle.dataset.playerId || "";
     singleDoublePickerOpen.backfill[playerId] = !singleDoublePickerOpen.backfill[playerId];
+    refreshBackfillSelectOptions();
+    return;
+  }
+
+  const playerDoubleClear = event.target.closest('[data-role="player-double-clear"]');
+  if (playerDoubleClear) {
+    const userPlayerId = playerDoubleClear.dataset.userPlayerId || "";
+    setSingleDoubleTarget("backfill", userPlayerId, "");
+    singleDoublePickerOpen.backfill[userPlayerId] = true;
     refreshBackfillSelectOptions();
     return;
   }
