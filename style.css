@@ -1584,35 +1584,28 @@ td {
   z-index: 1;
 }
 
-.leaderboard-player-name::after {
-  content: attr(data-name);
+.leaderboard-rank-overlay {
   grid-area: 1 / 1;
   position: relative;
-  z-index: 2;
   pointer-events: none;
   font: inherit;
   letter-spacing: inherit;
   line-height: inherit;
-  opacity: 0;
 }
 
-.leaderboard-player-name::before {
-  content: attr(data-name);
-  grid-area: 1 / 1;
-  position: relative;
+.leaderboard-rank-overlay-base {
+  z-index: 2;
+}
+
+.leaderboard-rank-overlay-gloss {
   z-index: 3;
-  pointer-events: none;
-  font: inherit;
-  letter-spacing: inherit;
-  line-height: inherit;
   color: transparent;
   -webkit-text-fill-color: transparent;
   -webkit-background-clip: text;
   background-clip: text;
-  opacity: 0;
 }
 
-.leaderboard-player-name-rank1::after {
+.leaderboard-rank-overlay-base.leaderboard-player-name-rank1 {
   opacity: 0.8;
   color: #7b5a22;
   text-shadow:
@@ -1620,7 +1613,7 @@ td {
     0 10px 22px rgba(58, 38, 12, 0.28);
 }
 
-.leaderboard-player-name-rank1::before {
+.leaderboard-rank-overlay-gloss.leaderboard-player-name-rank1 {
   opacity: 0.92;
   background: linear-gradient(180deg, rgba(255, 252, 238, 1) 0%, rgba(248, 229, 177, 0.96) 22%, rgba(212, 170, 84, 0.34) 44%, rgba(255, 236, 190, 0.06) 58%, rgba(255, 236, 190, 0) 100%);
   text-shadow:
@@ -1628,7 +1621,7 @@ td {
     0 0 24px rgba(191, 152, 68, 0.18);
 }
 
-.leaderboard-player-name-rank23::after {
+.leaderboard-rank-overlay-base.leaderboard-player-name-rank23 {
   opacity: 0.82;
   color: #d9e8f8;
   text-shadow:
@@ -1636,12 +1629,12 @@ td {
     0 8px 20px rgba(34, 44, 58, 0.2);
 }
 
-.leaderboard-player-name-rank23::before {
+.leaderboard-rank-overlay-gloss.leaderboard-player-name-rank23 {
   opacity: 0.88;
   background: linear-gradient(180deg, rgba(255, 255, 255, 1) 0%, rgba(233, 244, 255, 0.98) 20%, rgba(181, 209, 240, 0.34) 42%, rgba(233, 241, 250, 0.1) 56%, rgba(233, 241, 250, 0) 100%);
 }
 
-.leaderboard-player-name-rank45::after {
+.leaderboard-rank-overlay-base.leaderboard-player-name-rank45 {
   opacity: 0.56;
   color: #bc8743;
   text-shadow:

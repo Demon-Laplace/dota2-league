@@ -2218,7 +2218,12 @@ function renderLeaderboard(data) {
       <td><span class="leaderboard-rank">${rank}</span></td>
       <td>
         <div class="leaderboard-player-cell">
-          <strong class="leaderboard-player-name ${getLeaderboardNameRankClass(rank)}" data-name="${escapeHtml(player.display_name)}">
+          <strong class="leaderboard-player-name">
+            ${getLeaderboardNameRankClass(rank)
+              ? `<span class="leaderboard-rank-overlay leaderboard-rank-overlay-base ${getLeaderboardNameRankClass(rank)}" aria-hidden="true">${escapeHtml(player.display_name)}</span>
+                 <span class="leaderboard-rank-overlay leaderboard-rank-overlay-gloss ${getLeaderboardNameRankClass(rank)}" aria-hidden="true">${escapeHtml(player.display_name)}</span>`
+              : ""
+            }
             <span class="${nameClassName}">${escapeHtml(player.display_name)}</span>
           </strong>
           ${tagsHtml}
