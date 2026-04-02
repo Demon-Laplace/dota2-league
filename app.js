@@ -2209,7 +2209,7 @@ function renderLeaderboard(data) {
     }
 
     if (winStreakIds.has(playerId)) {
-      tags.push({ icon: "▲", label: "连胜中", tone: "ember" });
+      tags.push({ icon: "▲", label: "连胜", tone: "ember" });
     }
 
     if (mvpIds.has(playerId)) {
