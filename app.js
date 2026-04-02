@@ -3454,6 +3454,9 @@ heroPickerBackdrop.addEventListener("click", closeHeroPicker);
 heroSearchInput.addEventListener("input", () => {
   renderHeroOptions(heroSearchInput.value);
 });
+heroSearchInput.addEventListener("compositionend", () => {
+  renderHeroOptions(heroSearchInput.value);
+});
 heroSearchInput.addEventListener("focus", () => {
   renderHeroSuggestions(heroSearchInput.value);
 });
