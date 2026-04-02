@@ -828,39 +828,53 @@ button:disabled {
 #openMatchFormBtn,
 #addRewardBtn {
   background:
-    linear-gradient(135deg, rgba(181, 71, 53, 0.98), rgba(125, 35, 32, 0.98)),
-    linear-gradient(180deg, rgba(255, 206, 141, 0.12), transparent);
-  border-color: rgba(241, 154, 115, 0.36);
+    linear-gradient(135deg, rgba(31, 53, 82, 0.96), rgba(17, 31, 52, 0.98) 54%, rgba(66, 36, 31, 0.94)),
+    linear-gradient(180deg, rgba(255, 217, 171, 0.12), transparent 58%);
+  border-color: rgba(210, 151, 108, 0.32);
   box-shadow:
-    inset 0 1px 0 rgba(255, 221, 197, 0.12),
-    0 12px 28px rgba(85, 22, 20, 0.28);
+    inset 0 1px 0 rgba(236, 244, 255, 0.08),
+    inset 18px 0 24px rgba(53, 113, 175, 0.08),
+    inset -18px 0 24px rgba(179, 102, 73, 0.08),
+    0 12px 28px rgba(10, 22, 38, 0.28);
+  color: #f3f7ff;
 }
 
 #startMatchDayBtn:hover:not(:disabled),
 #addTodayPlayerBtn:hover:not(:disabled),
 #openMatchFormBtn:hover:not(:disabled),
 #addRewardBtn:hover:not(:disabled) {
-  filter: brightness(1.08);
+  filter: brightness(1.06);
   box-shadow:
-    inset 0 1px 0 rgba(255, 229, 205, 0.16),
-    0 14px 30px rgba(100, 28, 23, 0.34),
-    0 0 18px rgba(203, 88, 62, 0.16);
+    inset 0 1px 0 rgba(243, 248, 255, 0.12),
+    inset 20px 0 28px rgba(60, 132, 205, 0.1),
+    inset -20px 0 28px rgba(208, 130, 97, 0.1),
+    0 14px 30px rgba(12, 25, 43, 0.34),
+    0 0 18px rgba(198, 144, 96, 0.12);
 }
 
 #openBackfillFormBtn,
 .edit-match-btn {
-  background: linear-gradient(135deg, rgba(78, 109, 147, 0.94), rgba(45, 67, 101, 0.94));
-  border-color: rgba(154, 188, 231, 0.22);
+  background:
+    linear-gradient(135deg, rgba(47, 71, 104, 0.96), rgba(22, 38, 63, 0.98)),
+    linear-gradient(180deg, rgba(210, 229, 255, 0.08), transparent 62%);
+  border-color: rgba(147, 181, 223, 0.24);
   box-shadow:
-    inset 0 1px 0 rgba(221, 236, 255, 0.08),
-    0 10px 24px rgba(21, 46, 74, 0.22);
+    inset 0 1px 0 rgba(223, 236, 255, 0.08),
+    inset 0 -12px 24px rgba(9, 20, 35, 0.12),
+    0 10px 24px rgba(16, 33, 57, 0.24);
+  color: #e6f0ff;
 }
 
 .delete-match-btn {
-  background: linear-gradient(135deg, rgba(148, 42, 59, 0.98), rgba(106, 23, 42, 0.98));
+  background:
+    linear-gradient(135deg, rgba(72, 31, 42, 0.98), rgba(42, 18, 29, 0.98)),
+    linear-gradient(180deg, rgba(255, 208, 208, 0.08), transparent 62%);
+  border-color: rgba(185, 98, 114, 0.22);
   box-shadow:
-    inset 0 1px 0 rgba(255, 215, 215, 0.08),
-    0 10px 24px rgba(76, 15, 27, 0.24);
+    inset 0 1px 0 rgba(255, 220, 220, 0.08),
+    inset 0 -12px 24px rgba(17, 7, 11, 0.18),
+    0 10px 24px rgba(36, 10, 17, 0.24);
+  color: #ffe7ea;
 }
 
 #rewardPanel .row,
@@ -878,6 +892,45 @@ button:disabled {
   min-height: 40px;
   border-radius: 12px;
   letter-spacing: 0.03em;
+  position: relative;
+  overflow: hidden;
+}
+
+#addRewardBtn::before,
+#addTodayPlayerBtn::before,
+#openMatchFormBtn::before,
+#openBackfillFormBtn::before,
+.edit-match-btn::before,
+.delete-match-btn::before,
+#startMatchDayBtn::before {
+  content: "";
+  position: absolute;
+  inset: 1px 1px auto;
+  height: 42%;
+  border-radius: 11px 11px 8px 8px;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.12), transparent);
+  pointer-events: none;
+}
+
+#startMatchDayBtn {
+  background:
+    linear-gradient(135deg, rgba(45, 60, 86, 0.96), rgba(21, 34, 56, 0.98) 52%, rgba(92, 54, 35, 0.96)),
+    linear-gradient(180deg, rgba(255, 225, 175, 0.14), transparent 62%);
+  border-color: rgba(223, 174, 113, 0.36);
+  box-shadow:
+    inset 0 1px 0 rgba(247, 241, 223, 0.1),
+    inset 18px 0 24px rgba(67, 123, 184, 0.08),
+    inset -18px 0 24px rgba(203, 151, 87, 0.1),
+    0 14px 30px rgba(12, 24, 40, 0.3);
+}
+
+#startMatchDayBtn:hover:not(:disabled) {
+  box-shadow:
+    inset 0 1px 0 rgba(255, 246, 230, 0.14),
+    inset 18px 0 28px rgba(78, 144, 214, 0.1),
+    inset -18px 0 28px rgba(223, 167, 98, 0.12),
+    0 16px 34px rgba(14, 27, 46, 0.34),
+    0 0 20px rgba(224, 173, 109, 0.14);
 }
 
 .message {
