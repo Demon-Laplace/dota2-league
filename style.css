@@ -32,9 +32,9 @@ body {
   margin: 0;
   font-family: var(--font-ui);
   background:
-    radial-gradient(circle at top left, rgba(78, 148, 225, 0.14), transparent 26%),
-    radial-gradient(circle at top right, rgba(99, 213, 208, 0.12), transparent 24%),
-    linear-gradient(rgba(4, 13, 25, 0.78), rgba(5, 16, 31, 0.9)),
+    radial-gradient(circle at top left, rgba(122, 28, 26, 0.18), transparent 24%),
+    radial-gradient(circle at top right, rgba(178, 69, 43, 0.12), transparent 22%),
+    linear-gradient(rgba(15, 7, 10, 0.76), rgba(6, 12, 22, 0.92)),
     url("./assets/dota-bg.jpg") center / cover no-repeat fixed;
   color: var(--text);
   min-height: 100vh;
@@ -46,8 +46,8 @@ body::before {
   inset: 0;
   pointer-events: none;
   background:
-    linear-gradient(180deg, rgba(117, 186, 255, 0.05), transparent 28%),
-    radial-gradient(circle at 20% 12%, rgba(255, 255, 255, 0.06), transparent 18%);
+    linear-gradient(180deg, rgba(161, 46, 46, 0.08), transparent 26%),
+    radial-gradient(circle at 20% 12%, rgba(255, 230, 230, 0.06), transparent 18%);
   mix-blend-mode: screen;
 }
 
@@ -59,7 +59,7 @@ body::before {
   place-items: center;
   overflow: hidden;
   background:
-    linear-gradient(rgba(4, 13, 25, 0.42), rgba(5, 16, 31, 0.78)),
+    linear-gradient(rgba(20, 7, 10, 0.48), rgba(6, 11, 21, 0.84)),
     url("./assets/dota-bg.jpg") center / cover no-repeat;
   transition: opacity 0.45s ease, visibility 0.45s ease;
 }
@@ -74,8 +74,9 @@ body::before {
   position: absolute;
   inset: 0;
   background:
-    radial-gradient(circle at center, rgba(240, 195, 106, 0.18), transparent 24%),
-    linear-gradient(rgba(2, 10, 22, 0.25), rgba(2, 10, 22, 0.72));
+    radial-gradient(circle at center, rgba(171, 45, 45, 0.24), transparent 24%),
+    radial-gradient(circle at 50% 34%, rgba(255, 164, 110, 0.12), transparent 28%),
+    linear-gradient(rgba(20, 7, 10, 0.32), rgba(2, 9, 20, 0.76));
 }
 
 .loading-screen__content {
@@ -84,8 +85,8 @@ body::before {
   text-align: center;
   padding: 28px 32px;
   border-radius: 18px;
-  border: 1px solid var(--border-strong);
-  background: rgba(10, 26, 47, 0.5);
+  border: 1px solid rgba(163, 63, 63, 0.3);
+  background: linear-gradient(180deg, rgba(31, 11, 15, 0.58), rgba(10, 18, 33, 0.62));
   backdrop-filter: blur(14px);
   box-shadow: var(--shadow);
 }
@@ -161,7 +162,7 @@ h1 {
   width: 88px;
   height: 88px;
   border-radius: 999px;
-  background: radial-gradient(circle, rgba(240, 195, 106, 0.18), rgba(99, 213, 208, 0.08) 45%, transparent 72%);
+  background: radial-gradient(circle, rgba(178, 52, 46, 0.24), rgba(255, 141, 95, 0.12) 42%, transparent 72%);
   filter: blur(3px);
   pointer-events: none;
 }
@@ -173,7 +174,7 @@ h1 {
   font-size: 11px;
   font-weight: 700;
   letter-spacing: 0.28em;
-  color: rgba(216, 228, 244, 0.76);
+  color: rgba(239, 220, 220, 0.74);
 }
 
 .league-brand-kicker::before {
@@ -183,7 +184,7 @@ h1 {
   top: 50%;
   width: 12px;
   height: 1px;
-  background: linear-gradient(90deg, rgba(240, 195, 106, 0.9), rgba(99, 213, 208, 0.3));
+  background: linear-gradient(90deg, rgba(209, 79, 56, 0.92), rgba(255, 185, 129, 0.3));
   transform: translateY(-50%);
 }
 
@@ -201,11 +202,29 @@ h1 {
   font-family: var(--font-brand);
   font-size: clamp(34px, 4.8vw, 54px);
   font-weight: 700;
-  letter-spacing: 0.1em;
-  color: #f4f7fb;
+  letter-spacing: 0.16em;
+  color: transparent;
+  -webkit-text-fill-color: transparent;
+  background: linear-gradient(180deg, #fff8ee 2%, #f7dcc3 18%, #e5be98 40%, #bd845f 68%, #7a432e 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
   text-shadow:
-    0 10px 32px rgba(3, 11, 22, 0.48),
-    0 0 18px rgba(103, 218, 214, 0.12);
+    0 12px 34px rgba(7, 7, 12, 0.52),
+    0 0 18px rgba(205, 110, 75, 0.12);
+  position: relative;
+}
+
+.league-brand-title-main::after {
+  content: "";
+  position: absolute;
+  left: 0.12em;
+  right: -0.08em;
+  bottom: 0.05em;
+  height: 0.42em;
+  border-radius: 999px;
+  background: linear-gradient(90deg, rgba(153, 45, 40, 0.14), rgba(255, 190, 135, 0.08), rgba(110, 25, 25, 0.14));
+  filter: blur(10px);
+  z-index: -1;
 }
 
 .league-brand-title-sub {
@@ -213,15 +232,19 @@ h1 {
   margin-bottom: 6px;
   padding: 6px 10px 5px;
   border-radius: 999px;
-  border: 1px solid rgba(240, 195, 106, 0.34);
-  background: linear-gradient(135deg, rgba(87, 61, 18, 0.56), rgba(19, 42, 66, 0.74));
-  color: #f3dba0;
+  border: 1px solid rgba(163, 62, 55, 0.42);
+  background:
+    linear-gradient(135deg, rgba(88, 18, 22, 0.92), rgba(39, 12, 18, 0.96)),
+    radial-gradient(circle at 18% 20%, rgba(228, 93, 72, 0.2), transparent 28%);
+  color: #efb9a8;
   font-size: 12px;
   font-weight: 800;
   letter-spacing: 0.22em;
   box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.06),
-    0 10px 26px rgba(8, 21, 37, 0.28);
+    inset 0 1px 0 rgba(255, 223, 220, 0.08),
+    inset 0 0 20px rgba(122, 27, 27, 0.14),
+    0 10px 26px rgba(15, 8, 12, 0.34);
+  text-shadow: 0 0 12px rgba(183, 63, 44, 0.16);
 }
 
 .league-brand-loading {
@@ -247,6 +270,10 @@ h1 {
 
 .league-brand-loading .league-brand-title {
   justify-content: center;
+}
+
+.league-brand-loading .league-brand-title-main {
+  font-size: clamp(38px, 5.2vw, 58px);
 }
 
 .sub {
