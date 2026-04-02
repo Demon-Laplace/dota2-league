@@ -907,6 +907,84 @@ function getHardcoreLoseMetrics(data) {
   };
 }
 
+function getHighestRewardPlayerIds(data) {
+  const highestReward = (data || []).reduce((max, player) => {
+    const rewardPoints = Number(player.reward_points ?? 0);
+    return rewardPoints > max ? rewardPoints : max;
+  }, 0);
+
+  return new Set(
+    highestReward > 0
+      ? (data || [])
+        .filter((player) => Number(player.reward_points ?? 0) === highestReward)
+        .map((player) => player.player_id || player.id)
+        .filter(Boolean)
+      : []
+  );
+}
+
+function getHardcoreLoseTaggedPlayerIds(data) {
+  const hardcoreLoseMetrics = getHardcoreLoseMetrics(data);
+  if (!hasSeasonReachedDay(activeSeason?.start_date, 8) || !hardcoreLoseMetrics.canEvaluate) {
+    return new Set();
+  }
+
+  return new Set((data || []).filter((player) => {
+    const gamesPlayed = Number(player.games_played ?? 0);
+    const score = Number(player.score ?? 0);
+    const wins = Number(player.wins ?? 0);
+    const parsedWinRate = Number(player.win_rate);
+    const winRate = Number.isFinite(parsedWinRate)
+      ? parsedWinRate
+      : (gamesPlayed > 0 ? (wins / gamesPlayed) * 100 : 0);
+    const lovePlayScore = clampNumber(gamesPlayed / HARDCORE_TAG_LOVE_CAP_GAMES, 0, 1);
+    const winRateBadness = Number.isFinite(hardcoreLoseMetrics.winRateReference) && hardcoreLoseMetrics.winRateReference > 0
+      ? clampNumber((hardcoreLoseMetrics.winRateReference - winRate) / hardcoreLoseMetrics.winRateReference, 0, 1)
+      : 0;
+    const scoreSpread = Number.isFinite(hardcoreLoseMetrics.scoreReference) && Number.isFinite(hardcoreLoseMetrics.minScore)
+      ? Math.max(hardcoreLoseMetrics.scoreReference - hardcoreLoseMetrics.minScore, 0)
+      : 0;
+    const scoreBadness = Number.isFinite(hardcoreLoseMetrics.scoreReference)
+      ? (
+        scoreSpread > 0
+          ? clampNumber((hardcoreLoseMetrics.scoreReference - score) / scoreSpread, 0, 1)
+          : (score <= hardcoreLoseMetrics.scoreReference ? 1 : 0)
+      )
+      : 0;
+    const poorPerformanceScore = Math.max(winRateBadness, scoreBadness);
+    const hardcoreTagScore = poorPerformanceScore * lovePlayScore;
+
+    return gamesPlayed >= HARDCORE_TAG_MIN_GAMES && hardcoreTagScore >= HARDCORE_TAG_SHOW_THRESHOLD;
+  }).map((player) => player.player_id || player.id).filter(Boolean));
+}
+
+function getPlayerNameStyleClass(playerId, options = {}) {
+  const source = options.players || leaderboardPlayers || [];
+  if (!playerId || !source.length) {
+    return "player-name-display";
+  }
+
+  const hardcoreLoseIds = options.hardcoreLoseIds || getHardcoreLoseTaggedPlayerIds(source);
+  const highestRewardIds = options.highestRewardIds || getHighestRewardPlayerIds(source);
+  const koiPlayerId = options.koiPlayerId !== undefined
+    ? options.koiPlayerId
+    : (activeSeason?.koi_player_id || null);
+
+  if (koiPlayerId && playerId === koiPlayerId) {
+    return "player-name-display player-name-display-koi";
+  }
+
+  if (highestRewardIds.has(playerId)) {
+    return "player-name-display player-name-display-gold";
+  }
+
+  if (hardcoreLoseIds.has(playerId)) {
+    return "player-name-display player-name-display-slate";
+  }
+
+  return "player-name-display";
+}
+
 function hasRecordedWinner(value) {
   return value === "A" || value === "B";
 }
@@ -1637,14 +1715,21 @@ function renderSeasonPlayersPanel() {
     support: seasonPlayers.filter((player) => player.player_rank === "support"),
     idle: seasonPlayers.filter((player) => !player.player_rank),
   };
+  const highestRewardIds = getHighestRewardPlayerIds(leaderboardPlayers);
+  const hardcoreLoseIds = getHardcoreLoseTaggedPlayerIds(leaderboardPlayers);
 
   const renderPlayerCard = (player) => {
     const item = document.createElement("div");
     item.className = `season-player-item${player.is_in_season ? " season-player-item-active" : ""}`;
     const isCurrentKoi = activeSeason?.koi_player_id === player.id;
+    const nameClassName = getPlayerNameStyleClass(player.id, {
+      players: leaderboardPlayers,
+      highestRewardIds,
+      hardcoreLoseIds,
+    });
     item.innerHTML = `
       <div class="season-player-main">
-        <strong>${escapeHtml(player.display_name)}</strong>
+        <strong class="${nameClassName}">${escapeHtml(player.display_name)}</strong>
       </div>
       <div class="season-player-actions">
         <button
@@ -2035,43 +2120,21 @@ function renderLeaderboard(data) {
   renderRewardPlayerOptions();
   updateRewardMinimumHint();
 
-  const highestReward = data.reduce((max, player) => {
-    const rewardPoints = Number(player.reward_points ?? 0);
-    return rewardPoints > max ? rewardPoints : max;
-  }, 0);
-  const canShowHardcoreLoseTag = hasSeasonReachedDay(activeSeason?.start_date, 8);
-  const hardcoreLoseMetrics = getHardcoreLoseMetrics(data);
+  const highestRewardIds = getHighestRewardPlayerIds(data);
+  const hardcoreLoseIds = getHardcoreLoseTaggedPlayerIds(data);
 
   data.forEach((player, idx) => {
     const tr = document.createElement("tr");
     const rank = idx + 1;
     const playerId = player.player_id || player.id || "";
     const tags = [];
-    const gamesPlayed = Number(player.games_played ?? 0);
-    const score = Number(player.score ?? 0);
-    const wins = Number(player.wins ?? 0);
-    const parsedWinRate = Number(player.win_rate);
-    const winRate = Number.isFinite(parsedWinRate)
-      ? parsedWinRate
-      : (gamesPlayed > 0 ? (wins / gamesPlayed) * 100 : 0);
-    const lovePlayScore = clampNumber(gamesPlayed / HARDCORE_TAG_LOVE_CAP_GAMES, 0, 1);
-    const winRateBadness = hardcoreLoseMetrics.canEvaluate && Number.isFinite(hardcoreLoseMetrics.winRateReference) && hardcoreLoseMetrics.winRateReference > 0
-      ? clampNumber((hardcoreLoseMetrics.winRateReference - winRate) / hardcoreLoseMetrics.winRateReference, 0, 1)
-      : 0;
-    const scoreSpread = hardcoreLoseMetrics.canEvaluate && Number.isFinite(hardcoreLoseMetrics.scoreReference) && Number.isFinite(hardcoreLoseMetrics.minScore)
-      ? Math.max(hardcoreLoseMetrics.scoreReference - hardcoreLoseMetrics.minScore, 0)
-      : 0;
-    const scoreBadness = hardcoreLoseMetrics.canEvaluate && Number.isFinite(hardcoreLoseMetrics.scoreReference)
-      ? (
-        scoreSpread > 0
-          ? clampNumber((hardcoreLoseMetrics.scoreReference - score) / scoreSpread, 0, 1)
-          : (score <= hardcoreLoseMetrics.scoreReference ? 1 : 0)
-      )
-      : 0;
-    const poorPerformanceScore = Math.max(winRateBadness, scoreBadness);
-    const hardcoreTagScore = poorPerformanceScore * lovePlayScore;
+    const nameClassName = getPlayerNameStyleClass(playerId, {
+      players: data,
+      highestRewardIds,
+      hardcoreLoseIds,
+    });
 
-    if (highestReward > 0 && Number(player.reward_points ?? 0) === highestReward) {
+    if (highestRewardIds.has(playerId)) {
       tags.push({ icon: "¤", label: "金主", tone: "gold" });
     }
 
@@ -2079,12 +2142,7 @@ function renderLeaderboard(data) {
       tags.push({ icon: "✦", label: "锦鲤", tone: "teal" });
     }
 
-    if (
-      canShowHardcoreLoseTag &&
-      hardcoreLoseMetrics.canEvaluate &&
-      gamesPlayed >= HARDCORE_TAG_MIN_GAMES &&
-      hardcoreTagScore >= HARDCORE_TAG_SHOW_THRESHOLD
-    ) {
+    if (hardcoreLoseIds.has(playerId)) {
       tags.push({ icon: "☄", label: "又菜又爱玩", tone: "slate" });
     }
 
@@ -2108,7 +2166,7 @@ function renderLeaderboard(data) {
       <td><span class="leaderboard-rank">${rank}</span></td>
       <td>
         <div class="leaderboard-player-cell">
-          <strong class="leaderboard-player-name">${escapeHtml(player.display_name)}</strong>
+          <strong class="leaderboard-player-name ${nameClassName}">${escapeHtml(player.display_name)}</strong>
           ${tagsHtml}
         </div>
       </td>
@@ -2434,6 +2492,8 @@ function getOrderedSingleDoubleCandidates(player, candidates, teamMap) {
 function renderRecentMatches(data) {
   recentMatchesData = data || [];
   recentMatchesList.innerHTML = "";
+  const highestRewardIds = getHighestRewardPlayerIds(leaderboardPlayers);
+  const hardcoreLoseIds = getHardcoreLoseTaggedPlayerIds(leaderboardPlayers);
 
   if (!recentMatchesData || recentMatchesData.length === 0) {
     recentMatchesEmpty.style.display = "block";
@@ -2524,7 +2584,12 @@ function renderRecentMatches(data) {
             data-player-name="${escapeHtml(player.display_name || "未知选手")}"
             data-hero-name="${escapeHtml(player.hero_name || "")}"
           >
-            <span>${escapeHtml(player.display_name || "未知选手")}</span>
+            <span class="${getPlayerNameStyleClass(player.player_id, {
+              players: leaderboardPlayers,
+              highestRewardIds,
+              hardcoreLoseIds,
+              koiPlayerId: getSeasonKoiPlayerId(match.season_id),
+            })}">${escapeHtml(player.display_name || "未知选手")}</span>
             ${player.hero_name ? `<span class="match-picked-hero">${escapeHtml(getHeroDisplayName(player.hero_name))}</span>` : '<span class="muted">未选英雄</span>'}
           </button>
         </li>

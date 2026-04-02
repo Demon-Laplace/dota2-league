@@ -453,6 +453,7 @@ button.season-total {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  font-size: 16px;
 }
 
 .season-player-actions {
@@ -609,6 +610,48 @@ h2,
 .recent-match-team h3,
 .leaderboard-player-name {
   font-family: var(--font-display);
+}
+
+.player-name-display {
+  display: inline-block;
+  font-family: var(--font-brand);
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  line-height: 1.15;
+  color: #f4f8ff;
+  text-shadow:
+    0 8px 24px rgba(2, 10, 22, 0.38),
+    0 1px 0 rgba(255, 255, 255, 0.04);
+}
+
+.player-name-display-gold {
+  color: transparent;
+  background: linear-gradient(180deg, #fff7dc 8%, #f6d98a 42%, #d39b2d 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  text-shadow:
+    0 0 18px rgba(240, 195, 106, 0.18),
+    0 8px 24px rgba(77, 51, 12, 0.24);
+}
+
+.player-name-display-koi {
+  color: transparent;
+  background: linear-gradient(180deg, #fffdf8 6%, #ffe3e3 34%, #ffb4b4 58%, #d44949 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  text-shadow:
+    0 0 18px rgba(255, 118, 118, 0.16),
+    0 8px 24px rgba(86, 20, 20, 0.24);
+}
+
+.player-name-display-slate {
+  color: transparent;
+  background: linear-gradient(180deg, #f0fff4 4%, #c8f59f 40%, #7fcf54 72%, #4d8e31 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  text-shadow:
+    0 0 16px rgba(150, 223, 94, 0.16),
+    0 8px 24px rgba(22, 56, 18, 0.22);
 }
 
 select,
@@ -1363,6 +1406,10 @@ button:disabled {
   box-shadow: none;
 }
 
+.recent-match-player .player-name-display {
+  font-size: 15px;
+}
+
 .recent-match-player:hover:not(:disabled) {
   transform: none;
   filter: none;
@@ -1520,10 +1567,9 @@ td {
 }
 
 .leaderboard-player-name {
-  font-size: 15px;
+  font-size: 17px;
   line-height: 1.2;
-  color: #f4f8ff;
-  letter-spacing: 0.02em;
+  letter-spacing: 0.04em;
 }
 
 .leaderboard-player-tags {
