@@ -1569,6 +1569,7 @@ td {
 .leaderboard-player-name {
   position: relative;
   display: inline-grid;
+  isolation: isolate;
   font-size: 17px;
   line-height: 1.2;
   letter-spacing: 0.04em;
@@ -1576,11 +1577,15 @@ td {
 
 .leaderboard-player-name > .player-name-display {
   grid-area: 1 / 1;
+  position: relative;
+  z-index: 1;
 }
 
 .leaderboard-player-name::after {
   content: attr(data-name);
   grid-area: 1 / 1;
+  position: relative;
+  z-index: 2;
   pointer-events: none;
   font: inherit;
   letter-spacing: inherit;
@@ -1589,41 +1594,54 @@ td {
 }
 
 .leaderboard-player-name::before {
-  content: "";
+  content: attr(data-name);
   grid-area: 1 / 1;
+  position: relative;
+  z-index: 3;
   pointer-events: none;
+  font: inherit;
+  letter-spacing: inherit;
+  line-height: inherit;
+  color: transparent;
+  -webkit-background-clip: text;
+  background-clip: text;
   opacity: 0;
 }
 
 .leaderboard-player-name-rank1::after {
-  opacity: 0.6;
-  color: #8a6931;
+  opacity: 0.8;
+  color: #7b5a22;
   text-shadow:
-    0 0 16px rgba(209, 173, 96, 0.16),
-    0 10px 24px rgba(58, 38, 12, 0.3);
+    0 0 20px rgba(227, 194, 118, 0.24),
+    0 12px 28px rgba(58, 38, 12, 0.34);
 }
 
 .leaderboard-player-name-rank1::before {
-  opacity: 0.42;
-  background:
-    linear-gradient(180deg, rgba(255, 246, 220, 0.34), rgba(255, 246, 220, 0) 46%),
-    radial-gradient(circle at 50% 26%, rgba(214, 181, 104, 0.18), transparent 56%);
-  filter: blur(6px);
+  opacity: 0.92;
+  background: linear-gradient(180deg, rgba(255, 252, 238, 1) 0%, rgba(248, 229, 177, 0.96) 22%, rgba(212, 170, 84, 0.34) 44%, rgba(255, 236, 190, 0.06) 58%, rgba(255, 236, 190, 0) 100%);
+  text-shadow:
+    0 0 12px rgba(255, 245, 218, 0.22),
+    0 0 24px rgba(191, 152, 68, 0.18);
 }
 
 .leaderboard-player-name-rank23::after {
-  opacity: 0.48;
-  color: #d7e0ec;
+  opacity: 0.82;
+  color: #d9e8f8;
   text-shadow:
-    0 0 12px rgba(203, 219, 236, 0.18),
-    0 8px 20px rgba(34, 44, 58, 0.22);
+    0 0 18px rgba(220, 237, 255, 0.28),
+    0 10px 24px rgba(34, 44, 58, 0.26);
+}
+
+.leaderboard-player-name-rank23::before {
+  opacity: 0.88;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 1) 0%, rgba(233, 244, 255, 0.98) 20%, rgba(181, 209, 240, 0.34) 42%, rgba(233, 241, 250, 0.1) 56%, rgba(233, 241, 250, 0) 100%);
 }
 
 .leaderboard-player-name-rank45::after {
-  opacity: 0.46;
-  color: #b98645;
+  opacity: 0.56;
+  color: #bc8743;
   text-shadow:
-    0 0 12px rgba(193, 137, 73, 0.16),
+    0 0 14px rgba(201, 147, 83, 0.18),
     0 8px 20px rgba(63, 39, 14, 0.22);
 }
 
