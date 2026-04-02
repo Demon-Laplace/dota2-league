@@ -2637,11 +2637,14 @@ function renderRecentMatches(data) {
 
     const content = details.querySelector(".match-day-content-inner");
 
-    matches.forEach((match) => {
+    matches.forEach((match, matchIndex) => {
       const players = parseRecentMatchPlayers(match.players);
       const teamAPlayers = players.filter((player) => player.team === "A");
       const teamBPlayers = players.filter((player) => player.team === "B");
       const winnerLabel = getWinnerLabel(match.winner_team);
+      const resultToneClass = match.winner_team === "A"
+        ? "recent-match-result-a"
+        : (match.winner_team === "B" ? "recent-match-result-b" : "recent-match-result-pending");
       const matchDateLabel = match.match_date || formatArchiveDate(match.created_at) || "未知日期";
       const doubleDowns = parseRecentMatchPlayers(match.double_downs);
       const effectLogsByTeam = getMatchEffectLogsByTeam(match, players, doubleDowns);
@@ -2679,9 +2682,10 @@ function renderRecentMatches(data) {
 
       card.className = "recent-match-card";
       card.innerHTML = `
+        <span class="recent-match-round-badge">第 ${matchIndex + 1} 场</span>
         <div class="recent-match-head">
           <div class="recent-match-title">
-            <strong>${winnerLabel}</strong>
+            <strong class="${resultToneClass}">${winnerLabel}</strong>
             <span class="winner-badge">${getMatchStatusBadge(match.winner_team)}</span>
           </div>
           <div class="queue-actions">
