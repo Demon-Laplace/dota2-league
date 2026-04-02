@@ -123,7 +123,7 @@ const DOTA_HEROES = [
   "Death Prophet", "Disruptor", "Doom", "Dragon Knight", "Drow Ranger", "Earth Spirit",
   "Earthshaker", "Elder Titan", "Ember Spirit", "Enchantress", "Enigma", "Faceless Void",
   "Grimstroke", "Gyrocopter", "Hoodwink", "Huskar", "Invoker", "Io", "Jakiro",
-  "Juggernaut", "Keeper of the Light", "Kez", "Kunkka", "Legion Commander", "Leshrac",
+  "Juggernaut", "Keeper of the Light", "Kez", "Kunkka", "Largo", "Legion Commander", "Leshrac",
   "Lich", "Lifestealer", "Lina", "Lion", "Lone Druid", "Luna", "Lycan", "Magnus",
   "Marci", "Mars", "Medusa", "Meepo", "Mirana", "Monkey King", "Morphling", "Muerta",
   "Naga Siren", "Nature's Prophet", "Necrophos", "Night Stalker", "Nyx Assassin",
@@ -131,7 +131,7 @@ const DOTA_HEROES = [
   "Phantom Lancer", "Phoenix", "Primal Beast", "Puck", "Pudge", "Pugna", "Queen of Pain",
   "Razor", "Riki", "Ringmaster", "Rubick", "Sand King", "Shadow Demon", "Shadow Fiend",
   "Shadow Shaman", "Silencer", "Skywrath Mage", "Slardar", "Slark", "Snapfire", "Sniper",
-  "Spectre", "Spirit Breaker", "Storm Spirit", "Sven", "Techies", "Templar Assassin",
+  "Spectre", "Spirit Bear", "Spirit Breaker", "Storm Spirit", "Sven", "Techies", "Templar Assassin",
   "Terrorblade", "Tidehunter", "Timbersaw", "Tinker", "Tiny", "Treant Protector",
   "Troll Warlord", "Tusk", "Underlord", "Undying", "Ursa", "Vengeful Spirit", "Venomancer",
   "Viper", "Visage", "Void Spirit", "Warlock", "Weaver", "Windranger", "Winter Wyvern",
@@ -185,6 +185,7 @@ const HERO_NAME_ZH = {
   "Keeper of the Light": "光之守卫",
   "Kez": "凯",
   "Kunkka": "昆卡",
+  "Largo": "朗戈",
   "Legion Commander": "军团指挥官",
   "Leshrac": "拉席克",
   "Lich": "巫妖",
@@ -236,6 +237,7 @@ const HERO_NAME_ZH = {
   "Snapfire": "电炎绝手",
   "Sniper": "狙击手",
   "Spectre": "幽鬼",
+  "Spirit Bear": "灵熊",
   "Spirit Breaker": "裂魂人",
   "Storm Spirit": "风暴之灵",
   "Sven": "斯温",
@@ -364,6 +366,7 @@ const HERO_PINYIN_INITIALS = {
   "Snapfire": "dyjsh",
   "Sniper": "jjs",
   "Spectre": "yg",
+  "Spirit Bear": "lx",
   "Spirit Breaker": "lhr",
   "Storm Spirit": "fbzl",
   "Sven": "sw",
@@ -646,9 +649,17 @@ function getHeroSearchKeywords(heroName) {
   ].filter(Boolean);
 }
 
+function isHeroSearchReady(searchTerm = "") {
+  const normalizedSearch = String(searchTerm || "").trim();
+  if (!normalizedSearch) return false;
+
+  const hasChinese = /[\u3400-\u9fff]/.test(normalizedSearch);
+  return hasChinese ? normalizedSearch.length >= 1 : normalizedSearch.length >= 2;
+}
+
 function getFilteredHeroes(searchTerm = "") {
   const normalizedSearch = String(searchTerm || "").trim().toLowerCase();
-  if (!normalizedSearch) {
+  if (!normalizedSearch || !isHeroSearchReady(normalizedSearch)) {
     return DOTA_HEROES;
   }
 
@@ -2650,7 +2661,7 @@ function togglePlayerSelection(formType, teamKey, playerId) {
 function renderHeroSuggestions(searchTerm = "") {
   const normalizedSearch = String(searchTerm || "").trim().toLowerCase();
 
-  if (normalizedSearch.length < 2) {
+  if (!isHeroSearchReady(normalizedSearch)) {
     heroSearchSuggestions.hidden = true;
     heroSearchSuggestions.innerHTML = "";
     return;
