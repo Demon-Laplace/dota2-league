@@ -848,8 +848,9 @@ function setWinnerSelection(formType, winnerTeam = "") {
 
   [...panel.querySelectorAll('[data-role="winner-toggle"]')].forEach((button) => {
     const isActive = button.dataset.winner === select.value;
-    button.classList.toggle("winner-toggle-active", isActive);
+    button.classList.toggle("team-title-toggle-active", isActive);
     button.setAttribute("aria-pressed", String(isActive));
+    button.closest(".team-panel")?.classList.toggle("team-panel-winner", isActive);
   });
 
   if (hint) {
@@ -865,7 +866,7 @@ function toggleWinnerSelection(formType, winnerTeam) {
 }
 
 function updateRecentMatchGroupSummary(details, isActiveDay) {
-  const badge = details.querySelector(".winner-badge");
+  const badge = details.querySelector(".match-day-summary-badge");
   if (badge) {
     badge.textContent = isActiveDay ? "进行中" : "已归档";
   }
@@ -874,6 +875,8 @@ function updateRecentMatchGroupSummary(details, isActiveDay) {
   if (toggleText) {
     toggleText.textContent = details.open ? "点击收起" : "点击展开";
   }
+
+  details.dataset.expanded = details.open ? "true" : "false";
 }
 
 function rememberOpenRecentMatchGroups() {
@@ -2027,6 +2030,7 @@ function renderRecentMatches(data) {
     details.dataset.matchDate = matchDate;
     details.className = "match-day-group";
     details.open = isActiveDay || openRecentMatchGroups.has(matchDate);
+    details.dataset.expanded = details.open ? "true" : "false";
     details.addEventListener("toggle", () => {
       if (details.open) {
         openRecentMatchGroups.add(matchDate);
@@ -2041,7 +2045,7 @@ function renderRecentMatches(data) {
         <div class="match-day-summary">
           <strong>${escapeHtml(matchDate)}</strong>
           <span class="queue-slot">${matches.length} 场</span>
-          <span class="winner-badge">${isActiveDay ? "进行中" : "已归档"}</span>
+          <span class="winner-badge match-day-summary-badge">${isActiveDay ? "进行中" : "已归档"}</span>
         </div>
         <span class="match-day-toggle">
           <span class="match-day-toggle-icon" aria-hidden="true"></span>
@@ -2051,6 +2055,9 @@ function renderRecentMatches(data) {
       <div class="match-day-content"></div>
     `;
     updateRecentMatchGroupSummary(details, isActiveDay);
+    details.querySelector("summary")?.addEventListener("click", () => {
+      window.setTimeout(() => updateRecentMatchGroupSummary(details, isActiveDay), 0);
+    });
 
     const content = details.querySelector(".match-day-content");
 
