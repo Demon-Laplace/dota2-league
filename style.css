@@ -117,8 +117,8 @@ body::before {
 
 .admin-secret-trigger {
   position: absolute;
-  top: 20px;
-  right: 44px;
+  top: 16px;
+  right: 36px;
   width: 132px;
   height: 132px;
   border-radius: 28px;
