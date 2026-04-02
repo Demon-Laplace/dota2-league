@@ -2033,14 +2033,16 @@ function renderRecentMatches(data) {
           <span class="muted match-day-toggle-text">${details.open ? "点击收起" : "点击展开"}</span>
         </span>
       </summary>
-      <div class="match-day-content"></div>
+      <div class="match-day-content">
+        <div class="match-day-content-inner"></div>
+      </div>
     `;
     updateRecentMatchGroupSummary(details, isActiveDay);
     details.querySelector("summary")?.addEventListener("click", () => {
       window.setTimeout(() => updateRecentMatchGroupSummary(details, isActiveDay), 0);
     });
 
-    const content = details.querySelector(".match-day-content");
+    const content = details.querySelector(".match-day-content-inner");
 
     matches.forEach((match) => {
       const players = parseRecentMatchPlayers(match.players);

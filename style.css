@@ -824,6 +824,7 @@ button:disabled {
 }
 
 .match-day-group {
+  display: grid;
   border: 1px solid var(--border);
   border-radius: 12px;
   background: rgba(10, 26, 47, 0.52);
@@ -878,9 +879,32 @@ button:disabled {
 }
 
 .match-day-content {
-  padding: 12px;
+  display: grid;
+  grid-template-rows: 0fr;
+  transition: grid-template-rows 0.28s ease;
+}
+
+.match-day-content-inner {
+  min-height: 0;
+  overflow: hidden;
+  padding: 0 12px;
   display: grid;
   gap: 12px;
+  opacity: 0;
+  transform: translateY(-6px);
+  transition: opacity 0.22s ease, transform 0.28s ease, padding 0.28s ease;
+}
+
+.match-day-group[open] .match-day-content,
+.match-day-group[data-expanded="true"] .match-day-content {
+  grid-template-rows: 1fr;
+}
+
+.match-day-group[open] .match-day-content-inner,
+.match-day-group[data-expanded="true"] .match-day-content-inner {
+  padding: 12px;
+  opacity: 1;
+  transform: translateY(0);
 }
 
 .recent-match-head {
