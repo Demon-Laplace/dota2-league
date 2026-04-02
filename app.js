@@ -1150,28 +1150,34 @@ function renderRoleMembers() {
   const admins = getRoleMembersByRole("admin");
   const scorers = getRoleMembersByRole("scorer");
 
-  scorerMembersCount.textContent = `${scorers.length} 人`;
-  adminPanelSummary.textContent = `管理员 ${admins.length} 人 · 记分员 ${scorers.length} 人`;
+  if (scorerMembersCount) {
+    scorerMembersCount.textContent = `${scorers.length} 人`;
+  }
+  if (adminPanelSummary) {
+    adminPanelSummary.textContent = `管理员 ${admins.length} 人 · 记分员 ${scorers.length} 人`;
+  }
 
-  scorerMembersList.innerHTML = scorers.length
-    ? scorers.map((member, index) => `
-      <div class="admin-member-card">
-        <div>
-          <strong>${escapeHtml(getScorerDisplayName(member))}</strong>
-          ${member.allow_auto_reconnect ? '<span class="queue-slot">永久自动重连</span>' : ""}
+  if (scorerMembersList) {
+    scorerMembersList.innerHTML = scorers.length
+      ? scorers.map((member) => `
+        <div class="admin-member-card">
+          <div>
+            <strong>${escapeHtml(getScorerDisplayName(member))}</strong>
+            ${member.allow_auto_reconnect ? '<span class="queue-slot">永久自动重连</span>' : ""}
+          </div>
+          ${canCurrentUserManageRoles()
+            ? `<div class="admin-member-actions">
+                <button type="button" class="button-secondary admin-toggle-scorer-reconnect-btn" data-role-member-id="${member.id}" data-allow-auto-reconnect="${member.allow_auto_reconnect ? "true" : "false"}">
+                  ${member.allow_auto_reconnect ? "关闭永久自动重连" : "启用永久自动重连"}
+                </button>
+                <button type="button" class="button-danger admin-remove-scorer-btn" data-role-member-id="${member.id}">移除</button>
+              </div>`
+            : ""
+          }
         </div>
-        ${canCurrentUserManageRoles()
-          ? `<div class="admin-member-actions">
-              <button type="button" class="button-secondary admin-toggle-scorer-reconnect-btn" data-role-member-id="${member.id}" data-allow-auto-reconnect="${member.allow_auto_reconnect ? "true" : "false"}">
-                ${member.allow_auto_reconnect ? "关闭永久自动重连" : "启用永久自动重连"}
-              </button>
-              <button type="button" class="button-danger admin-remove-scorer-btn" data-role-member-id="${member.id}">移除</button>
-            </div>`
-          : ""
-        }
-      </div>
-    `).join("")
-    : '<p class="muted">暂无记分员</p>';
+      `).join("")
+      : '<p class="muted">暂无记分员</p>';
+  }
 
   renderAccessScorerOptions();
   renderAdminAddScorerOptions();
