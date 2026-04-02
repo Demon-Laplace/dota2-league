@@ -12,6 +12,7 @@ const ADMIN_ACCESS_PASSWORD = "我是大魔导师";
 const SCORER_ACCESS_PASSWORD = "夜神夜神夜神";
 const ACCESS_SESSION_STORAGE_KEY = "nd_dota_access_session_v1";
 const REMEMBERED_SCORER_PLAYER_KEY = "nd_dota_remembered_scorer_player_v1";
+const SKIP_NEXT_SCORER_RECONNECT_KEY = "nd_dota_skip_next_scorer_reconnect_v1";
 const ADMIN_ACTION_LOGS_STORAGE_PREFIX = "nd_dota_admin_action_logs_";
 
 const db = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
@@ -40,6 +41,7 @@ const adminPanelMessage = document.getElementById("adminPanelMessage");
 const adminClearQueueBtn = document.getElementById("adminClearQueueBtn");
 const adminClearTodayPlayersBtn = document.getElementById("adminClearTodayPlayersBtn");
 const adminResetSeasonBtn = document.getElementById("adminResetSeasonBtn");
+const adminClearScorerRememberBtn = document.getElementById("adminClearScorerRememberBtn");
 const seasonPlayersPanel = document.getElementById("seasonPlayersPanel");
 const seasonPanelTitle = document.getElementById("seasonPanelTitle");
 const seasonPlayersCount = document.getElementById("seasonPlayersCount");
@@ -927,6 +929,24 @@ function writeRememberedScorerPlayerId(playerId) {
   }
 }
 
+function shouldSkipNextScorerReconnect() {
+  try {
+    return window.sessionStorage.getItem(SKIP_NEXT_SCORER_RECONNECT_KEY) === "true";
+  } catch {
+    return false;
+  }
+}
+
+function setSkipNextScorerReconnect(shouldSkip) {
+  try {
+    if (!shouldSkip) {
+      window.sessionStorage.removeItem(SKIP_NEXT_SCORER_RECONNECT_KEY);
+      return;
+    }
+    window.sessionStorage.setItem(SKIP_NEXT_SCORER_RECONNECT_KEY, "true");
+  } catch {}
+}
+
 function writeStoredAccessSession(session) {
   currentAccessSession = {
     role: session?.role || "viewer",
@@ -951,10 +971,14 @@ function clearStoredAccessSession() {
 }
 
 function tryReconnectRememberedScorer() {
+  if (shouldSkipNextScorerReconnect()) {
+    setSkipNextScorerReconnect(false);
+    return false;
+  }
   const rememberedPlayerId = readRememberedScorerPlayerId();
   if (!rememberedPlayerId) return false;
   const scorerMember = getRoleMembersByRole("scorer").find((member) => member.player_id === rememberedPlayerId);
-  if (!scorerMember) return false;
+  if (!scorerMember || !scorerMember.allow_auto_reconnect) return false;
 
   writeStoredAccessSession({
     role: "scorer",
@@ -1108,9 +1132,15 @@ function renderRoleMembers() {
       <div class="admin-member-card">
         <div>
           <strong>${escapeHtml(getScorerDisplayName(member))}</strong>
+          ${member.allow_auto_reconnect ? '<span class="queue-slot">永久自动重连</span>' : ""}
         </div>
         ${canCurrentUserManageRoles()
-          ? `<button type="button" class="button-danger admin-remove-scorer-btn" data-role-member-id="${member.id}">移除</button>`
+          ? `<div class="admin-member-actions">
+              <button type="button" class="button-secondary admin-toggle-scorer-reconnect-btn" data-role-member-id="${member.id}" data-allow-auto-reconnect="${member.allow_auto_reconnect ? "true" : "false"}">
+                ${member.allow_auto_reconnect ? "关闭永久自动重连" : "启用永久自动重连"}
+              </button>
+              <button type="button" class="button-danger admin-remove-scorer-btn" data-role-member-id="${member.id}">移除</button>
+            </div>`
           : ""
         }
       </div>
@@ -1194,6 +1224,7 @@ function applyRolePermissions() {
   adminClearQueueBtn.disabled = !isAdmin;
   adminClearTodayPlayersBtn.disabled = !isAdmin;
   adminResetSeasonBtn.disabled = !isAdmin;
+  adminClearScorerRememberBtn.disabled = !isAdmin;
 
   if (canScore) {
     setMatchFormOpen(isMatchFormOpen);
@@ -3191,10 +3222,17 @@ async function loadActiveSeason() {
 }
 
 async function loadRoleMembers() {
-  const { data, error } = await db
+  let { data, error } = await db
     .from("app_role_members")
-    .select("id, role, player_id, created_at")
+    .select("id, role, player_id, allow_auto_reconnect, created_at")
     .order("created_at", { ascending: true });
+
+  if (error && String(error.message || "").includes("allow_auto_reconnect")) {
+    ({ data, error } = await db
+      .from("app_role_members")
+      .select("id, role, player_id, created_at")
+      .order("created_at", { ascending: true }));
+  }
 
   if (error) {
     console.error("加载角色成员失败：", error);
@@ -3207,6 +3245,7 @@ async function loadRoleMembers() {
   const nameMap = new Map(seasonPlayers.map((player) => [player.id, player.display_name]));
   roleMembers = (data || []).map((member) => ({
     ...member,
+    allow_auto_reconnect: Boolean(member.allow_auto_reconnect),
     display_name: member.player_id ? (nameMap.get(member.player_id) || "未命名选手") : "",
   }));
   validateStoredAccessSession();
@@ -3273,6 +3312,30 @@ async function removeScorerRole(memberId) {
   await loadRoleMembers();
 }
 
+async function toggleScorerAutoReconnect(memberId, shouldAllow) {
+  if (!ensureAdminAccess("仅管理员可调整记分员自动重连。")) return;
+  if (!memberId) return;
+
+  const member = getRoleAssignmentById(memberId);
+  if (!member || member.role !== "scorer") return;
+
+  setAdminPanelMessage(shouldAllow ? "正在启用永久自动重连..." : "正在关闭永久自动重连...");
+
+  const { error } = await db
+    .from("app_role_members")
+    .update({ allow_auto_reconnect: shouldAllow })
+    .eq("id", memberId);
+
+  if (error) {
+    setAdminPanelMessage(`更新自动重连失败：${error.message}。请先在 Supabase 执行最新 SQL。`, true);
+    return;
+  }
+
+  setAdminPanelMessage(shouldAllow ? "已启用永久自动重连。" : "已关闭永久自动重连。");
+  appendAdminActionLog(`${shouldAllow ? "启用" : "关闭"}了记分员 ${member.display_name || "该选手"} 的永久自动重连。`);
+  await loadRoleMembers();
+}
+
 async function confirmAccessRole() {
   const password = normalizeAccessPassword(accessPasswordInput.value);
   const selectedPlayerId = accessScorerSelect.value;
@@ -3333,11 +3396,21 @@ async function confirmAccessRole() {
   setAccessMessage("口令错误。", true);
 }
 
+function clearRememberedScorerAutoLogin({ silent = false } = {}) {
+  writeRememberedScorerPlayerId("");
+  setSkipNextScorerReconnect(false);
+  if (!silent) {
+    setAdminPanelMessage("已清空本机记分员自动登录状态。");
+    appendAdminActionLog("清空了本机记分员自动登录状态。");
+  }
+}
+
 function exitAccessRole() {
   const previousRole = currentAccessSession.role;
   if (previousRole === "scorer") {
     const confirmed = window.confirm("确认退出当前记分员身份吗？");
     if (!confirmed) return;
+    setSkipNextScorerReconnect(true);
   }
   clearStoredAccessSession();
   renderRoleMembers();
@@ -4897,6 +4970,10 @@ clearTodayPlayersBtn.addEventListener("click", clearTodayPlayersForTesting);
 adminClearQueueBtn.addEventListener("click", clearSignupQueueForTesting);
 adminClearTodayPlayersBtn.addEventListener("click", clearTodayPlayersForTesting);
 adminResetSeasonBtn.addEventListener("click", resetCurrentSeason);
+adminClearScorerRememberBtn.addEventListener("click", () => {
+  if (!ensureAdminAccess("仅管理员可清空本机记分员自动登录。")) return;
+  clearRememberedScorerAutoLogin();
+});
 adminAddScorerBtn.addEventListener("click", () => addScorerRoleByPlayer(adminAddScorerSelect.value));
 recordMatchBtn.addEventListener("click", recordMatch);
 recordBackfillBtn.addEventListener("click", recordBackfillMatch);
@@ -5310,6 +5387,14 @@ accessPasswordInput.addEventListener("keydown", async (event) => {
 });
 
 scorerMembersList.addEventListener("click", async (event) => {
+  const toggleButton = event.target.closest(".admin-toggle-scorer-reconnect-btn");
+  if (toggleButton) {
+    await toggleScorerAutoReconnect(
+      toggleButton.dataset.roleMemberId,
+      toggleButton.dataset.allowAutoReconnect !== "true"
+    );
+    return;
+  }
   const button = event.target.closest(".admin-remove-scorer-btn");
   if (!button) return;
   await removeScorerRole(button.dataset.roleMemberId);

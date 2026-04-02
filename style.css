@@ -454,6 +454,13 @@ button.season-total {
   background: rgba(14, 31, 54, 0.62);
 }
 
+.admin-member-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
 .admin-action-log-card {
   padding: 10px 12px;
   border-radius: 12px;

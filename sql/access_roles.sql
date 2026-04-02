@@ -6,8 +6,12 @@ create table if not exists public.app_role_members (
   id uuid primary key default gen_random_uuid(),
   role text not null check (role in ('admin', 'scorer')),
   player_id uuid references public.players(id) on delete cascade,
+  allow_auto_reconnect boolean not null default false,
   created_at timestamptz not null default now()
 );
+
+alter table public.app_role_members
+add column if not exists allow_auto_reconnect boolean not null default false;
 
 create unique index if not exists idx_app_role_members_unique_scorer_player
 on public.app_role_members (player_id)
