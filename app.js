@@ -2697,8 +2697,9 @@ function getBronzeFeederPlayerIds(data, matches) {
     .map((player) => ({
       playerId: player.player_id || player.id,
       losses: lossMap.get(player.player_id || player.id) || 0,
+      gamesPlayed: Number(player.games_played ?? 0),
     }))
-    .filter((entry) => entry.playerId);
+    .filter((entry) => entry.playerId && entry.gamesPlayed > 15);
 
   if (entries.length < 2) return new Set();
 
@@ -5141,7 +5142,7 @@ function renderLeaderboard(data) {
     });
 
     if (highestRewardIds.has(playerId)) {
-      tags.push({ icon: "¤", label: "金主", tone: "gold" });
+      tags.push({ icon: "¤", label: "金主", tone: "gold", description: "赛季最大赞助人" });
     }
 
     if (activeSeason?.koi_player_id && playerId === activeSeason.koi_player_id) {
@@ -5161,19 +5162,19 @@ function renderLeaderboard(data) {
     }
 
     if (bronzeFeederIds.has(playerId)) {
-      tags.push({ icon: "◈", label: "送分童子", tone: "brass", description: "本赛季常规败场明显多于其他人。" });
+      tags.push({ icon: "◈", label: "送分童子", tone: "brass", description: "本赛季常规败场明显多于其他人" });
     }
 
     if (goldenTouchIds.has(playerId)) {
-      tags.push({ icon: "✶", label: "点金手", tone: "sun", description: "靠双倍、锦鲤等加成拿到的额外积分最多。" });
+      tags.push({ icon: "✶", label: "点金手", tone: "sun", description: "靠双倍、锦鲤等加成拿到的额外积分最多" });
     }
 
     if (teammateAffinity.unluckyId && teammateAffinity.unluckyId === playerId) {
-      tags.push({ icon: "⚡", label: "避雷针", tone: "storm", description: "和他同队时，队友整体更容易输掉比赛。" });
+      tags.push({ icon: "⚡", label: "避雷针", tone: "storm", description: "和他同队时，队友整体更容易输掉比赛" });
     }
 
     if (teammateAffinity.luckyId && teammateAffinity.luckyId === playerId) {
-      tags.push({ icon: "✿", label: "幸运星", tone: "pink", description: "和他同队时，队友整体更容易赢下比赛。" });
+      tags.push({ icon: "✿", label: "幸运星", tone: "pink", description: "和他同队时，队友整体更容易赢下比赛" });
     }
 
     const nemesis = nemesisMap.get(playerId);
@@ -5183,7 +5184,7 @@ function renderLeaderboard(data) {
         icon: "✹",
         label: `${opponentName}的一生之敌`,
         tone: "inferno",
-        description: `面对 ${opponentName} 时，这位选手会明显更难赢。`,
+        description: `面对 ${opponentName} 时，这位选手会明显更难赢`,
       });
     }
 
