@@ -132,6 +132,17 @@
           <div id="adminActionLogsList" class="admin-action-logs"></div>
           <p id="adminActionLogsEmpty" class="muted">当前还没有操作记录</p>
         </section>
+        <section class="admin-panel-card">
+          <div class="section-head">
+            <div>
+              <h3>高级维护</h3>
+              <p class="muted">用于按当前数据库规则重新汇算当前赛季积分、场次与胜负。</p>
+            </div>
+          </div>
+          <div class="row admin-panel-actions">
+            <button id="adminRecalculateScoresBtn" class="button-secondary" type="button">高级重新汇算当前分数</button>
+          </div>
+        </section>
       </div>
       <p id="adminPanelMessage" class="message"></p>
     </section>
@@ -447,6 +458,6 @@
   </div>
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="app.js?v=20260403-34"></script>
+  <script src="app.js?v=20260403-36"></script>
 </body>
 </html>

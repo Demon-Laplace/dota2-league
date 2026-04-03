@@ -49,6 +49,7 @@ const adminPanelMessage = document.getElementById("adminPanelMessage");
 const adminClearQueueBtn = document.getElementById("adminClearQueueBtn");
 const adminClearTodayPlayersBtn = document.getElementById("adminClearTodayPlayersBtn");
 const adminResetSeasonBtn = document.getElementById("adminResetSeasonBtn");
+const adminRecalculateScoresBtn = document.getElementById("adminRecalculateScoresBtn");
 const adminClearScorerRememberBtn = document.getElementById("adminClearScorerRememberBtn");
 const seasonPlayersPanel = document.getElementById("seasonPlayersPanel");
 const seasonPanelTitle = document.getElementById("seasonPanelTitle");
@@ -1962,6 +1963,9 @@ function applyRolePermissions() {
   adminClearQueueBtn.disabled = !isAdmin;
   adminClearTodayPlayersBtn.disabled = !isAdmin;
   adminResetSeasonBtn.disabled = !isAdmin;
+  if (adminRecalculateScoresBtn) {
+    adminRecalculateScoresBtn.disabled = !isAdmin || !activeSeason?.id;
+  }
   adminClearScorerRememberBtn.disabled = !isAdmin;
 
   if (canScore) {
@@ -2463,6 +2467,15 @@ function getTodayRecordedMatchCount(seasonId = activeSeason?.id) {
     const matchDate = match.match_date || formatArchiveDate(match.created_at) || "";
     return (!seasonId || matchSeasonId === seasonId) && matchDate === today;
   }).length;
+}
+
+function updateFinishTodayMatchDayButtonLabel() {
+  if (!finishTodayMatchDayBtn) return;
+  const hasTodayMatches = getTodayRecordedMatchCount(activeSeason?.id) > 0;
+  const label = hasTodayMatches ? "结束比赛日" : "今日休战";
+  finishTodayMatchDayBtn.textContent = label;
+  finishTodayMatchDayBtn.title = hasTodayMatches ? "结束今日比赛日并结算未参赛加减分" : "今日无比赛，直接设置休战";
+  finishTodayMatchDayBtn.setAttribute("aria-label", finishTodayMatchDayBtn.title);
 }
 
 function getBackfillDateMaxValue() {
@@ -3769,6 +3782,7 @@ function renderSeasonPlayersPanel() {
 
 function renderMatchDayStatus() {
   const storedStartTime = readStoredMatchDayStartTime();
+  updateFinishTodayMatchDayButtonLabel();
   if (finishTodayMatchDayBtn) {
     finishTodayMatchDayBtn.disabled = !isCurrentRoleScorer() || !activeSeason?.id;
   }
@@ -5525,6 +5539,7 @@ async function loadRecentMatches() {
   }
 
   recentMatchesData = data || [];
+  updateFinishTodayMatchDayButtonLabel();
   const attendanceNotes = attendanceResult?.error
     ? []
     : (attendanceResult?.data || []).map((entry) => ({
@@ -5601,6 +5616,54 @@ async function resetCurrentSeason() {
   await loadRewardLogs();
   requestImmediateRefresh({
     seasonContext: true,
+  });
+}
+
+async function recalculateCurrentScores() {
+  if (!ensureAdminAccess("仅管理员可执行高级重新汇算。")) return;
+  if (!activeSeason?.id) {
+    setAdminPanelMessage("当前没有可重新汇算的赛季。", true);
+    return;
+  }
+
+  const confirmed = window.confirm(
+    `确认按当前数据库规则重新汇算 ${activeSeason.name} 的积分吗？这会全量重算积分、场次、胜负与相关衍生统计。`
+  );
+  if (!confirmed) return;
+
+  const confirmText = window.prompt('请输入“重新汇算”以继续执行：', "");
+  if (confirmText !== "重新汇算") {
+    setAdminPanelMessage("未输入正确确认文字，已取消重新汇算。", true);
+    return;
+  }
+
+  if (adminRecalculateScoresBtn) {
+    adminRecalculateScoresBtn.disabled = true;
+  }
+  setAdminPanelMessage("正在按当前规则重新汇算积分...");
+  setMessage("正在按当前规则重新汇算积分...");
+
+  const { error } = await db.rpc("recalculate_all_scores");
+
+  if (adminRecalculateScoresBtn) {
+    adminRecalculateScoresBtn.disabled = !isCurrentRoleAdmin() || !activeSeason?.id;
+  }
+
+  if (error) {
+    setAdminPanelMessage(`重新汇算失败：${error.message}。请先在 Supabase 执行最新 SQL。`, true);
+    setMessage(`重新汇算失败：${error.message}。请先在 Supabase 执行最新 SQL。`, true);
+    return;
+  }
+
+  scoreDetailSeasonCache.clear();
+  setAdminPanelMessage("当前赛季积分已按最新规则重新汇算。");
+  setMessage("当前赛季积分已按最新规则重新汇算。");
+  appendAdminActionLog(`手动触发了 ${activeSeason.name} 的高级重新汇算。`);
+  requestImmediateRefresh({
+    playerDriven: true,
+    leaderboard: true,
+    recentMatches: true,
+    rewardLogs: true,
   });
 }
 
@@ -7044,6 +7107,9 @@ adminExitModeBtn.addEventListener("click", exitAccessRole);
 closeScorerPanelBtn.addEventListener("click", () => setScorerPanelOpen(false));
 closeAdminPanelBtn.addEventListener("click", () => setAdminPanelOpen(false));
 resetSeasonBtn.addEventListener("click", resetCurrentSeason);
+if (adminRecalculateScoresBtn) {
+  adminRecalculateScoresBtn.addEventListener("click", recalculateCurrentScores);
+}
 startMatchDayBtn.addEventListener("click", async () => {
   if (activeMatchDay) {
     await cancelMatchDay();
