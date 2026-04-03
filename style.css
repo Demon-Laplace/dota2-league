@@ -1693,6 +1693,53 @@ button:disabled {
   color: #eef6ff;
 }
 
+.player-kda-row {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.player-kda-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 7px;
+  border-radius: 999px;
+  border: 1px solid rgba(124, 165, 209, 0.16);
+  background: rgba(8, 22, 38, 0.42);
+  font-size: 11px;
+  color: #9fb6d3;
+}
+
+.player-kda-chip span {
+  font-weight: 700;
+  letter-spacing: 0.04em;
+}
+
+.player-kda-input {
+  width: 52px;
+  min-width: 52px;
+  padding: 3px 6px;
+  border-radius: 8px;
+  border: 1px solid rgba(124, 165, 209, 0.2);
+  background: rgba(11, 26, 43, 0.92);
+  color: #eff6ff;
+  font-size: 12px;
+  text-align: center;
+  box-shadow: none;
+}
+
+.player-kda-input::-webkit-outer-spin-button,
+.player-kda-input::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+.player-kda-input[type="number"] {
+  -moz-appearance: textfield;
+}
+
 .player-double-toggle {
   width: 30px;
   height: 30px;
@@ -2386,6 +2433,7 @@ button:disabled {
   display: inline-flex;
   align-items: center;
   gap: 7px;
+  flex-wrap: wrap;
   padding: 0;
   color: var(--text);
   background: transparent;
@@ -2403,6 +2451,18 @@ button:disabled {
   filter: none;
   text-decoration: underline;
   text-decoration-color: rgba(150, 206, 255, 0.5);
+}
+
+.match-player-kda-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 1px 7px;
+  border-radius: 999px;
+  border: 1px solid rgba(133, 178, 224, 0.2);
+  background: rgba(13, 31, 52, 0.4);
+  color: #bfd6ec;
+  font-size: 11px;
+  letter-spacing: 0.01em;
 }
 
 .match-effect-logs {

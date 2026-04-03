@@ -187,6 +187,8 @@ let backfillTeamSelections = {
 };
 let matchHeroAssignments = {};
 let backfillHeroAssignments = {};
+let matchKdaAssignments = {};
+let backfillKdaAssignments = {};
 let matchDoubleState = {
   teamAUserId: "",
   teamBUserId: "",
@@ -2728,13 +2730,16 @@ function restoreMatchDayAttendanceNoteLocally(entry) {
   }
 }
 
-function buildOptimisticMatchRecord(matchId, seasonId, matchDayId, matchDate, winner, note, teamAIds, teamBIds, assignments, doubleDowns, createdAt = new Date().toISOString()) {
+function buildOptimisticMatchRecord(matchId, seasonId, matchDayId, matchDate, winner, note, teamAIds, teamBIds, assignments, kdaAssignments, doubleDowns, createdAt = new Date().toISOString()) {
   const playerMap = new Map(seasonPlayers.map((player) => [player.id, player.display_name]));
   const buildPlayerRows = (ids, team) => ids.map((playerId) => ({
     player_id: playerId,
     display_name: playerMap.get(playerId) || "未知选手",
     team,
     hero_name: assignments[playerId] || null,
+    kills: normalizeKdaValue(kdaAssignments?.[playerId]?.kills),
+    deaths: normalizeKdaValue(kdaAssignments?.[playerId]?.deaths),
+    assists: normalizeKdaValue(kdaAssignments?.[playerId]?.assists),
     score_change: 0,
     reward_change: 0,
   }));
@@ -3154,7 +3159,7 @@ function buildDoubleDownPayload(formType) {
   return { error: "", payload };
 }
 
-function syncTeamSelections(state, players, assignments = {}) {
+function syncTeamSelections(state, players, assignments = {}, kdaAssignments = {}) {
   const playerIds = new Set(players.map((player) => player.id));
   state.teamA = state.teamA.filter((playerId) => playerIds.has(playerId));
   state.teamB = state.teamB.filter(
@@ -3164,6 +3169,12 @@ function syncTeamSelections(state, players, assignments = {}) {
   Object.keys(assignments).forEach((playerId) => {
     if (!state.teamA.includes(playerId) && !state.teamB.includes(playerId)) {
       delete assignments[playerId];
+    }
+  });
+
+  Object.keys(kdaAssignments).forEach((playerId) => {
+    if (!state.teamA.includes(playerId) && !state.teamB.includes(playerId)) {
+      delete kdaAssignments[playerId];
     }
   });
 }
@@ -3181,6 +3192,87 @@ function buildHeroBadge(heroName) {
   return heroName
     ? `<span class="match-picked-hero">${escapeHtml(getHeroDisplayName(heroName))}</span>`
     : '<span class="muted">未选英雄</span>';
+}
+
+function normalizeKdaValue(value) {
+  if (value === "" || value === null || typeof value === "undefined") return null;
+  const numericValue = Number.parseInt(String(value).trim(), 10);
+  if (!Number.isFinite(numericValue) || numericValue < 0) return null;
+  return numericValue;
+}
+
+function normalizeKdaEntry(entry = {}) {
+  return {
+    kills: normalizeKdaValue(entry.kills),
+    deaths: normalizeKdaValue(entry.deaths),
+    assists: normalizeKdaValue(entry.assists),
+  };
+}
+
+function hasKdaEntryValue(entry = {}) {
+  const normalized = normalizeKdaEntry(entry);
+  return normalized.kills !== null || normalized.deaths !== null || normalized.assists !== null;
+}
+
+function getKdaAssignmentsByFormType(formType) {
+  return formType === "backfill" ? backfillKdaAssignments : matchKdaAssignments;
+}
+
+function getPlayerKdaEntry(formType, playerId) {
+  const assignments = getKdaAssignmentsByFormType(formType);
+  return normalizeKdaEntry(assignments[playerId] || {});
+}
+
+function setPlayerKdaField(formType, playerId, field, value) {
+  if (!playerId || !["kills", "deaths", "assists"].includes(field)) return;
+  const assignments = getKdaAssignmentsByFormType(formType);
+  const nextEntry = {
+    ...(assignments[playerId] || {}),
+    [field]: normalizeKdaValue(value),
+  };
+
+  if (hasKdaEntryValue(nextEntry)) {
+    assignments[playerId] = normalizeKdaEntry(nextEntry);
+  } else {
+    delete assignments[playerId];
+  }
+}
+
+function buildPlayerKdaInputsHtml(formType, playerId) {
+  const entry = getPlayerKdaEntry(formType, playerId);
+  const buildInput = (field, label) => `
+    <label class="player-kda-chip" title="${label}">
+      <span>${label}</span>
+      <input
+        type="number"
+        min="0"
+        step="1"
+        inputmode="numeric"
+        class="player-kda-input"
+        data-role="player-kda-input"
+        data-form-type="${formType}"
+        data-player-id="${playerId}"
+        data-kda-field="${field}"
+        value="${entry[field] ?? ""}"
+        placeholder="-"
+      />
+    </label>
+  `;
+
+  return `
+    <div class="player-kda-row">
+      ${buildInput("kills", "K")}
+      ${buildInput("deaths", "D")}
+      ${buildInput("assists", "A")}
+    </div>
+  `;
+}
+
+function buildPlayerKdaSummaryHtml(entry = {}) {
+  const normalized = normalizeKdaEntry(entry);
+  if (!hasKdaEntryValue(normalized)) return "";
+  const getDisplayValue = (value) => (value === null ? "-" : String(value));
+  return `<span class="match-player-kda-badge">KDA ${getDisplayValue(normalized.kills)}/${getDisplayValue(normalized.deaths)}/${getDisplayValue(normalized.assists)}</span>`;
 }
 
 function buildSingleDoubleOptionsHtml(formType, player, allSelectedPlayers) {
@@ -3219,11 +3311,12 @@ function renderTeamSelectionUI({
   players,
   selections,
   assignments,
+  kdaAssignments,
   teamAContainer,
   teamBContainer,
   formType,
 }) {
-  syncTeamSelections(selections, players, assignments);
+  syncTeamSelections(selections, players, assignments, kdaAssignments);
   const groupedPlayers = [
     { title: "核心", players: players.filter((player) => player.player_rank === "core") },
     { title: "辅助", players: players.filter((player) => player.player_rank === "support") },
@@ -3263,6 +3356,7 @@ function renderTeamSelectionUI({
               title="个人双倍"
             >◉</button>
           </div>
+          ${buildPlayerKdaInputsHtml(formType, player.id)}
           <div class="player-double-options${singleDoublePickerOpen[formType][player.id] || getSingleDoubleTargetByUser(formType, player.id) ? " player-double-options-open" : ""}">
             ${buildSingleDoubleOptionsHtml(formType, player, getSelectedPlayersByFormType(formType))}
           </div>
@@ -3323,6 +3417,7 @@ function refreshMatchSelectOptions() {
     players: getTodayMatchPlayers(),
     selections: matchTeamSelections,
     assignments: matchHeroAssignments,
+    kdaAssignments: matchKdaAssignments,
     teamAContainer: teamAFields,
     teamBContainer: teamBFields,
     formType: "match",
@@ -3334,6 +3429,7 @@ function refreshBackfillSelectOptions() {
     players: backfillPlayers,
     selections: backfillTeamSelections,
     assignments: backfillHeroAssignments,
+    kdaAssignments: backfillKdaAssignments,
     teamAContainer: backfillTeamAFields,
     teamBContainer: backfillTeamBFields,
     formType: "backfill",
@@ -4033,6 +4129,9 @@ function renderMatchForm() {
   recordMatchBtn.disabled = !canUseForm || !hasCompleteTeams;
   closeMatchFormBtn.disabled = false;
   openMatchFormBtn.disabled = isMatchFormOpen;
+  [...matchFormPanel.querySelectorAll('[data-role="player-kda-input"]')].forEach((input) => {
+    input.disabled = !canUseForm;
+  });
   [...matchFormPanel.querySelectorAll('[data-role="winner-toggle"]')].forEach((button) => {
     button.disabled = !canUseForm;
   });
@@ -4052,6 +4151,9 @@ function renderBackfillForm() {
   backfillMatchNoteInput.disabled = !hasSeason || !hasEnoughPlayers;
   recordBackfillBtn.disabled = !hasSeason || !hasEnoughPlayers || !backfillDateInput.value;
   recordBackfillBtn.textContent = editingMatchId ? "保存修改" : "保存补录比赛";
+  [...backfillFormPanel.querySelectorAll('[data-role="player-kda-input"]')].forEach((input) => {
+    input.disabled = !hasSeason || !hasEnoughPlayers;
+  });
   [...backfillFormPanel.querySelectorAll('[data-role="winner-toggle"]')].forEach((button) => {
     button.disabled = !hasSeason || !hasEnoughPlayers;
   });
@@ -4066,6 +4168,7 @@ function clearMatchForm() {
     teamB: [],
   };
   matchHeroAssignments = {};
+  matchKdaAssignments = {};
   matchDoubleState = {
     teamAUserId: "",
     teamBUserId: "",
@@ -4087,6 +4190,7 @@ function clearBackfillForm() {
     teamB: [],
   };
   backfillHeroAssignments = {};
+  backfillKdaAssignments = {};
   backfillDoubleState = {
     teamAUserId: "",
     teamBUserId: "",
@@ -4915,6 +5019,7 @@ function renderRecentMatches(groups) {
               wrapperClassName: "player-name-stack recent-match-player-name",
             })}
             ${player.hero_name ? `<span class="match-picked-hero match-picked-hero-${teamKey}">${escapeHtml(getHeroDisplayName(player.hero_name))}</span>` : '<span class="muted">未选英雄</span>'}
+            ${buildPlayerKdaSummaryHtml(player)}
           </button>
         </li>
       `).join("");
@@ -6644,6 +6749,25 @@ function validateBackfillPlayers(teamAIds, teamBIds) {
   return "";
 }
 
+function buildPlayerAssignmentsPayload(teamAIds, teamBIds, heroAssignments = {}, kdaAssignments = {}) {
+  return [...teamAIds, ...teamBIds].map((playerId) => {
+    const heroName = heroAssignments[playerId] || null;
+    const kdaEntry = normalizeKdaEntry(kdaAssignments[playerId] || {});
+    return {
+      player_id: playerId,
+      hero_name: heroName,
+      kills: kdaEntry.kills,
+      deaths: kdaEntry.deaths,
+      assists: kdaEntry.assists,
+    };
+  }).filter((item) =>
+    item.hero_name
+    || item.kills !== null
+    || item.deaths !== null
+    || item.assists !== null
+  );
+}
+
 async function recordMatch() {
   if (!ensureScorerAccess("仅记分员或管理员可登记比赛。")) return;
   if (!activeMatchDay && !activeSeason?.id) {
@@ -6655,7 +6779,14 @@ async function recordMatch() {
   const winner = winnerSelect.value || null;
   const matchNoteValue = matchNoteInput.value.trim() || null;
   const currentMatchHeroAssignments = { ...matchHeroAssignments };
+  const currentMatchKdaAssignments = { ...matchKdaAssignments };
   const { error: doubleError, payload: doubleDownPayload } = buildDoubleDownPayload("match");
+  const playerAssignments = buildPlayerAssignmentsPayload(
+    teamAIds,
+    teamBIds,
+    matchHeroAssignments,
+    matchKdaAssignments
+  );
   const validationError = validateMatchPlayers(teamAIds, teamBIds);
 
   if (validationError) {
@@ -6707,19 +6838,14 @@ async function recordMatch() {
     return;
   }
 
-  const matchHeroRows = [
-    ...teamAIds.map((playerId) => ({ player_id: playerId, hero_name: matchHeroAssignments[playerId] || null })),
-    ...teamBIds.map((playerId) => ({ player_id: playerId, hero_name: matchHeroAssignments[playerId] || null })),
-  ].filter((item) => item.hero_name);
-
-  if (matchHeroRows.length) {
+  if (playerAssignments.length) {
     const { error: heroError } = await db.rpc("update_match_result_heroes", {
       p_match_id: matchId,
-      p_assignments: matchHeroRows,
+      p_assignments: playerAssignments,
     });
 
     if (heroError) {
-      setMatchMessage(`比赛已保存，但英雄信息保存失败：${heroError.message}。请先在 Supabase 执行对应 SQL。`, true);
+      setMatchMessage(`比赛已保存，但英雄或 KDA 信息保存失败：${heroError.message}。请先在 Supabase 执行对应 SQL。`, true);
     }
   }
 
@@ -6736,6 +6862,7 @@ async function recordMatch() {
     teamAIds,
     teamBIds,
     currentMatchHeroAssignments,
+    currentMatchKdaAssignments,
     doubleDownPayload,
     new Date().toISOString()
   ));
@@ -6755,11 +6882,14 @@ async function recordBackfillMatch() {
   const isEditing = Boolean(editingMatchId);
   const backfillNoteValue = backfillMatchNoteInput.value.trim() || null;
   const currentBackfillHeroAssignments = { ...backfillHeroAssignments };
+  const currentBackfillKdaAssignments = { ...backfillKdaAssignments };
   const { error: doubleError, payload: doubleDownPayload } = buildDoubleDownPayload("backfill");
-  const heroAssignments = [
-    ...teamAIds.map((playerId) => ({ player_id: playerId, hero_name: backfillHeroAssignments[playerId] || null })),
-    ...teamBIds.map((playerId) => ({ player_id: playerId, hero_name: backfillHeroAssignments[playerId] || null })),
-  ];
+  const heroAssignments = buildPlayerAssignmentsPayload(
+    teamAIds,
+    teamBIds,
+    backfillHeroAssignments,
+    backfillKdaAssignments
+  );
   const validationError = validateBackfillPlayers(teamAIds, teamBIds);
 
   if (validationError) {
@@ -6811,7 +6941,12 @@ async function recordBackfillMatch() {
     return;
   }
 
-  const backfillHeroRows = heroAssignments.filter((item) => item.hero_name);
+  const backfillHeroRows = heroAssignments.filter((item) =>
+    item.hero_name
+    || item.kills !== null
+    || item.deaths !== null
+    || item.assists !== null
+  );
 
   if (!isEditing && backfillHeroRows.length) {
     const { error: heroError } = await db.rpc("update_match_result_heroes", {
@@ -6820,7 +6955,7 @@ async function recordBackfillMatch() {
     });
 
     if (heroError) {
-      setBackfillMessage(`补录比赛已保存，但英雄信息保存失败：${heroError.message}。请先在 Supabase 执行对应 SQL。`, true);
+      setBackfillMessage(`补录比赛已保存，但英雄或 KDA 信息保存失败：${heroError.message}。请先在 Supabase 执行对应 SQL。`, true);
     }
   }
 
@@ -6838,6 +6973,7 @@ async function recordBackfillMatch() {
       teamAIds,
       teamBIds,
       currentBackfillHeroAssignments,
+      currentBackfillKdaAssignments,
       doubleDownPayload,
       new Date().toISOString()
     ));
@@ -6895,6 +7031,11 @@ async function startEditingMatch(matchId) {
   };
   backfillHeroAssignments = Object.fromEntries(
     players.map((player) => [player.player_id, player.hero_name || ""])
+  );
+  backfillKdaAssignments = Object.fromEntries(
+    players
+      .map((player) => [player.player_id, normalizeKdaEntry(player)])
+      .filter(([, entry]) => hasKdaEntryValue(entry))
   );
   backfillDoubleState = {
     teamAUserId: doubleDowns.find((item) => item.mode === "team" && item.target_team === "A")?.user_player_id || "",
@@ -7307,13 +7448,44 @@ matchFormPanel.addEventListener("click", (event) => {
   togglePlayerSelection(chip.dataset.formType || "match", chip.dataset.team, chip.dataset.playerId);
 });
 
-matchFormPanel.addEventListener("change", () => {});
+matchFormPanel.addEventListener("input", (event) => {
+  const kdaInput = event.target.closest('[data-role="player-kda-input"]');
+  if (!kdaInput) return;
+  setPlayerKdaField(
+    "match",
+    kdaInput.dataset.playerId || "",
+    kdaInput.dataset.kdaField || "",
+    kdaInput.value
+  );
+});
 
 backfillFormPanel.addEventListener("change", async (event) => {
   if (event.target === backfillSeasonSelect) {
     clearBackfillForm();
     await loadPlayersForSeason(backfillSeasonSelect.value);
+    return;
   }
+
+  const kdaInput = event.target.closest('[data-role="player-kda-input"]');
+  if (kdaInput) {
+    setPlayerKdaField(
+      "backfill",
+      kdaInput.dataset.playerId || "",
+      kdaInput.dataset.kdaField || "",
+      kdaInput.value
+    );
+  }
+});
+
+backfillFormPanel.addEventListener("input", (event) => {
+  const kdaInput = event.target.closest('[data-role="player-kda-input"]');
+  if (!kdaInput) return;
+  setPlayerKdaField(
+    "backfill",
+    kdaInput.dataset.playerId || "",
+    kdaInput.dataset.kdaField || "",
+    kdaInput.value
+  );
 });
 
 backfillFormPanel.addEventListener("click", (event) => {
