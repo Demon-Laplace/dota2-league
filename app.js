@@ -1477,6 +1477,12 @@ function buildScoreDetailEntries(player, seasonData) {
         roundLabel,
         formatShortLocalTime(match.created_at),
       ].filter(Boolean);
+      const teamAPlayers = players
+        .filter((item) => item.team === "A")
+        .map((item) => getCompactPlayerDisplayName(item.display_name));
+      const teamBPlayers = players
+        .filter((item) => item.team === "B")
+        .map((item) => getCompactPlayerDisplayName(item.display_name));
       const subtitleParts = [
         getWinnerLabel(match.winner_team),
         getTeamLabel(targetPlayer.team),
@@ -1488,6 +1494,11 @@ function buildScoreDetailEntries(player, seasonData) {
         title: `${roundLabel} · ${getWinnerLabel(match.winner_team)}`,
         subtitle: subtitleParts.join(" · "),
         meta: metaParts.join(" · "),
+        matchup: {
+          teamA: teamAPlayers,
+          teamB: teamBPlayers,
+          targetTeam: targetPlayer.team,
+        },
         badges,
       });
     });
@@ -1631,6 +1642,23 @@ function renderScoreDetailContent(player, detail) {
     return;
   }
 
+  const renderMatchupHtml = (entry) => {
+    if (!entry.matchup) return "";
+    const renderTeam = (teamKey, label, names) => `
+      <div class="score-detail-match-team${entry.matchup.targetTeam === teamKey ? " score-detail-match-team-active" : ""}">
+        <span class="score-detail-match-team-label">${label}</span>
+        <span class="score-detail-match-team-names">${escapeHtml((names || []).join("·") || "待补充")}</span>
+      </div>
+    `;
+
+    return `
+      <div class="score-detail-matchup">
+        ${renderTeam("A", "天辉", entry.matchup.teamA)}
+        ${renderTeam("B", "夜魇", entry.matchup.teamB)}
+      </div>
+    `;
+  };
+
   scoreDetailList.innerHTML = [...detail.entries].reverse().map((entry) => `
     <article class="score-detail-item">
       <div class="score-detail-item-head">
@@ -1641,6 +1669,7 @@ function renderScoreDetailContent(player, detail) {
         <span class="score-detail-delta ${entry.delta >= 0 ? "score-detail-delta-positive" : "score-detail-delta-negative"}">${formatSignedScore(entry.delta)}</span>
       </div>
       <p class="score-detail-item-meta muted">${escapeHtml(entry.meta)}</p>
+      ${renderMatchupHtml(entry)}
       ${entry.note ? `<p class="score-detail-item-note">${escapeHtml(`备注：${entry.note}`)}</p>` : ""}
       <div class="score-detail-badges">
         ${entry.badges.map((badge) => `<span class="score-detail-badge score-detail-badge-${badge.tone}">${escapeHtml(badge.label)}</span>`).join("")}
@@ -5169,6 +5198,15 @@ function stripPlayerNameMeta(name) {
     .replace(/\s*（[^）]*）/g, "")
     .replace(/\s*\([^)]*\)/g, "")
     .trim();
+}
+
+function getCompactPlayerDisplayName(name) {
+  const normalized = stripPlayerNameMeta(name || "未知选手").replace(/\s+/g, "");
+  if (!normalized) return "未知";
+  if (/[\u4e00-\u9fff]/.test(normalized)) {
+    return normalized.slice(0, 4);
+  }
+  return normalized.slice(0, 6);
 }
 
 function getMatchDayPlayerNames(matches) {
