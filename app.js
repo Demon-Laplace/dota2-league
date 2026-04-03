@@ -5190,7 +5190,7 @@ function renderLeaderboard(data) {
     });
 
     if (highestRewardIds.has(playerId)) {
-      tags.push({ icon: "¤", label: "金主", tone: "gold", description: "赛季最大赞助人" });
+      tags.push({ icon: "¤", label: "金主", tone: "gold", description: "本赛季最大赞助人" });
     }
 
     if (activeSeason?.koi_player_id && playerId === activeSeason.koi_player_id) {
@@ -5210,23 +5210,23 @@ function renderLeaderboard(data) {
     }
 
     if (bronzeFeederIds.has(playerId)) {
-      tags.push({ icon: "◈", label: "送分童子", tone: "brass", description: "本赛季常规败场明显多于其他人" });
+      tags.push({ icon: "◈", label: "送分童子", tone: "brass", description: "常规败场明显偏多" });
     }
 
     if (goldenTouchIds.has(playerId)) {
-      tags.push({ icon: "✶", label: "点金手", tone: "sun", description: "扣除双倍额外扣分后 净加成积分最多的人" });
+      tags.push({ icon: "✶", label: "点金手", tone: "sun", description: "净加成积分最多" });
     }
 
     if (superDoubleIds.has(playerId)) {
-      tags.push({ icon: "⟡", label: "超级加倍", tone: "arcane", description: "扣除额外加成后 双倍净扣分最多的人" });
+      tags.push({ icon: "⟡", label: "超级加倍", tone: "arcane", description: "双倍净扣分最多" });
     }
 
     if (teammateAffinity.unluckyId && teammateAffinity.unluckyId === playerId) {
-      tags.push({ icon: "⚡", label: "避雷针", tone: "storm", description: "和他同队时，队友整体更容易输掉比赛" });
+      tags.push({ icon: "⚡", label: "避雷针", tone: "storm", description: "同队时更容易输" });
     }
 
     if (teammateAffinity.luckyId && teammateAffinity.luckyId === playerId) {
-      tags.push({ icon: "✿", label: "幸运星", tone: "pink", description: "和他同队时，队友整体更容易赢下比赛" });
+      tags.push({ icon: "✿", label: "幸运星", tone: "pink", description: "同队时更容易赢" });
     }
 
     const nemesis = nemesisMap.get(playerId);
@@ -5236,7 +5236,7 @@ function renderLeaderboard(data) {
         icon: "✹",
         label: `${opponentName}的一生之敌`,
         tone: "inferno",
-        description: `面对 ${opponentName} 时，这位选手会明显更难赢`,
+        description: `面对 ${opponentName} 时更难赢`,
       });
     }
 
@@ -5244,9 +5244,10 @@ function renderLeaderboard(data) {
       tags.push({ icon: "★", label: "MVP", tone: "royal" });
     }
 
+    // Future follow-up: if tags exceed 12, add an admin action log entry so we can revisit tag prioritization.
     const tagsHtml = `
       <div class="leaderboard-player-tags${tags.length ? "" : " leaderboard-player-tags-empty"}">
-        ${tags.map((tag) => `
+        ${tags.slice(0, 12).map((tag) => `
         <span class="leaderboard-tag leaderboard-tag-${tag.tone}" title="${escapeHtml(tag.description || tag.label)}" aria-label="${escapeHtml(tag.description || tag.label)}">
           <span class="leaderboard-tag-icon">${escapeHtml(tag.icon)}</span>
           <span class="leaderboard-tag-label">${escapeHtml(tag.label)}</span>
