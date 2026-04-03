@@ -3137,7 +3137,6 @@ function renderSeasonPlayersPanel() {
             players: leaderboardPlayers,
             highestRewardIds,
             hardcoreLoseIds,
-            rank: getLeaderboardRankByPlayerId(player.id, leaderboardPlayers),
           })}
         </div>
       </div>
