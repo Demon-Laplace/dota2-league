@@ -90,6 +90,16 @@
           </div>
           <p id="scorerManualScoreHint" class="muted">点击下方选手可多选，再统一执行加减分；备注非必填。</p>
         </section>
+        <section class="admin-panel-card">
+          <details class="admin-log-details">
+            <summary class="admin-log-summary">
+              <span>赛季日志</span>
+              <span class="muted">当前赛季内共享，赛季切换后自动进入新赛季日志</span>
+            </summary>
+            <div id="scorerActionLogsList" class="admin-action-logs"></div>
+            <p id="scorerActionLogsEmpty" class="muted">当前还没有操作记录</p>
+          </details>
+        </section>
       </div>
       <p id="scorerPanelMessage" class="message"></p>
     </section>
@@ -147,8 +157,8 @@
         <section class="admin-panel-card">
           <details class="admin-log-details">
             <summary class="admin-log-summary">
-              <span>今日日志</span>
-              <span class="muted">北京时间凌晨 2 点自动清空</span>
+              <span>赛季日志</span>
+              <span class="muted">当前赛季内共享，赛季切换后自动进入新赛季日志</span>
             </summary>
             <div id="adminActionLogsList" class="admin-action-logs"></div>
             <p id="adminActionLogsEmpty" class="muted">当前还没有操作记录</p>

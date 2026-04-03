@@ -14,7 +14,6 @@ const ACCESS_SESSION_STORAGE_KEY = "nd_dota_access_session_v1";
 const REMEMBERED_SCORER_PLAYER_KEY = "nd_dota_remembered_scorer_player_v1";
 const SKIP_NEXT_SCORER_RECONNECT_KEY = "nd_dota_skip_next_scorer_reconnect_v1";
 const DEVICE_ID_STORAGE_KEY = "nd_dota_device_id_v1";
-const ADMIN_ACTION_LOGS_STORAGE_PREFIX = "nd_dota_admin_action_logs_";
 const LEADERBOARD_COMPACT_STORAGE_KEY = "nd_dota_leaderboard_compact_v1";
 
 const db = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
@@ -52,6 +51,8 @@ const adminManualScoreNoteInput = document.getElementById("adminManualScoreNoteI
 const adminManualScoreHint = document.getElementById("adminManualScoreHint");
 const adminDeathFingerBtn = document.getElementById("adminDeathFingerBtn");
 const adminHealingHandBtn = document.getElementById("adminHealingHandBtn");
+const scorerActionLogsList = document.getElementById("scorerActionLogsList");
+const scorerActionLogsEmpty = document.getElementById("scorerActionLogsEmpty");
 const adminActionLogsList = document.getElementById("adminActionLogsList");
 const adminActionLogsEmpty = document.getElementById("adminActionLogsEmpty");
 const adminAddScorerSelect = document.getElementById("adminAddScorerSelect");
@@ -182,6 +183,7 @@ let leaderboardPlayers = [];
 let leaderboardDisplaySeasonName = "";
 let leaderboardDisplaySeasonId = null;
 let rewardLogs = [];
+let seasonActionLogs = [];
 let rewardCardUsageSummary = new Map();
 let seasonPlayerRewardTotal = 0;
 let externalRewardTotal = 0;
@@ -584,6 +586,7 @@ const refreshState = {
   queue: false,
   leaderboard: false,
   rewardLogs: false,
+  seasonLogs: false,
   recentMatches: false,
 };
 const refreshSuppressUntil = {
@@ -592,6 +595,7 @@ const refreshSuppressUntil = {
   queue: 0,
   leaderboard: 0,
   rewardLogs: 0,
+  seasonLogs: 0,
   recentMatches: 0,
 };
 
@@ -635,6 +639,7 @@ async function flushRefreshQueue() {
         await loadQueue();
         await loadLeaderboard();
         await loadRewardLogs();
+        await loadSeasonActionLogs();
         await loadRecentMatches();
         continue;
       }
@@ -653,6 +658,10 @@ async function flushRefreshQueue() {
 
       if (pending.rewardLogs) {
         await loadRewardLogs();
+      }
+
+      if (pending.seasonLogs) {
+        await loadSeasonActionLogs();
       }
 
       if (pending.recentMatches) {
@@ -743,33 +752,33 @@ function writeExternalDonationLogs(seasonId, logs) {
   );
 }
 
-function getAdminActionLogsStorageKey() {
-  return `${ADMIN_ACTION_LOGS_STORAGE_PREFIX}${getBeijingBusinessDateString()}`;
-}
-
-function cleanupExpiredAdminActionLogs() {
-  const activeKey = getAdminActionLogsStorageKey();
-  Object.keys(window.localStorage).forEach((key) => {
-    if (key.startsWith(ADMIN_ACTION_LOGS_STORAGE_PREFIX) && key !== activeKey) {
-      window.localStorage.removeItem(key);
-    }
-  });
-}
-
 function readAdminActionLogs() {
-  cleanupExpiredAdminActionLogs();
-  try {
-    const raw = window.localStorage.getItem(getAdminActionLogsStorageKey());
-    const parsed = raw ? JSON.parse(raw) : [];
-    return Array.isArray(parsed) ? parsed : [];
-  } catch {
-    return [];
-  }
+  return Array.isArray(seasonActionLogs) ? seasonActionLogs : [];
 }
 
-function writeAdminActionLogs(logs) {
-  cleanupExpiredAdminActionLogs();
-  window.localStorage.setItem(getAdminActionLogsStorageKey(), JSON.stringify(logs));
+async function loadSeasonActionLogs() {
+  if (!activeSeason?.id) {
+    seasonActionLogs = [];
+    renderAdminActionLogs();
+    return;
+  }
+
+  const { data, error } = await db
+    .from("season_action_logs")
+    .select("id, season_id, actor, text, created_at")
+    .eq("season_id", activeSeason.id)
+    .order("created_at", { ascending: false })
+    .limit(200);
+
+  if (error) {
+    console.error("加载赛季日志失败：", error);
+    seasonActionLogs = [];
+    renderAdminActionLogs();
+    return;
+  }
+
+  seasonActionLogs = data || [];
+  renderAdminActionLogs();
 }
 
 function getCurrentAccessActorLabel() {
@@ -792,17 +801,38 @@ function getCurrentAccessActorLabel() {
   return "游客";
 }
 
-function appendAdminActionLog(action) {
+async function appendAdminActionLog(action) {
   const text = String(action || "").trim();
-  if (!text) return;
-  const logs = readAdminActionLogs();
-  logs.unshift({
-    id: `action-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+  if (!text || !activeSeason?.id) return;
+
+  const optimisticLog = {
+    id: `temp-action-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+    season_id: activeSeason.id,
     actor: getCurrentAccessActorLabel(),
     text,
     created_at: new Date().toISOString(),
-  });
-  writeAdminActionLogs(logs.slice(0, 100));
+  };
+  seasonActionLogs = [optimisticLog, ...readAdminActionLogs()].slice(0, 200);
+  renderAdminActionLogs();
+
+  const { data, error } = await db
+    .from("season_action_logs")
+    .insert([{
+      season_id: activeSeason.id,
+      actor: optimisticLog.actor,
+      text,
+    }])
+    .select("id, season_id, actor, text, created_at")
+    .single();
+
+  if (error) {
+    console.error("写入赛季日志失败：", error);
+    seasonActionLogs = readAdminActionLogs().filter((log) => log.id !== optimisticLog.id);
+    renderAdminActionLogs();
+    return;
+  }
+
+  seasonActionLogs = readAdminActionLogs().map((log) => (log.id === optimisticLog.id ? data : log));
   renderAdminActionLogs();
 }
 
@@ -1905,16 +1935,26 @@ function getScorerDisplayName(member) {
 }
 
 function renderAdminActionLogs() {
-  if (!adminActionLogsList || !adminActionLogsEmpty) return;
   const logs = readAdminActionLogs();
-  adminActionLogsList.innerHTML = logs.length
+  const logsHtml = logs.length
     ? logs.map((log) => `
       <div class="admin-action-log-card">
         <p class="admin-action-log-text">${escapeHtml(log.actor)} 在 ${escapeHtml(formatLocalTime(log.created_at) || "未知时间")} ${escapeHtml(log.text)}</p>
       </div>
     `).join("")
     : "";
-  adminActionLogsEmpty.hidden = logs.length > 0;
+  if (adminActionLogsList) {
+    adminActionLogsList.innerHTML = logsHtml;
+  }
+  if (adminActionLogsEmpty) {
+    adminActionLogsEmpty.hidden = logs.length > 0;
+  }
+  if (scorerActionLogsList) {
+    scorerActionLogsList.innerHTML = logsHtml;
+  }
+  if (scorerActionLogsEmpty) {
+    scorerActionLogsEmpty.hidden = logs.length > 0;
+  }
 }
 
 function setAdminPanelMessage(text = "", isError = false) {
@@ -6128,6 +6168,7 @@ async function refreshPlayerDrivenViews() {
     loadRoleMembers(),
     loadSeasonEndConfirmations(),
     loadSeasons(),
+    loadSeasonActionLogs(),
     loadTodayPlayers(),
   ]);
   renderQueue(queueEntries);
@@ -8185,6 +8226,15 @@ function subscribeRealtime() {
         scoreDetailSeasonCache.clear();
         scheduleRefresh({
           leaderboard: true,
+        });
+      }
+    )
+    .on(
+      "postgres_changes",
+      { event: "*", schema: "public", table: "season_action_logs" },
+      () => {
+        scheduleRefresh({
+          seasonLogs: true,
         });
       }
     )
