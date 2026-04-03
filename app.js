@@ -1222,7 +1222,7 @@ function applyAccessModalMode() {
   if (accessModalTitle) {
     accessModalTitle.textContent = isAdminMode
       ? "噢！你居然直接来到了天地迷宫的大门！"
-      : "你居然找到了阿哈利姆迷宫的入口！ 小强，你是从哪来的";
+      : "你居然来到了阿哈利姆天地迷宫！ 你是从哪个墙缝钻进来的？";
   }
   if (accessModalHint) {
     accessModalHint.textContent = isAdminMode
