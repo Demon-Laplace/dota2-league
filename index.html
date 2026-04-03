@@ -80,11 +80,7 @@
             <button id="scorerRecalculateScoresBtn" class="button-secondary" type="button">重新汇算当前分数</button>
             <button id="scorerClearQueueBtn" class="button-danger" type="button">清空报名队列</button>
           </div>
-          <div class="row">
-            <select id="scorerManualScorePlayerSelect">
-              <option value="">请选择当前赛季选手</option>
-            </select>
-          </div>
+          <div id="scorerManualScoreChips" class="manual-score-player-chips"></div>
           <div class="row">
             <input id="scorerManualScoreNoteInput" type="text" placeholder="备注，可选" maxlength="80" />
           </div>
@@ -92,7 +88,7 @@
             <button id="scorerDeathFingerBtn" class="button-danger" type="button">死亡一指 -1</button>
             <button id="scorerHealingHandBtn" class="button-secondary" type="button">治疗之手 +1</button>
           </div>
-          <p id="scorerManualScoreHint" class="muted">先选择当前赛季选手，再执行加减分；备注非必填。</p>
+          <p id="scorerManualScoreHint" class="muted">点击下方选手可多选，再统一执行加减分；备注非必填。</p>
         </section>
       </div>
       <p id="scorerPanelMessage" class="message"></p>
@@ -123,11 +119,7 @@
             <button id="adminResetSeasonBtn" class="button-danger" type="button">重置当前赛季</button>
             <button id="adminClearScorerRememberBtn" class="button-secondary" type="button">清空所有记分员自动登录</button>
           </div>
-          <div class="row">
-            <select id="adminManualScorePlayerSelect">
-              <option value="">请选择当前赛季选手</option>
-            </select>
-          </div>
+          <div id="adminManualScoreChips" class="manual-score-player-chips"></div>
           <div class="row">
             <input id="adminManualScoreNoteInput" type="text" placeholder="备注，可选" maxlength="80" />
           </div>
@@ -135,7 +127,7 @@
             <button id="adminDeathFingerBtn" class="button-danger" type="button">死亡一指 -1</button>
             <button id="adminHealingHandBtn" class="button-secondary" type="button">治疗之手 +1</button>
           </div>
-          <p id="adminManualScoreHint" class="muted">先选择当前赛季选手，再执行加减分；备注非必填。</p>
+          <p id="adminManualScoreHint" class="muted">点击下方选手可多选，再统一执行加减分；备注非必填。</p>
         </section>
         <section class="admin-panel-card">
           <div class="section-head">

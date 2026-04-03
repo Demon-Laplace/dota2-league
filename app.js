@@ -42,12 +42,12 @@ const scorerMembersCount = document.getElementById("scorerMembersCount");
 const scorerMembersList = document.getElementById("scorerMembersList");
 const scorerRecalculateScoresBtn = document.getElementById("scorerRecalculateScoresBtn");
 const scorerClearQueueBtn = document.getElementById("scorerClearQueueBtn");
-const scorerManualScorePlayerSelect = document.getElementById("scorerManualScorePlayerSelect");
+const scorerManualScoreChips = document.getElementById("scorerManualScoreChips");
 const scorerManualScoreNoteInput = document.getElementById("scorerManualScoreNoteInput");
 const scorerManualScoreHint = document.getElementById("scorerManualScoreHint");
 const scorerDeathFingerBtn = document.getElementById("scorerDeathFingerBtn");
 const scorerHealingHandBtn = document.getElementById("scorerHealingHandBtn");
-const adminManualScorePlayerSelect = document.getElementById("adminManualScorePlayerSelect");
+const adminManualScoreChips = document.getElementById("adminManualScoreChips");
 const adminManualScoreNoteInput = document.getElementById("adminManualScoreNoteInput");
 const adminManualScoreHint = document.getElementById("adminManualScoreHint");
 const adminDeathFingerBtn = document.getElementById("adminDeathFingerBtn");
@@ -176,6 +176,8 @@ let activeMatchDay = null;
 let allSeasons = [];
 let backfillPlayers = [];
 let allPlayersDirectory = [];
+let scorerManualScoreSelectedIds = new Set();
+let adminManualScoreSelectedIds = new Set();
 let leaderboardPlayers = [];
 let leaderboardDisplaySeasonName = "";
 let leaderboardDisplaySeasonId = null;
@@ -2010,80 +2012,117 @@ function renderAdminAddScorerOptions() {
 }
 
 function renderScorerManualScoreOptions() {
-  if (!scorerManualScorePlayerSelect) return;
-  const options = ['<option value="">请选择当前赛季选手</option>'];
-  seasonPlayers
+  if (!scorerManualScoreChips) return;
+  const players = seasonPlayers
     .filter((player) => player.is_in_season)
-    .sort((a, b) => a.display_name.localeCompare(b.display_name, "zh-CN"))
-    .forEach((player) => {
-      options.push(`<option value="${player.id}">${escapeHtml(player.display_name)}</option>`);
-    });
-  scorerManualScorePlayerSelect.innerHTML = options.join("");
+    .sort((a, b) => a.display_name.localeCompare(b.display_name, "zh-CN"));
+
+  scorerManualScoreSelectedIds = new Set(
+    [...scorerManualScoreSelectedIds].filter((playerId) => players.some((player) => player.id === playerId))
+  );
+
+  scorerManualScoreChips.innerHTML = players.length
+    ? players.map((player) => `
+      <button
+        type="button"
+        class="manual-score-player-chip${scorerManualScoreSelectedIds.has(player.id) ? " manual-score-player-chip-active" : ""}"
+        data-mode="scorer"
+        data-player-id="${player.id}"
+      >${escapeHtml(player.display_name)}</button>
+    `).join("")
+    : '<p class="muted">当前赛季还没有可选选手。</p>';
 }
 
 function renderAdminManualScoreOptions() {
-  if (!adminManualScorePlayerSelect) return;
-  const options = ['<option value="">请选择当前赛季选手</option>'];
-  seasonPlayers
+  if (!adminManualScoreChips) return;
+  const players = seasonPlayers
     .filter((player) => player.is_in_season)
-    .sort((a, b) => a.display_name.localeCompare(b.display_name, "zh-CN"))
-    .forEach((player) => {
-      options.push(`<option value="${player.id}">${escapeHtml(player.display_name)}</option>`);
-    });
-  adminManualScorePlayerSelect.innerHTML = options.join("");
+    .sort((a, b) => a.display_name.localeCompare(b.display_name, "zh-CN"));
+
+  adminManualScoreSelectedIds = new Set(
+    [...adminManualScoreSelectedIds].filter((playerId) => players.some((player) => player.id === playerId))
+  );
+
+  adminManualScoreChips.innerHTML = players.length
+    ? players.map((player) => `
+      <button
+        type="button"
+        class="manual-score-player-chip${adminManualScoreSelectedIds.has(player.id) ? " manual-score-player-chip-active" : ""}"
+        data-mode="admin"
+        data-player-id="${player.id}"
+      >${escapeHtml(player.display_name)}</button>
+    `).join("")
+    : '<p class="muted">当前赛季还没有可选选手。</p>';
 }
 
 function getManualScoreControlConfig(mode = "scorer") {
   if (mode === "admin") {
     return {
-      playerSelect: adminManualScorePlayerSelect,
+      chipContainer: adminManualScoreChips,
       noteInput: adminManualScoreNoteInput,
       hintEl: adminManualScoreHint,
       deathBtn: adminDeathFingerBtn,
       healBtn: adminHealingHandBtn,
+      selectedIds: adminManualScoreSelectedIds,
       canUse: isCurrentRoleAdmin() && Boolean(activeSeason?.id),
     };
   }
 
   return {
-    playerSelect: scorerManualScorePlayerSelect,
+    chipContainer: scorerManualScoreChips,
     noteInput: scorerManualScoreNoteInput,
     hintEl: scorerManualScoreHint,
     deathBtn: scorerDeathFingerBtn,
     healBtn: scorerHealingHandBtn,
+    selectedIds: scorerManualScoreSelectedIds,
     canUse: isCurrentRoleScorer() && Boolean(activeSeason?.id),
   };
 }
 
 function updateManualScoreControlState(mode = "scorer") {
   const config = getManualScoreControlConfig(mode);
-  const playerSelect = config.playerSelect;
+  const chipContainer = config.chipContainer;
   const noteInput = config.noteInput;
   const hintEl = config.hintEl;
   const deathBtn = config.deathBtn;
   const healBtn = config.healBtn;
-  const selectedPlayer = seasonPlayers.find((item) => item.id === (playerSelect?.value || "") && item.is_in_season);
-  const canAct = config.canUse && Boolean(selectedPlayer);
+  const selectedPlayers = seasonPlayers.filter((item) => config.selectedIds.has(item.id) && item.is_in_season);
+  const canAct = config.canUse && selectedPlayers.length > 0;
 
-  if (playerSelect) {
-    playerSelect.disabled = !config.canUse;
+  if (chipContainer) {
+    chipContainer.querySelectorAll(".manual-score-player-chip").forEach((chip) => {
+      const playerId = chip.dataset.playerId || "";
+      chip.disabled = !config.canUse;
+      chip.classList.toggle("manual-score-player-chip-active", config.selectedIds.has(playerId));
+    });
   }
   if (noteInput) {
     noteInput.disabled = !config.canUse;
   }
   if (deathBtn) {
     deathBtn.disabled = !canAct;
-    deathBtn.textContent = selectedPlayer ? `对 ${selectedPlayer.display_name} -1` : "死亡一指 -1";
+    deathBtn.textContent = "死亡一指 -1";
   }
   if (healBtn) {
     healBtn.disabled = !canAct;
-    healBtn.textContent = selectedPlayer ? `给 ${selectedPlayer.display_name} +1` : "治疗之手 +1";
+    healBtn.textContent = "治疗之手 +1";
   }
   if (hintEl) {
-    hintEl.textContent = selectedPlayer
-      ? `当前目标：${selectedPlayer.display_name}${String(noteInput?.value || "").trim() ? `；备注：${String(noteInput.value).trim()}` : ""}`
-      : "先选择当前赛季选手，再执行加减分；备注非必填。";
+    hintEl.textContent = selectedPlayers.length
+      ? `已选 ${selectedPlayers.length} 名选手${String(noteInput?.value || "").trim() ? `；备注：${String(noteInput.value).trim()}` : ""}`
+      : "点击下方选手可多选，再统一执行加减分；备注非必填。";
   }
+}
+
+function toggleManualScorePlayer(mode, playerId) {
+  const selectedIds = mode === "admin" ? adminManualScoreSelectedIds : scorerManualScoreSelectedIds;
+  if (!playerId) return;
+  if (selectedIds.has(playerId)) {
+    selectedIds.delete(playerId);
+  } else {
+    selectedIds.add(playerId);
+  }
+  updateManualScoreControlState(mode);
 }
 
 function renderScorerPanelSummary() {
@@ -2241,12 +2280,6 @@ function applyRolePermissions() {
   }
   if (scorerClearQueueBtn) {
     scorerClearQueueBtn.disabled = !canScore || !activeSeason?.id;
-  }
-  if (scorerManualScorePlayerSelect) {
-    scorerManualScorePlayerSelect.disabled = !canScore || !activeSeason?.id;
-  }
-  if (adminManualScorePlayerSelect) {
-    adminManualScorePlayerSelect.disabled = !isAdmin || !activeSeason?.id;
   }
   updateManualScoreControlState("scorer");
   updateManualScoreControlState("admin");
@@ -6575,13 +6608,12 @@ async function applyManualScoreAdjustment(kind, options = {}) {
     return;
   }
 
-  const sourceSelect = options.playerSelect || scorerManualScorePlayerSelect;
   const noteInput = options.noteInput || (mode === "admin" ? adminManualScoreNoteInput : scorerManualScoreNoteInput);
-  const playerId = sourceSelect?.value || "";
   const note = String(noteInput?.value || "").trim();
-  const player = seasonPlayers.find((item) => item.id === playerId && item.is_in_season);
-  if (!player) {
-    panelMessage("请先选择一名当前赛季选手。", true);
+  const selectedIds = mode === "admin" ? adminManualScoreSelectedIds : scorerManualScoreSelectedIds;
+  const selectedPlayers = seasonPlayers.filter((item) => selectedIds.has(item.id) && item.is_in_season);
+  if (!selectedPlayers.length) {
+    panelMessage("请先选择至少一名当前赛季选手。", true);
     return;
   }
 
@@ -6589,33 +6621,37 @@ async function applyManualScoreAdjustment(kind, options = {}) {
   const delta = isDeathFinger ? -1 : 1;
   const actionLabel = isDeathFinger ? "死亡一指" : "治疗之手";
   const scoreLabel = isDeathFinger ? "-1" : "+1";
-  const confirmed = window.confirm(`确认对 ${player.display_name} 执行${actionLabel}吗？这会固定 ${scoreLabel} 分。`);
+  const previewNames = selectedPlayers.slice(0, 6).map((item) => item.display_name).join("、");
+  const confirmed = window.confirm(`确认对 ${selectedPlayers.length} 名选手执行${actionLabel}吗？这会为每人固定 ${scoreLabel} 分。${previewNames ? `\n${previewNames}${selectedPlayers.length > 6 ? " 等" : ""}` : ""}`);
   if (!confirmed) return;
 
-  panelMessage(`正在对 ${player.display_name} 执行${actionLabel}...`);
+  panelMessage(`正在对 ${selectedPlayers.length} 名选手执行${actionLabel}...`);
 
-  const { error } = await db.rpc("apply_manual_score_adjustment", {
-    p_season_id: activeSeason.id,
-    p_player_id: player.id,
-    p_delta: delta,
-    p_kind: kind,
-    p_role_member_id: currentAccessSession.memberId,
-    p_note: note || null,
-  });
+  for (const player of selectedPlayers) {
+    const { error } = await db.rpc("apply_manual_score_adjustment", {
+      p_season_id: activeSeason.id,
+      p_player_id: player.id,
+      p_delta: delta,
+      p_kind: kind,
+      p_role_member_id: currentAccessSession.memberId,
+      p_note: note || null,
+    });
 
-  if (error) {
-    panelMessage(`人工积分调整失败：${error.message}。请先在 Supabase 执行最新 SQL。`, true);
-    return;
+    if (error) {
+      panelMessage(`人工积分调整失败：${error.message}。请先在 Supabase 执行最新 SQL。`, true);
+      return;
+    }
   }
 
   scoreDetailSeasonCache.clear();
+  selectedIds.clear();
   if (noteInput) {
     noteInput.value = "";
   }
   updateManualScoreControlState(mode);
-  panelMessage(`${player.display_name} 已执行${actionLabel}（${scoreLabel}）${note ? `，备注：${note}` : ""}。`);
-  setMessage(`${player.display_name} 已执行${actionLabel}（${scoreLabel}）${note ? `，备注：${note}` : ""}。`);
-  appendAdminActionLog(`${getCurrentAccessActorLabel()} 对 ${player.display_name} 执行了${actionLabel}（${scoreLabel}）${note ? `，备注：${note}` : ""}。`);
+  panelMessage(`已对 ${selectedPlayers.length} 名选手执行${actionLabel}（每人 ${scoreLabel}）${note ? `，备注：${note}` : ""}。`);
+  setMessage(`已对 ${selectedPlayers.length} 名选手执行${actionLabel}（每人 ${scoreLabel}）${note ? `，备注：${note}` : ""}。`);
+  appendAdminActionLog(`${getCurrentAccessActorLabel()} 对 ${selectedPlayers.map((item) => item.display_name).join("、")} 执行了${actionLabel}（每人 ${scoreLabel}）${note ? `，备注：${note}` : ""}。`);
   requestImmediateRefresh({
     leaderboard: true,
     recentMatches: true,
@@ -8186,8 +8222,12 @@ if (scorerRecalculateScoresBtn) {
 if (scorerClearQueueBtn) {
   scorerClearQueueBtn.addEventListener("click", clearSignupQueueForScorer);
 }
-if (scorerManualScorePlayerSelect) {
-  scorerManualScorePlayerSelect.addEventListener("change", () => updateManualScoreControlState("scorer"));
+if (scorerManualScoreChips) {
+  scorerManualScoreChips.addEventListener("click", (event) => {
+    const chip = event.target.closest(".manual-score-player-chip");
+    if (!chip || chip.disabled) return;
+    toggleManualScorePlayer(chip.dataset.mode || "scorer", chip.dataset.playerId || "");
+  });
 }
 if (scorerManualScoreNoteInput) {
   scorerManualScoreNoteInput.addEventListener("input", () => updateManualScoreControlState("scorer"));
@@ -8202,22 +8242,24 @@ if (scorerHealingHandBtn) {
     noteInput: scorerManualScoreNoteInput,
   }));
 }
-if (adminManualScorePlayerSelect) {
-  adminManualScorePlayerSelect.addEventListener("change", () => updateManualScoreControlState("admin"));
+if (adminManualScoreChips) {
+  adminManualScoreChips.addEventListener("click", (event) => {
+    const chip = event.target.closest(".manual-score-player-chip");
+    if (!chip || chip.disabled) return;
+    toggleManualScorePlayer(chip.dataset.mode || "admin", chip.dataset.playerId || "");
+  });
 }
 if (adminManualScoreNoteInput) {
   adminManualScoreNoteInput.addEventListener("input", () => updateManualScoreControlState("admin"));
 }
 if (adminDeathFingerBtn) {
   adminDeathFingerBtn.addEventListener("click", () => applyManualScoreAdjustment("death_finger", {
-    playerSelect: adminManualScorePlayerSelect,
     noteInput: adminManualScoreNoteInput,
     messageTarget: "admin",
   }));
 }
 if (adminHealingHandBtn) {
   adminHealingHandBtn.addEventListener("click", () => applyManualScoreAdjustment("healing_hand", {
-    playerSelect: adminManualScorePlayerSelect,
     noteInput: adminManualScoreNoteInput,
     messageTarget: "admin",
   }));

@@ -563,6 +563,36 @@ button.season-total {
   align-items: stretch;
 }
 
+.manual-score-player-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.manual-score-player-chip {
+  border: 1px solid rgba(120, 158, 201, 0.18);
+  background: rgba(14, 31, 54, 0.62);
+  color: #d7e6f8;
+  padding: 8px 12px;
+  border-radius: 999px;
+  font-size: 13px;
+  line-height: 1.2;
+  transition: background 0.18s ease, border-color 0.18s ease, transform 0.18s ease;
+}
+
+.manual-score-player-chip:hover:not(:disabled) {
+  background: rgba(24, 48, 78, 0.78);
+  border-color: rgba(157, 196, 235, 0.28);
+  transform: translateY(-1px);
+}
+
+.manual-score-player-chip-active {
+  background: linear-gradient(135deg, rgba(44, 101, 165, 0.9), rgba(21, 61, 110, 0.92));
+  border-color: rgba(180, 221, 255, 0.42);
+  color: #f3f9ff;
+  box-shadow: 0 8px 18px rgba(6, 16, 29, 0.22);
+}
+
 .scorer-panel-nav-btn {
   min-width: 96px;
 }
