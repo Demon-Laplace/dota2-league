@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Dota2 宁德联赛</title>
-  <link rel="stylesheet" href="style.css?v=20260403-14" />
+  <link rel="stylesheet" href="style.css?v=20260403-15" />
 </head>
   <body>
   <div id="loadingScreen" class="loading-screen" aria-live="polite">
@@ -311,7 +311,10 @@
               <select id="backfillSeasonSelect">
                 <option value="">请选择赛季</option>
               </select>
-              <input id="backfillDateInput" type="date" />
+              <label id="backfillDateShell" class="date-input-shell" for="backfillDateInput">
+                <span class="date-input-shell-kicker">补录日期</span>
+                <input id="backfillDateInput" type="date" />
+              </label>
             </div>
             <div class="match-grid">
               <div class="team-panel">
@@ -412,6 +415,6 @@
   </div>
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="app.js?v=20260403-15"></script>
+  <script src="app.js?v=20260403-18"></script>
 </body>
 </html>

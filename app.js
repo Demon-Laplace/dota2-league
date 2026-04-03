@@ -111,6 +111,7 @@ const backfillWinnerToggleHint = document.getElementById("backfillWinnerToggleHi
 const matchNoteInput = document.getElementById("matchNote");
 const matchDoublePanel = document.getElementById("matchDoublePanel");
 const backfillSeasonSelect = document.getElementById("backfillSeasonSelect");
+const backfillDateShell = document.getElementById("backfillDateShell");
 const backfillDateInput = document.getElementById("backfillDateInput");
 const backfillMatchNoteInput = document.getElementById("backfillMatchNote");
 const backfillDoublePanel = document.getElementById("backfillDoublePanel");
@@ -3932,7 +3933,6 @@ function renderRecentMatches(groups) {
         </div>
         <div class="recent-match-meta">
           <span class="muted">比赛日期：${escapeHtml(group.match_date || "未知日期")}</span>
-          ${group.note ? `<span class="muted">备注：${escapeHtml(group.note)}</span>` : '<span class="muted">未来如有补录比赛，可直接归入这个比赛日。</span>'}
         </div>
       `;
       content.appendChild(emptyCard);
@@ -5250,6 +5250,8 @@ async function addMatchDayAttendanceNote(matchDayId, seasonId, matchDate, status
 async function removeMatchDayAttendanceNote(noteId, playerName, buttonEl) {
   if (!ensureScorerAccess("仅记分员或管理员可移除每日补记名单。")) return;
   if (!noteId) return;
+  const confirmed = window.confirm(`确认移除 ${playerName || "该选手"} 的补记状态吗？`);
+  if (!confirmed) return;
 
   if (buttonEl) {
     buttonEl.disabled = true;
@@ -5985,6 +5987,22 @@ openBackfillFormBtn.addEventListener("click", async () => {
   setMatchFormOpen(false);
   renderBackfillForm();
 });
+
+if (backfillDateShell) {
+  backfillDateShell.addEventListener("click", (event) => {
+    if (event.target === backfillDateInput || backfillDateInput.disabled) {
+      return;
+    }
+
+    if (typeof backfillDateInput.showPicker === "function") {
+      backfillDateInput.showPicker();
+      return;
+    }
+
+    backfillDateInput.focus();
+    backfillDateInput.click();
+  });
+}
 
 closeMatchFormBtn.addEventListener("click", () => {
   clearMatchForm();
