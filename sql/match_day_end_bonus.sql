@@ -477,6 +477,36 @@ begin
   update public.season_player_stats
   set reward_points = (20 + coalesce(reward_floor_bonus, 0) + coalesce(reward_double_bonus, 0)) + coalesce(reward_extra_points, 0)
   where true;
+
+  if exists (
+    select 1
+    from information_schema.tables
+    where table_schema = 'public'
+      and table_name = 'manual_score_adjustments'
+  ) then
+    with active_adjustments as (
+      select season_id, player_id, sum(delta)::numeric(10,2) as total_delta
+      from public.manual_score_adjustments
+      where revoked_at is null
+      group by season_id, player_id
+    )
+    update public.season_player_stats sps
+    set score = sps.score + adj.total_delta
+    from active_adjustments adj
+    where sps.season_id = adj.season_id
+      and sps.player_id = adj.player_id;
+
+    with active_adjustments as (
+      select player_id, sum(delta)::numeric(10,2) as total_delta
+      from public.manual_score_adjustments
+      where revoked_at is null
+      group by player_id
+    )
+    update public.players p
+    set score = p.score + adj.total_delta
+    from active_adjustments adj
+    where p.id = adj.player_id;
+  end if;
 end;
 $$;
 

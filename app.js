@@ -40,6 +40,11 @@ const scorerPanelStatusText = document.getElementById("scorerPanelStatusText");
 const adminPanelSummary = document.getElementById("adminPanelSummary");
 const scorerMembersCount = document.getElementById("scorerMembersCount");
 const scorerMembersList = document.getElementById("scorerMembersList");
+const scorerRecalculateScoresBtn = document.getElementById("scorerRecalculateScoresBtn");
+const scorerClearQueueBtn = document.getElementById("scorerClearQueueBtn");
+const scorerManualScorePlayerSelect = document.getElementById("scorerManualScorePlayerSelect");
+const scorerDeathFingerBtn = document.getElementById("scorerDeathFingerBtn");
+const scorerHealingHandBtn = document.getElementById("scorerHealingHandBtn");
 const adminActionLogsList = document.getElementById("adminActionLogsList");
 const adminActionLogsEmpty = document.getElementById("adminActionLogsEmpty");
 const adminAddScorerSelect = document.getElementById("adminAddScorerSelect");
@@ -164,6 +169,8 @@ let activeMatchDay = null;
 let allSeasons = [];
 let backfillPlayers = [];
 let leaderboardPlayers = [];
+let leaderboardDisplaySeasonName = "";
+let leaderboardDisplaySeasonId = null;
 let rewardLogs = [];
 let rewardCardUsageSummary = new Map();
 let seasonPlayerRewardTotal = 0;
@@ -944,8 +951,9 @@ function buildLeaderboardShareText(players = leaderboardPlayers) {
     return "";
   }
 
-  const header = activeSeason?.name
-    ? `【${activeSeason.name}积分榜】`
+  const headerSeasonName = leaderboardDisplaySeasonName || activeSeason?.name || "";
+  const header = headerSeasonName
+    ? `【${headerSeasonName}积分榜】`
     : "【积分榜】";
 
   const lines = source.map((player, idx) => {
@@ -1158,13 +1166,13 @@ function setMatchFormOpen(isOpen) {
   isMatchFormOpen = isOpen && isCurrentRoleScorer();
   matchFormPanel.hidden = !isMatchFormOpen;
   openMatchFormBtn.textContent = isMatchFormOpen ? "正在录入比赛" : "添加当日比赛";
-  openMatchFormBtn.disabled = !isCurrentRoleScorer() || isMatchFormOpen;
+  openMatchFormBtn.disabled = !isCurrentRoleScorer() || isMatchFormOpen || !isActiveSeasonReadyForMatches();
 }
 
 function setBackfillFormOpen(isOpen) {
   isBackfillFormOpen = isOpen && isCurrentRoleScorer();
   backfillFormPanel.hidden = !isBackfillFormOpen;
-  openBackfillFormBtn.disabled = !isCurrentRoleScorer() || isBackfillFormOpen;
+  openBackfillFormBtn.disabled = !isCurrentRoleScorer() || isBackfillFormOpen || !isActiveSeasonReadyForMatches();
 }
 
 function setSeasonPanelOpen(isOpen) {
@@ -1240,7 +1248,8 @@ function renderScoreDetailLoading(player) {
     scoreDetailTitle.textContent = `${stripPlayerNameMeta(player?.display_name || "未知选手")} · 积分明细`;
   }
   if (scoreDetailSubtitle) {
-    const seasonLabel = activeSeason?.name ? `${activeSeason.name} · 起始 10 分` : "起始 10 分";
+    const seasonLabelName = leaderboardDisplaySeasonName || activeSeason?.name || "";
+    const seasonLabel = seasonLabelName ? `${seasonLabelName} · 起始 10 分` : "起始 10 分";
     scoreDetailSubtitle.textContent = seasonLabel;
   }
   if (scoreDetailSummary) {
@@ -1338,11 +1347,17 @@ async function getScoreDetailSeasonData(seasonId) {
     .from("season_players")
     .select("player_id")
     .eq("season_id", seasonId);
+  const adjustmentsQuery = db
+    .from("manual_score_adjustments")
+    .select("id, season_id, player_id, delta, kind, created_at, revoked_at, created_by_role_member_id, created_by_name, revoked_by_role_member_id, revoked_by_name")
+    .eq("season_id", seasonId)
+    .order("created_at", { ascending: true });
 
-  const [matchesResult, matchDaysResult, participantsResult] = await Promise.all([
+  const [matchesResult, matchDaysResult, participantsResult, adjustmentsResult] = await Promise.all([
     matchesQuery,
     matchDaysQuery,
     participantsQuery,
+    adjustmentsQuery,
   ]);
 
   if (matchesResult.error) {
@@ -1355,6 +1370,7 @@ async function getScoreDetailSeasonData(seasonId) {
   const seasonData = {
     matches: [...(matchesResult.data || [])].sort(compareScoreDetailMatches),
     matchDays: matchDaysResult.error ? [] : (matchDaysResult.data || []),
+    manualAdjustments: adjustmentsResult.error ? [] : (adjustmentsResult.data || []),
     participantIds: new Set(
       participantsResult.error
         ? []
@@ -1536,6 +1552,29 @@ function buildScoreDetailEntries(player, seasonData) {
     }
   });
 
+  (seasonData?.manualAdjustments || []).forEach((adjustment) => {
+    if (adjustment.player_id !== targetPlayerId || adjustment.revoked_at) return;
+
+    const delta = Number(adjustment.delta ?? 0);
+    if (!Number.isFinite(delta) || !delta) return;
+
+    entries.push({
+      id: `manual-${adjustment.id}`,
+      adjustmentId: adjustment.id,
+      delta,
+      title: adjustment.kind === "death_finger" ? "死亡一指" : "治疗之手",
+      subtitle: `${adjustment.created_by_name || "未知记分员"} 执行`,
+      meta: formatLocalTime(adjustment.created_at) || "人工积分调整",
+      badges: [
+        { label: "人工积分", tone: "team" },
+        { label: delta > 0 ? "+1" : "-1", tone: delta > 0 ? "win" : "lose" },
+      ],
+      revocable: isCurrentRoleScorer(),
+      playerName: targetPlayerName,
+      actionLabel: adjustment.kind === "death_finger" ? "死亡一指" : "治疗之手",
+    });
+  });
+
   const currentScore = Number(player.score ?? (10 + entries.reduce((sum, entry) => sum + entry.delta, 0)));
   const positiveDelta = entries.reduce((sum, entry) => sum + (entry.delta > 0 ? entry.delta : 0), 0);
   const negativeDelta = entries.reduce((sum, entry) => sum + (entry.delta < 0 ? entry.delta : 0), 0);
@@ -1554,8 +1593,8 @@ function renderScoreDetailContent(player, detail) {
   if (!scoreDetailTitle || !scoreDetailSubtitle || !scoreDetailSummary || !scoreDetailList) return;
 
   scoreDetailTitle.textContent = `${detail.playerName} · 积分明细`;
-  scoreDetailSubtitle.textContent = activeSeason?.name
-    ? `${activeSeason.name} · 起始 10 分`
+  scoreDetailSubtitle.textContent = (leaderboardDisplaySeasonName || activeSeason?.name)
+    ? `${leaderboardDisplaySeasonName || activeSeason?.name} · 起始 10 分`
     : "起始 10 分";
 
   scoreDetailSummary.innerHTML = `
@@ -1596,6 +1635,17 @@ function renderScoreDetailContent(player, detail) {
       <div class="score-detail-badges">
         ${entry.badges.map((badge) => `<span class="score-detail-badge score-detail-badge-${badge.tone}">${escapeHtml(badge.label)}</span>`).join("")}
       </div>
+      ${entry.revocable ? `
+        <div class="queue-actions">
+          <button
+            class="button-secondary revoke-manual-score-btn"
+            type="button"
+            data-adjustment-id="${entry.adjustmentId || ""}"
+            data-player-name="${escapeHtml(entry.playerName || "")}"
+            data-action-label="${escapeHtml(entry.actionLabel || "人工积分调整")}"
+          >撤销</button>
+        </div>
+      ` : ""}
     </article>
   `).join("");
 
@@ -1610,22 +1660,23 @@ async function openScoreDetailModal(playerId) {
     setMessage("未找到这位选手的积分信息。", true);
     return;
   }
-  if (!activeSeason?.id) {
+  const detailSeasonId = leaderboardDisplaySeasonId || activeSeason?.id || null;
+  if (!detailSeasonId) {
     setMessage("当前没有可查看的赛季积分明细。", true);
     return;
   }
 
   scoreDetailState = {
     playerId,
-    seasonId: activeSeason.id,
+    seasonId: detailSeasonId,
   };
   scoreDetailModal.hidden = false;
   renderScoreDetailLoading(player);
   setScoreDetailMessage("正在整理积分变动...");
 
   try {
-    const seasonData = await getScoreDetailSeasonData(activeSeason.id);
-    if (!scoreDetailState || scoreDetailState.playerId !== playerId || scoreDetailState.seasonId !== activeSeason?.id) {
+    const seasonData = await getScoreDetailSeasonData(detailSeasonId);
+    if (!scoreDetailState || scoreDetailState.playerId !== playerId || scoreDetailState.seasonId !== detailSeasonId) {
       return;
     }
     const detail = buildScoreDetailEntries(player, seasonData);
@@ -1919,6 +1970,18 @@ function renderAdminAddScorerOptions() {
   adminAddScorerSelect.innerHTML = options.join("");
 }
 
+function renderScorerManualScoreOptions() {
+  if (!scorerManualScorePlayerSelect) return;
+  const options = ['<option value="">请选择当前赛季选手</option>'];
+  seasonPlayers
+    .filter((player) => player.is_in_season)
+    .sort((a, b) => a.display_name.localeCompare(b.display_name, "zh-CN"))
+    .forEach((player) => {
+      options.push(`<option value="${player.id}">${escapeHtml(player.display_name)}</option>`);
+    });
+  scorerManualScorePlayerSelect.innerHTML = options.join("");
+}
+
 function renderScorerPanelSummary() {
   if (!scorerPanelSummary || !scorerPanelStatusText) return;
 
@@ -1975,6 +2038,7 @@ function renderRoleMembers() {
 
   renderAccessScorerOptions();
   renderAdminAddScorerOptions();
+  renderScorerManualScoreOptions();
   renderAdminActionLogs();
   renderScorerPanelSummary();
 }
@@ -2065,6 +2129,21 @@ function applyRolePermissions() {
     adminRecalculateScoresBtn.disabled = !isAdmin || !activeSeason?.id;
   }
   adminClearScorerRememberBtn.disabled = !isAdmin;
+  if (scorerRecalculateScoresBtn) {
+    scorerRecalculateScoresBtn.disabled = !canScore || !activeSeason?.id;
+  }
+  if (scorerClearQueueBtn) {
+    scorerClearQueueBtn.disabled = !canScore || !activeSeason?.id;
+  }
+  if (scorerManualScorePlayerSelect) {
+    scorerManualScorePlayerSelect.disabled = !canScore || !activeSeason?.id;
+  }
+  if (scorerDeathFingerBtn) {
+    scorerDeathFingerBtn.disabled = !canScore || !activeSeason?.id;
+  }
+  if (scorerHealingHandBtn) {
+    scorerHealingHandBtn.disabled = !canScore || !activeSeason?.id;
+  }
   if (seasonRolloverBtn) {
     seasonRolloverBtn.hidden = !canScore;
   }
@@ -2579,6 +2658,29 @@ function getSeasonMonthLastDate(dateText) {
   return `${yearText}-${String(month).padStart(2, "0")}-${String(lastDay).padStart(2, "0")}`;
 }
 
+function isDateOnOrAfter(dateA, dateB) {
+  if (!dateA || !dateB) return false;
+  return String(dateA) >= String(dateB);
+}
+
+function isActiveSeasonReadyForMatches() {
+  if (!activeSeason?.start_date) return true;
+  return isDateOnOrAfter(getBeijingBusinessDateString(), activeSeason.start_date);
+}
+
+function getActiveSeasonMatchGateMessage() {
+  if (!activeSeason?.start_date) return "";
+  if (isActiveSeasonReadyForMatches()) return "";
+  return `${activeSeason.name} 已初始化，比赛登记将于北京时间 ${activeSeason.start_date} 开放。`;
+}
+
+function shouldShowPreviousSeasonLeaderboard() {
+  if (!activeSeason?.start_date) return false;
+  const beijingNow = getBeijingNowDate();
+  const carryoverDeadline = new Date(`${activeSeason.start_date}T12:00:00`);
+  return beijingNow.getTime() < carryoverDeadline.getTime();
+}
+
 function getSeasonRolloverWindowInfo(season = activeSeason) {
   if (!season) {
     return {
@@ -2667,7 +2769,7 @@ function renderSeasonRolloverAction() {
   seasonRolloverBtn.textContent = hasCurrentConfirmation ? "已登记赛季完结" : "赛季完结";
 
   if (!windowInfo.isOpen) {
-    seasonRolloverStatus.textContent = `赛季完结将于北京时间 ${windowInfo.cutoffLabel} 开放。`;
+    seasonRolloverStatus.textContent = `开放时间：北京时间 ${windowInfo.cutoffLabel}`;
     return;
   }
 
@@ -2715,10 +2817,10 @@ function getFinishMatchDayActionContext(seasonId = activeSeason?.id) {
 function updateFinishTodayMatchDayButtonLabel() {
   if (!finishTodayMatchDayBtn) return;
   const actionContext = getFinishMatchDayActionContext(activeSeason?.id);
-  const label = actionContext.isRestMode ? "今日休战" : "结束比赛日";
+  const label = actionContext.isRestMode ? "今日无比赛" : "结束比赛日";
   finishTodayMatchDayBtn.textContent = label;
   finishTodayMatchDayBtn.title = actionContext.isRestMode
-    ? "今日无比赛，直接设置休战"
+    ? "今日无比赛，将由系统自动按休战处理"
     : (
       actionContext.targetDate === actionContext.businessDate
         ? "结束今日比赛日并结算比赛日未参赛加减分"
@@ -2733,6 +2835,10 @@ function getBackfillDateMaxValue() {
     return backfillDateInput.value;
   }
   return latestPastDate;
+}
+
+function getBackfillDateMinValue() {
+  return allSeasons.find((season) => season.id === backfillSeasonSelect.value)?.start_date || "";
 }
 
 function getPlaceholderEnsureAttemptKey() {
@@ -3130,7 +3236,7 @@ function getLinkedTodayPlayers() {
 }
 
 function canUseMatchRecordingForm() {
-  return Boolean(activeMatchDay || activeSeason?.id);
+  return Boolean((activeMatchDay || activeSeason?.id) && isActiveSeasonReadyForMatches());
 }
 
 function createEmptySingleDoubleEntry() {
@@ -4126,9 +4232,10 @@ function renderSeasonPlayersPanel() {
 
 function renderMatchDayStatus() {
   const storedStartTime = readStoredMatchDayStartTime();
+  const matchGateMessage = getActiveSeasonMatchGateMessage();
   updateFinishTodayMatchDayButtonLabel();
   if (finishTodayMatchDayBtn) {
-    finishTodayMatchDayBtn.disabled = !isCurrentRoleScorer() || !activeSeason?.id;
+    finishTodayMatchDayBtn.disabled = !isCurrentRoleScorer() || !activeSeason?.id || !isActiveSeasonReadyForMatches() || getFinishMatchDayActionContext(activeSeason?.id).isRestMode;
   }
 
   if (activeMatchDay) {
@@ -4157,12 +4264,12 @@ function renderMatchDayStatus() {
 
   matchDayStatus.textContent = "未发起";
   matchDayStatus.className = "muted match-day-status-pill day-status-inactive";
-  matchDayInfo.textContent = "";
-  matchDayInfo.hidden = true;
+  matchDayInfo.textContent = matchGateMessage || "";
+  matchDayInfo.hidden = !matchGateMessage;
   startMatchDayBtn.textContent = "发起当日比赛";
   startMatchDayBtn.classList.remove("button-cancel-state");
-  startMatchDayBtn.disabled = false;
-  matchStartTimeInput.disabled = false;
+  startMatchDayBtn.disabled = !isActiveSeasonReadyForMatches();
+  matchStartTimeInput.disabled = !isActiveSeasonReadyForMatches();
   matchStartTimeDisplay.textContent = "";
   matchStartTimeDisplay.hidden = true;
 }
@@ -4180,12 +4287,15 @@ function renderSignupOptions() {
 
   const participants = seasonPlayers.filter((player) => player.is_in_season);
   if (signupAllBtn) {
-    signupAllBtn.disabled = !isCurrentRoleScorer() || !activeMatchDay || participants.length === 0;
+    signupAllBtn.disabled = !isCurrentRoleScorer() || !activeMatchDay || participants.length === 0 || !isActiveSeasonReadyForMatches();
   }
 
   if (!participants.length) {
     signupEmpty.style.display = "block";
     signupEmpty.textContent = "当前赛季暂无可报名选手";
+  } else if (!isActiveSeasonReadyForMatches()) {
+    signupEmpty.style.display = "block";
+    signupEmpty.textContent = getActiveSeasonMatchGateMessage() || "当前赛季尚未开放比赛登记。";
   } else if (!activeMatchDay) {
     signupEmpty.style.display = "block";
     signupEmpty.textContent = "请先发起当日比赛";
@@ -4202,6 +4312,7 @@ function renderSignupOptions() {
     chip.className = "signup-player-chip";
     chip.dataset.playerId = player.id;
     chip.dataset.playerName = player.display_name;
+    chip.disabled = !isActiveSeasonReadyForMatches();
 
     if (isActive) {
       chip.classList.add("signup-player-chip-active");
@@ -4341,7 +4452,7 @@ function renderMatchForm() {
   matchNoteInput.disabled = !canUseForm;
   recordMatchBtn.disabled = !canUseForm || !hasCompleteTeams;
   closeMatchFormBtn.disabled = false;
-  openMatchFormBtn.disabled = isMatchFormOpen;
+  openMatchFormBtn.disabled = isMatchFormOpen || !isActiveSeasonReadyForMatches();
   [...matchFormPanel.querySelectorAll('[data-role="winner-toggle"]')].forEach((button) => {
     button.disabled = !canUseForm;
   });
@@ -4355,12 +4466,14 @@ function renderBackfillForm() {
   const hasEnoughPlayers = backfillPlayers.length >= TEAM_SIZE * 2;
   const hasSeason = Boolean(backfillSeasonSelect.value);
   backfillDateInput.max = getBackfillDateMaxValue();
+  backfillDateInput.min = getBackfillDateMinValue();
   renderInlineTeamDoubleControls("backfill", !hasSeason || !hasEnoughPlayers);
   backfillWinnerSelect.disabled = !hasSeason || !hasEnoughPlayers;
   backfillDateInput.disabled = !hasSeason;
   backfillMatchNoteInput.disabled = !hasSeason || !hasEnoughPlayers;
   recordBackfillBtn.disabled = !hasSeason || !hasEnoughPlayers || !backfillDateInput.value;
   recordBackfillBtn.textContent = editingMatchId ? "保存修改" : "保存补录比赛";
+  openBackfillFormBtn.disabled = isBackfillFormOpen || !isActiveSeasonReadyForMatches();
   [...backfillFormPanel.querySelectorAll('[data-role="winner-toggle"]')].forEach((button) => {
     button.disabled = !hasSeason || !hasEnoughPlayers;
   });
@@ -5823,12 +5936,73 @@ async function refreshPlayerDrivenViews() {
 }
 
 async function loadLeaderboard() {
-  let result = await db
-    .from("current_season_leaderboard")
-    .select("player_id, display_name, score, games_played, wins, losses, win_rate, reward_points, reward_minimum, reward_extra_points")
-    .order("score", { ascending: false })
-    .order("reward_points", { ascending: false })
-    .order("display_name", { ascending: true });
+  leaderboardDisplaySeasonName = activeSeason?.name || "";
+  leaderboardDisplaySeasonId = activeSeason?.id || null;
+  let result = null;
+
+  if (shouldShowPreviousSeasonLeaderboard() && activeSeason?.start_date) {
+    const previousSeasonResult = await db
+      .from("seasons")
+      .select("id, name, start_date")
+      .lt("start_date", activeSeason.start_date)
+      .order("start_date", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (!previousSeasonResult.error && previousSeasonResult.data?.id) {
+      const previousSeason = previousSeasonResult.data;
+      const previousLeaderboardResult = await db
+        .from("season_player_stats")
+        .select(`
+          player_id,
+          score,
+          games_played,
+          wins,
+          losses,
+          reward_points,
+          reward_floor_bonus,
+          reward_double_bonus,
+          reward_extra_points,
+          players (
+            display_name
+          )
+        `)
+        .eq("season_id", previousSeason.id)
+        .order("score", { ascending: false })
+        .order("reward_points", { ascending: false });
+
+      if (!previousLeaderboardResult.error) {
+        leaderboardDisplaySeasonName = previousSeason.name || leaderboardDisplaySeasonName;
+        leaderboardDisplaySeasonId = previousSeason.id || leaderboardDisplaySeasonId;
+        result = {
+          data: (previousLeaderboardResult.data || []).map((row) => ({
+            player_id: row.player_id,
+            display_name: row.players?.display_name || "未知选手",
+            score: row.score,
+            games_played: row.games_played,
+            wins: row.wins,
+            losses: row.losses,
+            reward_points: row.reward_points,
+            reward_minimum: 20 + Number(row.reward_floor_bonus ?? 0) + Number(row.reward_double_bonus ?? 0),
+            reward_extra_points: row.reward_extra_points ?? 0,
+            win_rate: Number(row.games_played ?? 0) > 0
+              ? Number(((Number(row.wins ?? 0) / Number(row.games_played ?? 0)) * 100).toFixed(2))
+              : 0,
+          })),
+          error: null,
+        };
+      }
+    }
+  }
+
+  if (!result) {
+    result = await db
+      .from("current_season_leaderboard")
+      .select("player_id, display_name, score, games_played, wins, losses, win_rate, reward_points, reward_minimum, reward_extra_points")
+      .order("score", { ascending: false })
+      .order("reward_points", { ascending: false })
+      .order("display_name", { ascending: true });
+  }
 
   if (result.error) {
     result = await db
@@ -6134,6 +6308,163 @@ async function recalculateCurrentScores() {
   });
 }
 
+async function recalculateCurrentScoresForScorer() {
+  if (!ensureScorerAccess("仅记分员或管理员可重新汇算当前分数。")) return;
+  if (!activeSeason?.id) {
+    setScorerPanelMessage("当前没有可重新汇算的赛季。", true);
+    return;
+  }
+
+  const confirmed = window.confirm(`确认重新汇算 ${activeSeason.name} 的积分吗？这会按当前规则重算本赛季分数。`);
+  if (!confirmed) return;
+
+  if (scorerRecalculateScoresBtn) {
+    scorerRecalculateScoresBtn.disabled = true;
+  }
+  setScorerPanelMessage("正在重新汇算当前分数...");
+  setMessage("正在重新汇算当前分数...");
+
+  const { error } = await db.rpc("recalculate_all_scores");
+
+  if (scorerRecalculateScoresBtn) {
+    scorerRecalculateScoresBtn.disabled = !isCurrentRoleScorer() || !activeSeason?.id;
+  }
+
+  if (error) {
+    setScorerPanelMessage(`重新汇算失败：${error.message}。请先在 Supabase 执行最新 SQL。`, true);
+    setMessage(`重新汇算失败：${error.message}。请先在 Supabase 执行最新 SQL。`, true);
+    return;
+  }
+
+  scoreDetailSeasonCache.clear();
+  setScorerPanelMessage("当前赛季积分已重新汇算。");
+  setMessage("当前赛季积分已重新汇算。");
+  appendAdminActionLog(`${getCurrentAccessActorLabel()} 重新汇算了 ${activeSeason.name} 的积分。`);
+  requestImmediateRefresh({
+    playerDriven: true,
+    leaderboard: true,
+    recentMatches: true,
+    rewardLogs: true,
+  });
+}
+
+async function clearSignupQueueForScorer() {
+  if (!ensureScorerAccess("仅记分员或管理员可清空报名队列。")) return;
+  const confirmed = window.confirm("确认清空当前赛季的全部报名队列记录吗？这会删除报名中、已取消和已确认记录。");
+  if (!confirmed) return;
+
+  if (scorerClearQueueBtn) {
+    scorerClearQueueBtn.disabled = true;
+  }
+  setScorerPanelMessage("正在清空报名队列...");
+  setMessage("正在清空报名队列...");
+
+  const { data, error } = await db.rpc("clear_signup_queue_for_testing", {
+    p_season_id: activeSeason?.id || null,
+  });
+
+  if (scorerClearQueueBtn) {
+    scorerClearQueueBtn.disabled = !isCurrentRoleScorer() || !activeSeason?.id;
+  }
+
+  if (error) {
+    setScorerPanelMessage(`清空报名队列失败：${error.message}`, true);
+    setMessage(`清空报名队列失败：${error.message}`, true);
+    return;
+  }
+
+  setScorerPanelMessage(`已清空当前赛季报名队列，共删除 ${data ?? 0} 条记录。`);
+  setMessage(`已清空当前赛季报名队列，共删除 ${data ?? 0} 条记录。`);
+  appendAdminActionLog(`${getCurrentAccessActorLabel()} 清空了报名队列，共删除 ${data ?? 0} 条记录。`);
+  requestImmediateRefresh({ queue: true });
+}
+
+async function applyManualScoreAdjustment(kind) {
+  if (!ensureScorerAccess("仅记分员或管理员可执行人工积分调整。")) return;
+  if (!activeSeason?.id) {
+    setScorerPanelMessage("当前没有可操作的赛季。", true);
+    return;
+  }
+  if (!currentAccessSession.memberId) {
+    setScorerPanelMessage("当前身份缺少角色记录，暂时无法执行人工积分调整。", true);
+    return;
+  }
+
+  const playerId = scorerManualScorePlayerSelect?.value || "";
+  const player = seasonPlayers.find((item) => item.id === playerId && item.is_in_season);
+  if (!player) {
+    setScorerPanelMessage("请先选择一名当前赛季选手。", true);
+    return;
+  }
+
+  const isDeathFinger = kind === "death_finger";
+  const delta = isDeathFinger ? -1 : 1;
+  const actionLabel = isDeathFinger ? "死亡一指" : "治疗之手";
+  const scoreLabel = isDeathFinger ? "-1" : "+1";
+  const confirmed = window.confirm(`确认对 ${player.display_name} 执行${actionLabel}吗？这会固定 ${scoreLabel} 分。`);
+  if (!confirmed) return;
+
+  setScorerPanelMessage(`正在对 ${player.display_name} 执行${actionLabel}...`);
+
+  const { error } = await db.rpc("apply_manual_score_adjustment", {
+    p_season_id: activeSeason.id,
+    p_player_id: player.id,
+    p_delta: delta,
+    p_kind: kind,
+    p_role_member_id: currentAccessSession.memberId,
+  });
+
+  if (error) {
+    setScorerPanelMessage(`人工积分调整失败：${error.message}。请先在 Supabase 执行最新 SQL。`, true);
+    return;
+  }
+
+  scoreDetailSeasonCache.clear();
+  setScorerPanelMessage(`${player.display_name} 已执行${actionLabel}（${scoreLabel}）。`);
+  setMessage(`${player.display_name} 已执行${actionLabel}（${scoreLabel}）。`);
+  appendAdminActionLog(`${getCurrentAccessActorLabel()} 对 ${player.display_name} 执行了${actionLabel}（${scoreLabel}）。`);
+  requestImmediateRefresh({
+    leaderboard: true,
+    recentMatches: true,
+  });
+}
+
+async function revokeManualScoreAdjustment(adjustmentId, playerName, actionLabel) {
+  if (!ensureScorerAccess("仅记分员或管理员可撤销人工积分调整。")) return;
+  if (!currentAccessSession.memberId) {
+    setScoreDetailMessage("当前身份缺少角色记录，暂时无法撤销人工积分调整。", true);
+    return;
+  }
+  if (!adjustmentId) return;
+
+  const confirmed = window.confirm(`确认撤销 ${playerName || "该选手"} 的${actionLabel || "人工积分调整"}吗？`);
+  if (!confirmed) return;
+
+  setScoreDetailMessage("正在撤销人工积分调整...");
+
+  const { error } = await db.rpc("revoke_manual_score_adjustment", {
+    p_adjustment_id: adjustmentId,
+    p_role_member_id: currentAccessSession.memberId,
+  });
+
+  if (error) {
+    setScoreDetailMessage(`撤销失败：${error.message}。请先在 Supabase 执行最新 SQL。`, true);
+    return;
+  }
+
+  scoreDetailSeasonCache.clear();
+  setScoreDetailMessage("人工积分调整已撤销。");
+  appendAdminActionLog(`${getCurrentAccessActorLabel()} 撤销了 ${playerName || "该选手"} 的${actionLabel || "人工积分调整"}。`);
+  requestImmediateRefresh({
+    leaderboard: true,
+    recentMatches: true,
+  });
+
+  if (scoreDetailState?.playerId) {
+    await openScoreDetailModal(scoreDetailState.playerId);
+  }
+}
+
 async function setSeasonPlayerRank(playerId, playerName, playerRank) {
   if (!ensureScorerAccess("仅记分员或管理员可调整赛季选手身份。")) return;
   if (!activeSeason?.id) {
@@ -6280,6 +6611,11 @@ async function loadQueue() {
 }
 
 async function signup() {
+  if (!isActiveSeasonReadyForMatches()) {
+    setMessage(getActiveSeasonMatchGateMessage() || "当前赛季尚未开放比赛登记。", true);
+    return;
+  }
+
   if (!activeMatchDay) {
     setMessage("请先发起当日比赛，再开启报名。", true);
     return;
@@ -6442,6 +6778,10 @@ async function reSignupByEntry(entryId, playerName, buttonEl) {
 
 async function confirmQueueToTodayPlayers() {
   if (!ensureScorerAccess("仅记分员或管理员可确认到齐。")) return;
+  if (!isActiveSeasonReadyForMatches()) {
+    setMessage(getActiveSeasonMatchGateMessage() || "当前赛季尚未开放比赛登记。", true);
+    return;
+  }
   confirmQueueBtn.disabled = true;
   setMessage("正在确认已就位的选手...");
 
@@ -6518,6 +6858,11 @@ async function clearTodayPlayersForTesting() {
 }
 
 async function startMatchDay() {
+  if (!isActiveSeasonReadyForMatches()) {
+    setMessage(getActiveSeasonMatchGateMessage() || "当前赛季尚未开放比赛登记。", true);
+    return;
+  }
+
   matchStartTimeInput.value = normalizeTimeInput(matchStartTimeInput.value);
   const startTime = matchStartTimeInput.value || "19:30";
 
@@ -6586,18 +6931,20 @@ async function cancelMatchDay() {
 }
 
 async function finishTodayMatchDay() {
-  if (!ensureScorerAccess("仅记分员或管理员可设置今日休战。")) return;
+  if (!ensureScorerAccess("仅记分员或管理员可结束比赛日。")) return;
   if (!activeSeason?.id) {
     setMessage("当前缺少可用赛季，暂时无法设置今日休战。", true);
     return;
   }
 
   const actionContext = getFinishMatchDayActionContext(activeSeason.id);
+  if (actionContext.isRestMode) {
+    setMessage("今日无比赛时无需手动点击，系统会自动按休战处理。");
+    return;
+  }
   const todayMatchCount = getTodayRecordedMatchCount(activeSeason.id);
   const confirmed = window.confirm(
-    actionContext.isRestMode
-      ? "确认设置今日休战吗？今天还没有已记录比赛，本次不会触发未参赛加减分，只会结束今日状态并清空今日报名队列与当日名单。"
-      : `确认结束 ${actionContext.targetDate === actionContext.businessDate ? "今日" : actionContext.targetDate} 比赛日吗？这会立刻按“比赛日未参赛”规则结算“总榜榜首缺席 -1 / 总榜榜尾缺席 +1”，并清空对应比赛日后的报名队列与当日名单。若之后该比赛日又新增或补录比赛，系统仍会自动重新回算。`
+    `确认结束 ${actionContext.targetDate === actionContext.businessDate ? "今日" : actionContext.targetDate} 比赛日吗？这会立刻按“比赛日未参赛”规则结算“总榜榜首缺席 -1 / 总榜榜尾缺席 +1”，并清空对应比赛日后的报名队列与当日名单。若之后该比赛日又新增或补录比赛，系统仍会自动重新回算。`
   );
   if (!confirmed) {
     return;
@@ -6607,14 +6954,14 @@ async function finishTodayMatchDay() {
     finishTodayMatchDayBtn.disabled = true;
   }
 
-  setMessage(actionContext.isRestMode ? "正在设置今日休战..." : "正在结束比赛日并结算...");
-  setMatchMessage(actionContext.isRestMode ? "正在设置今日休战..." : "正在结束比赛日并结算...");
+  setMessage("正在结束比赛日并结算...");
+  setMatchMessage("正在结束比赛日并结算...");
   setBackfillMessage("");
 
   let data = null;
   let error = null;
 
-  if (!actionContext.isRestMode && actionContext.targetDate === actionContext.businessDate && todayMatchCount > 0) {
+  if (actionContext.targetDate === actionContext.businessDate && todayMatchCount > 0) {
     ({ data, error } = await db.rpc("finalize_active_match_day", {
       p_season_id: activeSeason.id,
     }));
@@ -6636,30 +6983,24 @@ async function finishTodayMatchDay() {
   }
 
   if (error) {
-    const failurePrefix = actionContext.isRestMode ? "设置今日休战失败" : "结束比赛日失败";
+    const failurePrefix = "结束比赛日失败";
     setMessage(`${failurePrefix}：${error.message}。请先在 Supabase 执行最新 SQL。`, true);
     setMatchMessage(`${failurePrefix}：${error.message}。请先在 Supabase 执行最新 SQL。`, true);
     return;
   }
 
   if (!data) {
-    setMessage(actionContext.isRestMode ? "今日没有已记录比赛，未触发积分结算。" : "当前没有可结束的比赛日记录。");
-    setMatchMessage(actionContext.isRestMode ? "今日没有已记录比赛，未触发积分结算。" : "当前没有可结束的比赛日记录。");
+    setMessage("当前没有可结束的比赛日记录。");
+    setMatchMessage("当前没有可结束的比赛日记录。");
     return;
   }
 
   clearStoredMatchDayStartTime();
   matchStartTimeInput.value = "";
-  if (actionContext.isRestMode) {
-    setMessage("今日已休战。今日没有比赛，未触发积分结算。");
-    setMatchMessage("今日已休战。今日没有比赛，未触发积分结算。");
-    appendAdminActionLog("手动设置了今日休战（今日无比赛，未触发积分结算）。");
-  } else {
-    const targetLabel = actionContext.targetDate === actionContext.businessDate ? "今日比赛日" : `${actionContext.targetDate} 比赛日`;
-    setMessage(`${targetLabel}已结束，比赛日未参赛加减分已完成结算。`);
-    setMatchMessage(`${targetLabel}已结束，比赛日未参赛加减分已完成结算。`);
-    appendAdminActionLog(`手动结束了 ${actionContext.targetDate} 比赛日并结算比赛日未参赛加减分。`);
-  }
+  const targetLabel = actionContext.targetDate === actionContext.businessDate ? "今日比赛日" : `${actionContext.targetDate} 比赛日`;
+  setMessage(`${targetLabel}已结束，比赛日未参赛加减分已完成结算。`);
+  setMatchMessage(`${targetLabel}已结束，比赛日未参赛加减分已完成结算。`);
+  appendAdminActionLog(`手动结束了 ${actionContext.targetDate} 比赛日并结算比赛日未参赛加减分。`);
   requestImmediateRefresh({
     playerDriven: true,
     queue: true,
@@ -7054,6 +7395,11 @@ function validateBackfillPlayers(teamAIds, teamBIds) {
     return "请选择补录比赛日期。";
   }
 
+  const selectedSeason = allSeasons.find((season) => season.id === backfillSeasonSelect.value) || null;
+  if (selectedSeason?.start_date && backfillDateInput.value < selectedSeason.start_date) {
+    return `补录比赛日期不能早于 ${selectedSeason.start_date}。`;
+  }
+
   if (!editingMatchId && backfillDateInput.value > getPreviousBeijingBusinessDateString()) {
     return "补录比赛日期只能选择今天之前。";
   }
@@ -7097,6 +7443,10 @@ function buildPlayerAssignmentsPayload(teamAIds, teamBIds, heroAssignments = {},
 
 async function recordMatch() {
   if (!ensureScorerAccess("仅记分员或管理员可登记比赛。")) return;
+  if (!isActiveSeasonReadyForMatches()) {
+    setMatchMessage(getActiveSeasonMatchGateMessage() || "当前赛季尚未开放比赛登记。", true);
+    return;
+  }
   if (!activeMatchDay && !activeSeason?.id) {
     setMatchMessage("当前缺少可用赛季，暂时无法保存今日比赛。", true);
     return;
@@ -7600,6 +7950,16 @@ function subscribeRealtime() {
         });
       }
     )
+    .on(
+      "postgres_changes",
+      { event: "*", schema: "public", table: "manual_score_adjustments" },
+      () => {
+        scoreDetailSeasonCache.clear();
+        scheduleRefresh({
+          leaderboard: true,
+        });
+      }
+    )
     .subscribe((status) => {
       console.info("[realtime] app-realtime status:", status);
     });
@@ -7627,6 +7987,18 @@ if (seasonRolloverBtn) {
 }
 if (adminRecalculateScoresBtn) {
   adminRecalculateScoresBtn.addEventListener("click", recalculateCurrentScores);
+}
+if (scorerRecalculateScoresBtn) {
+  scorerRecalculateScoresBtn.addEventListener("click", recalculateCurrentScoresForScorer);
+}
+if (scorerClearQueueBtn) {
+  scorerClearQueueBtn.addEventListener("click", clearSignupQueueForScorer);
+}
+if (scorerDeathFingerBtn) {
+  scorerDeathFingerBtn.addEventListener("click", () => applyManualScoreAdjustment("death_finger"));
+}
+if (scorerHealingHandBtn) {
+  scorerHealingHandBtn.addEventListener("click", () => applyManualScoreAdjustment("healing_hand"));
 }
 startMatchDayBtn.addEventListener("click", async () => {
   if (activeMatchDay) {
@@ -8185,6 +8557,18 @@ if (leaderboardBody) {
     const playerId = trigger.dataset.playerId || "";
     if (!playerId) return;
     await openScoreDetailModal(playerId);
+  });
+}
+
+if (scoreDetailList) {
+  scoreDetailList.addEventListener("click", async (event) => {
+    const button = event.target.closest(".revoke-manual-score-btn");
+    if (!button) return;
+    await revokeManualScoreAdjustment(
+      button.dataset.adjustmentId,
+      button.dataset.playerName,
+      button.dataset.actionLabel
+    );
   });
 }
 

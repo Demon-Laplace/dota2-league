@@ -71,15 +71,27 @@
         </section>
         <section class="admin-panel-card">
           <div class="section-head">
-            <h3>预留操作 A</h3>
+            <h3>快捷维护</h3>
           </div>
-          <p class="muted">这里预留给记录员的快捷登记、批量处理或校验功能，后续可直接往本卡片扩展。</p>
+          <div class="row admin-panel-actions">
+            <button id="scorerRecalculateScoresBtn" class="button-secondary" type="button">重新汇算当前分数</button>
+            <button id="scorerClearQueueBtn" class="button-danger" type="button">清空报名队列</button>
+          </div>
         </section>
         <section class="admin-panel-card">
           <div class="section-head">
-            <h3>预留操作 B</h3>
+            <h3>人工积分</h3>
           </div>
-          <p class="muted">这里预留给记录员的赛中辅助工具、临时面板或额外配置入口，后续可继续拆分。</p>
+          <div class="row">
+            <select id="scorerManualScorePlayerSelect">
+              <option value="">请选择当前赛季选手</option>
+            </select>
+          </div>
+          <div class="row admin-panel-actions">
+            <button id="scorerDeathFingerBtn" class="button-danger" type="button">死亡一指 -1</button>
+            <button id="scorerHealingHandBtn" class="button-secondary" type="button">治疗之手 +1</button>
+          </div>
+          <p class="muted">每次只允许对一名当前赛季选手加减 1 分，所有记分员与管理员都可在积分明细中撤销。</p>
         </section>
       </div>
       <p id="scorerPanelMessage" class="message"></p>
@@ -175,8 +187,8 @@
         </div>
         <div class="row">
           <div id="seasonRolloverBlock" class="season-rollover-block" hidden>
-            <button id="seasonRolloverBtn" class="button-danger" type="button" hidden>赛季完结</button>
-            <p id="seasonRolloverStatus" class="muted season-rollover-status">赛季完结暂未开放。</p>
+            <button id="seasonRolloverBtn" class="button-danger season-rollover-btn" type="button" hidden>赛季完结</button>
+            <p id="seasonRolloverStatus" class="muted season-rollover-status"></p>
           </div>
           <button id="resetSeasonBtn" class="button-danger" type="button">重置当前赛季</button>
         </div>
