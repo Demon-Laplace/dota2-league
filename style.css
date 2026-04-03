@@ -3637,6 +3637,22 @@ ol {
   border: 1px solid rgba(115, 151, 195, 0.18);
 }
 
+button.score-detail-summary-card {
+  width: 100%;
+  text-align: left;
+  cursor: pointer;
+}
+
+.score-detail-summary-filter:hover {
+  background: linear-gradient(180deg, rgba(24, 50, 81, 0.94), rgba(14, 31, 53, 0.9));
+  border-color: rgba(145, 186, 231, 0.24);
+}
+
+.score-detail-summary-filter-active {
+  border-color: rgba(181, 219, 255, 0.42);
+  box-shadow: 0 10px 24px rgba(7, 17, 31, 0.2);
+}
+
 .score-detail-summary-label {
   color: #8da3bc;
   font-size: 11px;

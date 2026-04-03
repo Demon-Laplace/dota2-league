@@ -246,6 +246,7 @@ let refreshFlushPromise = null;
 let placeholderEnsureAttemptKey = "";
 let scoreDetailSeasonCache = new Map();
 let scoreDetailState = null;
+let scoreDetailFilterMode = "all";
 const loadingStartedAt = Date.now();
 const REFRESH_DEBOUNCE_MS = 150;
 const REFRESH_SELF_SUPPRESS_MS = 1200;
@@ -1242,6 +1243,8 @@ function setScorerPanelOpen(isOpen) {
     scorerModeBtn.textContent = isScorerPanelOpen ? "收起记录" : "记录员模式";
   }
   if (isScorerPanelOpen) {
+    renderScorerManualScoreOptions();
+    updateManualScoreControlState("scorer");
     setAdminPanelOpen(false);
   }
 }
@@ -1254,6 +1257,8 @@ function setAdminPanelOpen(isOpen) {
     adminModeBtn.textContent = isAdminPanelOpen ? "收起管理" : "管理员模式";
   }
   if (isAdminPanelOpen) {
+    renderAdminManualScoreOptions();
+    updateManualScoreControlState("admin");
     setScorerPanelOpen(false);
   }
 }
@@ -1271,6 +1276,7 @@ function setLeaderboardCompactMode(isCompact) {
 
 function closeScoreDetailModal() {
   scoreDetailState = null;
+  scoreDetailFilterMode = "all";
   if (scoreDetailModal) {
     scoreDetailModal.hidden = true;
   }
@@ -1649,6 +1655,14 @@ function renderScoreDetailContent(player, detail) {
     ? `${leaderboardDisplaySeasonName || activeSeason?.name} · 起始 10 分`
     : "起始 10 分";
 
+  const isPositiveFilter = scoreDetailFilterMode === "positive";
+  const isNegativeFilter = scoreDetailFilterMode === "negative";
+  const filteredEntries = detail.entries.filter((entry) => {
+    if (isPositiveFilter) return entry.delta > 0;
+    if (isNegativeFilter) return entry.delta < 0;
+    return true;
+  });
+
   scoreDetailSummary.innerHTML = `
     <div class="score-detail-summary-card">
       <span class="score-detail-summary-label">当前积分</span>
@@ -1658,19 +1672,25 @@ function renderScoreDetailContent(player, detail) {
       <span class="score-detail-summary-label">净变化</span>
       <strong class="score-detail-summary-value ${detail.totalDelta >= 0 ? "score-detail-delta-positive" : "score-detail-delta-negative"}">${formatSignedScore(detail.totalDelta)}</strong>
     </div>
-    <div class="score-detail-summary-card">
+    <button type="button" class="score-detail-summary-card score-detail-summary-filter${isPositiveFilter ? " score-detail-summary-filter-active" : ""}" data-filter-mode="positive" aria-pressed="${isPositiveFilter ? "true" : "false"}">
       <span class="score-detail-summary-label">上分合计</span>
       <strong class="score-detail-summary-value score-detail-delta-positive">${formatSignedScore(detail.positiveDelta)}</strong>
-    </div>
-    <div class="score-detail-summary-card">
+    </button>
+    <button type="button" class="score-detail-summary-card score-detail-summary-filter${isNegativeFilter ? " score-detail-summary-filter-active" : ""}" data-filter-mode="negative" aria-pressed="${isNegativeFilter ? "true" : "false"}">
       <span class="score-detail-summary-label">掉分合计</span>
       <strong class="score-detail-summary-value score-detail-delta-negative">${formatSignedScore(detail.negativeDelta)}</strong>
-    </div>
+    </button>
   `;
 
   if (!detail.entries.length) {
     scoreDetailList.innerHTML = '<div class="score-detail-empty muted">本赛季还没有产生积分变动。</div>';
     setScoreDetailMessage("");
+    return;
+  }
+
+  if (!filteredEntries.length) {
+    scoreDetailList.innerHTML = `<div class="score-detail-empty muted">${isPositiveFilter ? "当前没有上分记录。" : "当前没有掉分记录。"}</div>`;
+    setScoreDetailMessage(isPositiveFilter ? "当前仅显示上分内容。" : "当前仅显示掉分内容。");
     return;
   }
 
@@ -1691,7 +1711,7 @@ function renderScoreDetailContent(player, detail) {
     `;
   };
 
-  scoreDetailList.innerHTML = [...detail.entries].reverse().map((entry) => `
+  scoreDetailList.innerHTML = [...filteredEntries].reverse().map((entry) => `
     <article class="score-detail-item">
       <div class="score-detail-item-head">
         <div class="score-detail-item-copy">
@@ -1720,7 +1740,11 @@ function renderScoreDetailContent(player, detail) {
     </article>
   `).join("");
 
-  setScoreDetailMessage(`共整理出 ${detail.entries.length} 条有效积分变动。`);
+  setScoreDetailMessage(
+    scoreDetailFilterMode === "all"
+      ? `共整理出 ${detail.entries.length} 条有效积分变动。`
+      : `当前筛选后显示 ${filteredEntries.length} 条记录。`
+  );
 }
 
 async function openScoreDetailModal(playerId) {
@@ -1737,10 +1761,15 @@ async function openScoreDetailModal(playerId) {
     return;
   }
 
+  const previousPlayerId = scoreDetailState?.playerId || "";
+  const previousSeasonId = scoreDetailState?.seasonId || "";
   scoreDetailState = {
     playerId,
     seasonId: detailSeasonId,
   };
+  if (previousPlayerId !== playerId || previousSeasonId !== detailSeasonId) {
+    scoreDetailFilterMode = "all";
+  }
   scoreDetailModal.hidden = false;
   renderScoreDetailLoading(player);
   setScoreDetailMessage("正在整理积分变动...");
@@ -8889,6 +8918,16 @@ if (closeScoreDetailBtn) {
 
 if (scoreDetailBackdrop) {
   scoreDetailBackdrop.addEventListener("click", closeScoreDetailModal);
+}
+
+if (scoreDetailSummary) {
+  scoreDetailSummary.addEventListener("click", async (event) => {
+    const card = event.target.closest("[data-filter-mode]");
+    if (!card || !scoreDetailState?.playerId) return;
+    const nextMode = card.dataset.filterMode || "all";
+    scoreDetailFilterMode = scoreDetailFilterMode === nextMode ? "all" : nextMode;
+    await openScoreDetailModal(scoreDetailState.playerId);
+  });
 }
 
 document.addEventListener("keydown", (event) => {
