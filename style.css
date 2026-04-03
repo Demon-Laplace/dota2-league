@@ -1759,7 +1759,7 @@ button:disabled {
 
 .match-day-summary {
   display: flex;
-  gap: 10px;
+  gap: 8px;
   align-items: center;
   flex-wrap: wrap;
   min-width: 0;
@@ -1769,8 +1769,7 @@ button:disabled {
 .match-day-player-count {
   display: inline-flex;
   align-items: center;
-  gap: 5px;
-  padding: 2px 8px 2px 6px;
+  padding: 2px 8px;
   border-radius: 999px;
   border: 1px solid rgba(99, 213, 208, 0.24);
   background: rgba(16, 71, 78, 0.28);
@@ -1787,31 +1786,58 @@ button:disabled {
   transform: none;
 }
 
-.match-day-player-count::before {
-  content: "▸";
-  font-size: 10px;
-  color: rgba(99, 213, 208, 0.92);
-  transition: transform 0.18s ease;
-}
-
 .match-day-player-list {
   display: flex;
   align-items: center;
-  flex-wrap: wrap;
-  gap: 6px;
+  gap: 10px;
+  flex: 1 1 280px;
   min-width: 0;
-  max-width: min(100%, 760px);
+  max-width: 100%;
+  overflow: hidden;
+  white-space: nowrap;
+}
+
+.match-day-player-group {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+}
+
+.match-day-player-group-label {
+  display: inline-flex;
+  align-items: center;
+  padding: 1px 6px;
+  border-radius: 999px;
+  flex: none;
+  font-size: 10px;
+  line-height: 1.35;
+  letter-spacing: 0.04em;
+  color: rgba(187, 209, 235, 0.84);
+  background: rgba(34, 58, 88, 0.42);
+  box-shadow: inset 0 0 0 1px rgba(112, 151, 198, 0.16);
+}
+
+.match-day-player-group-list {
+  display: inline-flex;
+  align-items: center;
+  min-width: 0;
+  overflow: hidden;
 }
 
 .match-day-player-name {
-  display: inline-flex;
-  align-items: center;
-  min-height: 20px;
-  padding: 1px 8px;
-  border-radius: 999px;
+  display: inline;
+  min-height: 0;
+  padding: 0;
+  border-radius: 0;
   font-size: 12px;
-  line-height: 1.4;
+  line-height: 1.2;
   letter-spacing: 0.01em;
+}
+
+.match-day-player-group-list .match-day-player-name:not(:last-child)::after {
+  content: "、";
+  color: rgba(173, 197, 226, 0.42);
 }
 
 .match-day-player-name-participant {
@@ -1823,17 +1849,10 @@ button:disabled {
 
 .match-day-player-name-standby {
   color: rgba(184, 196, 214, 0.82);
-  background: rgba(50, 62, 79, 0.22);
 }
 
 .match-day-player-name-absent {
   color: rgba(163, 98, 98, 0.94);
-  background: linear-gradient(135deg, rgba(34, 16, 18, 0.9), rgba(16, 10, 12, 0.94));
-  box-shadow: inset 0 0 0 1px rgba(99, 32, 32, 0.28);
-}
-
-.match-day-group[data-attendance-expanded="true"] .match-day-player-count::before {
-  transform: rotate(90deg);
 }
 
 .match-day-attendance-panel {

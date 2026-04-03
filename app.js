@@ -912,7 +912,7 @@ function setMatchFormOpen(isOpen) {
   isMatchFormOpen = isOpen && isCurrentRoleScorer();
   matchFormPanel.hidden = !isMatchFormOpen;
   openMatchFormBtn.textContent = isMatchFormOpen ? "正在录入比赛" : "添加当日比赛";
-  openMatchFormBtn.disabled = !isCurrentRoleScorer() || isMatchFormOpen || !activeMatchDay || todayPlayers.length < TEAM_SIZE * 2;
+  openMatchFormBtn.disabled = !isCurrentRoleScorer() || isMatchFormOpen || !activeMatchDay;
 }
 
 function setBackfillFormOpen(isOpen) {
@@ -1734,17 +1734,29 @@ function getMatchDayParticipantEntries(matches) {
 }
 
 function buildMatchDayPlayerSummaryHtml(participants, attendanceNotes) {
-  const participantHtml = (participants || []).map((player) => `
-    <span class="match-day-player-name match-day-player-name-participant">${escapeHtml(player.display_name)}</span>
-  `).join("");
-  const standbyHtml = (attendanceNotes || [])
-    .filter((entry) => entry.status === "standby")
-    .map((entry) => `<span class="match-day-player-name match-day-player-name-standby">${escapeHtml(entry.display_name || "未知选手")}</span>`)
-    .join("");
-  const absentHtml = (attendanceNotes || [])
-    .filter((entry) => entry.status === "absent")
-    .map((entry) => `<span class="match-day-player-name match-day-player-name-absent">${escapeHtml(entry.display_name || "未知选手")}</span>`)
-    .join("");
+  const buildGroupHtml = (entries, itemClassName, label) => {
+    if (!entries.length) return "";
+    return `
+      <span class="match-day-player-group">
+        <span class="match-day-player-group-label">${escapeHtml(label)}</span>
+        <span class="match-day-player-group-list">
+          ${entries.map((entry) => `<span class="match-day-player-name ${itemClassName}">${escapeHtml(entry.display_name || "未知选手")}</span>`).join("")}
+        </span>
+      </span>
+    `;
+  };
+
+  const participantHtml = buildGroupHtml(participants || [], "match-day-player-name-participant", "参赛");
+  const standbyHtml = buildGroupHtml(
+    (attendanceNotes || []).filter((entry) => entry.status === "standby"),
+    "match-day-player-name-standby",
+    "替补"
+  );
+  const absentHtml = buildGroupHtml(
+    (attendanceNotes || []).filter((entry) => entry.status === "absent"),
+    "match-day-player-name-absent",
+    "未到场"
+  );
 
   const html = [participantHtml, standbyHtml, absentHtml].filter(Boolean).join("");
   return html ? `<div class="match-day-player-list">${html}</div>` : "";
@@ -1876,6 +1888,25 @@ function getBeijingBusinessDateString() {
   const month = String(beijing.getMonth() + 1).padStart(2, "0");
   const day = String(beijing.getDate()).padStart(2, "0");
   return `${year}-${month}-${day}`;
+}
+
+function getPreviousBeijingBusinessDateString() {
+  const businessDate = getBeijingBusinessDateString();
+  const [year, month, day] = businessDate.split("-").map(Number);
+  const date = new Date(year, month - 1, day);
+  date.setDate(date.getDate() - 1);
+  const prevYear = date.getFullYear();
+  const prevMonth = String(date.getMonth() + 1).padStart(2, "0");
+  const prevDay = String(date.getDate()).padStart(2, "0");
+  return `${prevYear}-${prevMonth}-${prevDay}`;
+}
+
+function getBackfillDateMaxValue() {
+  const latestPastDate = getPreviousBeijingBusinessDateString();
+  if (editingMatchId && backfillDateInput.value && backfillDateInput.value > latestPastDate) {
+    return backfillDateInput.value;
+  }
+  return latestPastDate;
 }
 
 function getQueueTimestamp(row) {
@@ -3059,15 +3090,16 @@ function renderMatchForm() {
   refreshMatchSelectOptions();
   renderDoublePanel("match");
 
-  const hasEnoughPlayers = Boolean(activeMatchDay) && todayPlayers.length >= TEAM_SIZE * 2;
-  renderInlineTeamDoubleControls("match", !hasEnoughPlayers);
-  winnerSelect.disabled = !hasEnoughPlayers;
-  matchNoteInput.disabled = !hasEnoughPlayers;
-  recordMatchBtn.disabled = !hasEnoughPlayers;
+  const hasActiveMatchDay = Boolean(activeMatchDay);
+  const hasCompleteTeams = matchTeamSelections.teamA.length === TEAM_SIZE && matchTeamSelections.teamB.length === TEAM_SIZE;
+  renderInlineTeamDoubleControls("match", !hasActiveMatchDay);
+  winnerSelect.disabled = !hasActiveMatchDay;
+  matchNoteInput.disabled = !hasActiveMatchDay;
+  recordMatchBtn.disabled = !hasActiveMatchDay || !hasCompleteTeams;
   closeMatchFormBtn.disabled = false;
-  openMatchFormBtn.disabled = isMatchFormOpen || !hasEnoughPlayers;
+  openMatchFormBtn.disabled = isMatchFormOpen || !hasActiveMatchDay;
   [...matchFormPanel.querySelectorAll('[data-role="winner-toggle"]')].forEach((button) => {
-    button.disabled = !hasEnoughPlayers;
+    button.disabled = !hasActiveMatchDay;
   });
   setWinnerSelection("match", winnerSelect.value);
 }
@@ -3078,6 +3110,7 @@ function renderBackfillForm() {
   backfillSeasonSelect.innerHTML = buildSeasonOptions(allSeasons, backfillSeasonSelect.value);
   const hasEnoughPlayers = backfillPlayers.length >= TEAM_SIZE * 2;
   const hasSeason = Boolean(backfillSeasonSelect.value);
+  backfillDateInput.max = getBackfillDateMaxValue();
   renderInlineTeamDoubleControls("backfill", !hasSeason || !hasEnoughPlayers);
   backfillWinnerSelect.disabled = !hasSeason || !hasEnoughPlayers;
   backfillDateInput.disabled = !hasSeason;
@@ -5318,13 +5351,11 @@ function getSelectionStateByFormType(formType) {
 
 function rerenderSelectionsByFormType(formType) {
   if (formType === "backfill") {
-    refreshBackfillSelectOptions();
-    renderDoublePanel("backfill");
+    renderBackfillForm();
     return;
   }
 
-  refreshMatchSelectOptions();
-  renderDoublePanel("match");
+  renderMatchForm();
 }
 
 function togglePlayerSelection(formType, teamKey, playerId) {
@@ -5499,10 +5530,6 @@ function getSelectedTeamIds(prefix) {
 }
 
 function validateMatchPlayers(teamAIds, teamBIds) {
-  if (todayPlayers.length < TEAM_SIZE * 2) {
-    return "当日名单不足 10 人，无法记录比赛。";
-  }
-
   if (teamAIds.some((id) => !id) || teamBIds.some((id) => !id)) {
     return "请为两队各选择 5 名选手。";
   }
@@ -5524,6 +5551,10 @@ function validateBackfillPlayers(teamAIds, teamBIds) {
 
   if (!backfillDateInput.value) {
     return "请选择补录比赛日期。";
+  }
+
+  if (!editingMatchId && backfillDateInput.value > getPreviousBeijingBusinessDateString()) {
+    return "补录比赛日期只能选择今天之前。";
   }
 
   if (backfillPlayers.length < TEAM_SIZE * 2) {
@@ -5993,7 +6024,7 @@ openBackfillFormBtn.addEventListener("click", async () => {
   if (!backfillSeasonSelect.value && activeSeason?.id) {
     backfillSeasonSelect.value = activeSeason.id;
   }
-  backfillDateInput.value = backfillDateInput.value || getBeijingBusinessDateString();
+  backfillDateInput.value = backfillDateInput.value || getPreviousBeijingBusinessDateString();
   await loadPlayersForSeason(backfillSeasonSelect.value);
   clearBackfillForm();
   setBackfillFormOpen(true);
@@ -6025,7 +6056,7 @@ matchFormPanel.addEventListener("click", (event) => {
     const formType = teamDoubleToggle.dataset.formType || "match";
     const team = teamDoubleToggle.dataset.team || "A";
     teamDoublePickerOpen[formType][team] = !teamDoublePickerOpen[formType][team];
-    renderInlineTeamDoubleControls(formType, !activeMatchDay || todayPlayers.length < TEAM_SIZE * 2);
+    renderInlineTeamDoubleControls(formType, !activeMatchDay);
     return;
   }
 
@@ -6034,7 +6065,7 @@ matchFormPanel.addEventListener("click", (event) => {
     const team = teamDoubleClear.dataset.team === "A" ? "A" : "B";
     matchDoubleState[team === "A" ? "teamAUserId" : "teamBUserId"] = "";
     teamDoublePickerOpen.match[team] = true;
-    renderInlineTeamDoubleControls("match", !activeMatchDay || todayPlayers.length < TEAM_SIZE * 2);
+    renderInlineTeamDoubleControls("match", !activeMatchDay);
     return;
   }
 
@@ -6045,7 +6076,7 @@ matchFormPanel.addEventListener("click", (event) => {
     const currentValue = matchDoubleState[team === "A" ? "teamAUserId" : "teamBUserId"];
     matchDoubleState[team === "A" ? "teamAUserId" : "teamBUserId"] = currentValue === playerId ? "" : playerId;
     teamDoublePickerOpen.match[team] = true;
-    renderInlineTeamDoubleControls("match", !activeMatchDay || todayPlayers.length < TEAM_SIZE * 2);
+    renderInlineTeamDoubleControls("match", !activeMatchDay);
     return;
   }
 
@@ -6515,7 +6546,7 @@ async function init() {
     setLeaderboardCompactMode(readStoredLeaderboardCompactState());
     renderHeroOptions();
     matchStartTimeInput.value = formatTime24(readStoredMatchDayStartTime()?.startTime || "");
-    backfillDateInput.value = getBeijingBusinessDateString();
+    backfillDateInput.value = getPreviousBeijingBusinessDateString();
     renderMatchForm();
     renderBackfillForm();
     renderSeasonPlayersPanel();
