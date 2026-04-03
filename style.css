@@ -627,6 +627,15 @@ button.season-total {
   gap: 8px;
 }
 
+.admin-member-section {
+  display: grid;
+  gap: 8px;
+}
+
+.admin-member-section-title {
+  margin: 0;
+}
+
 .admin-action-logs {
   display: grid;
   gap: 8px;
@@ -670,6 +679,11 @@ button.season-total {
   border-radius: 12px;
   border: 1px solid rgba(117, 155, 197, 0.18);
   background: rgba(14, 31, 54, 0.62);
+}
+
+.admin-member-card-pending {
+  border-color: rgba(245, 158, 11, 0.24);
+  background: rgba(61, 39, 12, 0.28);
 }
 
 .admin-member-actions {

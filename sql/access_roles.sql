@@ -5,11 +5,26 @@ create extension if not exists pgcrypto;
 create table if not exists public.app_role_members (
   id uuid primary key default gen_random_uuid(),
   role text not null check (role in ('admin', 'scorer')),
+  status text not null default 'approved' check (status in ('approved', 'pending')),
   player_id uuid references public.players(id) on delete cascade,
   allow_auto_reconnect boolean not null default false,
   auto_reconnect_device_id text,
   created_at timestamptz not null default now()
 );
+
+alter table public.app_role_members
+add column if not exists status text not null default 'approved';
+
+update public.app_role_members
+set status = 'approved'
+where status is null;
+
+alter table public.app_role_members
+drop constraint if exists app_role_members_status_check;
+
+alter table public.app_role_members
+add constraint app_role_members_status_check
+check (status in ('approved', 'pending'));
 
 alter table public.app_role_members
 add column if not exists allow_auto_reconnect boolean not null default false;

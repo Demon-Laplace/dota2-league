@@ -2045,6 +2045,10 @@ function canCurrentUserManageRoles() {
   return isCurrentRoleAdmin();
 }
 
+function isApprovedRoleMember(member) {
+  return (member?.status || "approved") === "approved";
+}
+
 function ensureScorerAccess(message = "当前身份无此操作权限。") {
   if (isCurrentRoleScorer()) return true;
   setMessage(message, true);
@@ -2058,7 +2062,15 @@ function ensureAdminAccess(message = "当前身份无管理员权限。") {
 }
 
 function getRoleMembersByRole(role) {
+  return roleMembers.filter((member) => member.role === role && isApprovedRoleMember(member));
+}
+
+function getRoleMembersByRoleAll(role) {
   return roleMembers.filter((member) => member.role === role);
+}
+
+function getPendingScorerApplications() {
+  return roleMembers.filter((member) => member.role === "scorer" && member.status === "pending");
 }
 
 function getAdminDisplayName(index) {
@@ -2174,7 +2186,7 @@ function renderAccessScorerOptions() {
 
 function renderAdminAddScorerOptions() {
   if (!adminAddScorerSelect) return;
-  const scorerPlayerIds = new Set(getRoleMembersByRole("scorer").map((member) => member.player_id));
+  const scorerPlayerIds = new Set(getRoleMembersByRoleAll("scorer").map((member) => member.player_id));
   const options = ['<option value="">请选择总表选手</option>'];
   allPlayersDirectory
     .filter((player) => !scorerPlayerIds.has(player.id))
@@ -2321,16 +2333,21 @@ function renderScorerPanelSummary() {
 function renderRoleMembers() {
   const admins = getRoleMembersByRole("admin");
   const scorers = getRoleMembersByRole("scorer");
+  const pendingScorers = getPendingScorerApplications();
 
   if (scorerMembersCount) {
-    scorerMembersCount.textContent = `${scorers.length} 人`;
+    scorerMembersCount.textContent = pendingScorers.length
+      ? `${scorers.length} 人，待审批 ${pendingScorers.length} 人`
+      : `${scorers.length} 人`;
   }
   if (adminPanelSummary) {
-    adminPanelSummary.textContent = `管理员 ${admins.length} 人 · 记分员 ${scorers.length} 人`;
+    adminPanelSummary.textContent = pendingScorers.length
+      ? `管理员 ${admins.length} 人 · 记分员 ${scorers.length} 人 · 待审批 ${pendingScorers.length} 人`
+      : `管理员 ${admins.length} 人 · 记分员 ${scorers.length} 人`;
   }
 
   if (scorerMembersList) {
-    scorerMembersList.innerHTML = scorers.length
+    const approvedHtml = scorers.length
       ? scorers.map((member) => `
         <div class="admin-member-card">
           <div>
@@ -2350,7 +2367,37 @@ function renderRoleMembers() {
           }
         </div>
       `).join("")
-      : '<p class="muted">暂无记分员</p>';
+      : '<p class="muted">暂无已启用记分员</p>';
+    const pendingHtml = pendingScorers.length
+      ? `
+        <div class="admin-member-section">
+          <p class="muted admin-member-section-title">记分员申请中</p>
+          ${pendingScorers.map((member) => `
+            <div class="admin-member-card admin-member-card-pending">
+              <div>
+                <strong>${escapeHtml(getScorerDisplayName(member))}</strong>
+                <span class="queue-slot">申请中</span>
+                <p class="muted">${escapeHtml(formatLocalTime(member.created_at) || "申请时间未知")}</p>
+              </div>
+              ${canCurrentUserManageRoles()
+                ? `<div class="admin-member-actions">
+                    <button type="button" class="button-secondary admin-approve-scorer-btn" data-role-member-id="${member.id}">通过</button>
+                    <button type="button" class="button-danger admin-reject-scorer-btn" data-role-member-id="${member.id}">驳回</button>
+                  </div>`
+                : ""
+              }
+            </div>
+          `).join("")}
+        </div>
+      `
+      : "";
+    scorerMembersList.innerHTML = `
+      <div class="admin-member-section">
+        <p class="muted admin-member-section-title">已启用记分员</p>
+        ${approvedHtml}
+      </div>
+      ${pendingHtml}
+    `;
   }
 
   renderAccessScorerOptions();
@@ -2378,7 +2425,7 @@ function validateStoredAccessSession() {
 
   if (stored.role === "scorer" && stored.memberId) {
     const member = getRoleAssignmentById(stored.memberId);
-    if (member?.role === "scorer") {
+    if (member?.role === "scorer" && isApprovedRoleMember(member)) {
       currentAccessSession = {
         role: "scorer",
         memberId: member.id,
@@ -6469,6 +6516,7 @@ async function loadRoleMembers() {
     .select(`
       id,
       role,
+      status,
       player_id,
       allow_auto_reconnect,
       auto_reconnect_device_id,
@@ -6479,7 +6527,11 @@ async function loadRoleMembers() {
     `)
     .order("created_at", { ascending: true });
 
-  if (error && (String(error.message || "").includes("allow_auto_reconnect") || String(error.message || "").includes("auto_reconnect_device_id"))) {
+  if (error && (
+    String(error.message || "").includes("allow_auto_reconnect")
+    || String(error.message || "").includes("auto_reconnect_device_id")
+    || String(error.message || "").includes("status")
+  )) {
     roleMembersSupportAutoReconnect = false;
     ({ data, error } = await db
       .from("app_role_members")
@@ -6505,6 +6557,7 @@ async function loadRoleMembers() {
 
   roleMembers = (data || []).map((member) => ({
     ...member,
+    status: member.status || "approved",
     allow_auto_reconnect: Boolean(member.allow_auto_reconnect),
     auto_reconnect_device_id: member.auto_reconnect_device_id || "",
     display_name: member.players?.display_name || "",
@@ -6522,9 +6575,13 @@ async function addScorerRoleByPlayer(playerId) {
     return;
   }
 
-  const existing = getRoleMembersByRole("scorer").find((member) => member.player_id === playerId);
-  if (existing) {
+  const existing = getRoleMembersByRoleAll("scorer").find((member) => member.player_id === playerId);
+  if (existing?.status === "approved") {
     setAdminPanelMessage("该选手已经是记分员。", true);
+    return;
+  }
+  if (existing?.status === "pending") {
+    setAdminPanelMessage("该选手当前处于申请中，请直接在下方审批。", true);
     return;
   }
 
@@ -6571,6 +6628,55 @@ async function removeScorerRole(memberId) {
 
   setAdminPanelMessage("记分员已移除。");
   appendAdminActionLog(`移除了记分员 ${member?.display_name || "该选手"}。`);
+  await loadRoleMembers();
+}
+
+async function approveScorerApplication(memberId) {
+  if (!ensureAdminAccess("仅管理员可审批记分员申请。")) return;
+  if (!memberId) return;
+
+  const member = getRoleAssignmentById(memberId);
+  if (!member || member.role !== "scorer" || member.status !== "pending") return;
+
+  setAdminPanelMessage("正在通过记分员申请...");
+  const { error } = await db
+    .from("app_role_members")
+    .update({ status: "approved" })
+    .eq("id", memberId);
+
+  if (error) {
+    setAdminPanelMessage(`审批记分员申请失败：${error.message}`, true);
+    return;
+  }
+
+  setAdminPanelMessage("记分员申请已通过。");
+  appendAdminActionLog(`通过了 ${member.display_name || "该选手"} 的记分员申请。`);
+  await loadRoleMembers();
+}
+
+async function rejectScorerApplication(memberId) {
+  if (!ensureAdminAccess("仅管理员可驳回记分员申请。")) return;
+  if (!memberId) return;
+
+  const member = getRoleAssignmentById(memberId);
+  if (!member || member.role !== "scorer" || member.status !== "pending") return;
+  const confirmed = window.confirm(`确认驳回 ${member.display_name || "该选手"} 的记分员申请吗？`);
+  if (!confirmed) return;
+
+  setAdminPanelMessage("正在驳回记分员申请...");
+  const { error } = await db.from("app_role_members").delete().eq("id", memberId);
+
+  if (error) {
+    setAdminPanelMessage(`驳回记分员申请失败：${error.message}`, true);
+    return;
+  }
+
+  if (readRememberedScorerPlayerId() === (member?.player_id || "")) {
+    writeRememberedScorerPlayerId("");
+  }
+
+  setAdminPanelMessage("记分员申请已驳回。");
+  appendAdminActionLog(`驳回了 ${member.display_name || "该选手"} 的记分员申请。`);
   await loadRoleMembers();
 }
 
@@ -6675,23 +6781,39 @@ async function confirmAccessRole() {
       return;
     }
 
-    let scorerMember = getRoleMembersByRole("scorer").find((member) => member.player_id === selectedPlayerId);
+    let scorerMember = getRoleMembersByRoleAll("scorer").find((member) => member.player_id === selectedPlayerId);
 
     if (!scorerMember) {
-      setAccessMessage("正在登记记分员身份...");
-      const { error } = await db.from("app_role_members").insert([{ role: "scorer", player_id: selectedPlayerId }]);
+      setAccessMessage("正在提交记分员申请...");
+      const { error } = await db.from("app_role_members").insert([{ role: "scorer", player_id: selectedPlayerId, status: "pending" }]);
 
       if (error && !String(error.message || "").includes("duplicate key")) {
-        setAccessMessage(`记分员身份登记失败：${error.message}`, true);
+        if (String(error.message || "").includes("status")) {
+          setAccessMessage("记分员申请功能依赖最新 SQL，请先执行 sql/access_roles.sql。", true);
+        } else {
+          setAccessMessage(`记分员申请提交失败：${error.message}`, true);
+        }
         return;
       }
 
       await loadRoleMembers();
-      scorerMember = getRoleMembersByRole("scorer").find((member) => member.player_id === selectedPlayerId);
+      scorerMember = getRoleMembersByRoleAll("scorer").find((member) => member.player_id === selectedPlayerId);
     }
 
     if (!scorerMember || scorerMember.role !== "scorer") {
-      setAccessMessage("该选手暂时无法成为记分员。", true);
+      setAccessMessage("该选手暂时无法申请记分员。", true);
+      return;
+    }
+
+    if (scorerMember.status === "pending") {
+      setAccessMessage("记分员申请已提交，请等待管理员审批通过后再登录。");
+      renderRoleMembers();
+      applyRolePermissions();
+      return;
+    }
+
+    if (!isApprovedRoleMember(scorerMember)) {
+      setAccessMessage("该选手当前尚未获得记分员权限。", true);
       return;
     }
 
@@ -9638,6 +9760,16 @@ accessPasswordInput.addEventListener("keydown", async (event) => {
 });
 
 scorerMembersList.addEventListener("click", async (event) => {
+  const approveButton = event.target.closest(".admin-approve-scorer-btn");
+  if (approveButton) {
+    await approveScorerApplication(approveButton.dataset.roleMemberId);
+    return;
+  }
+  const rejectButton = event.target.closest(".admin-reject-scorer-btn");
+  if (rejectButton) {
+    await rejectScorerApplication(rejectButton.dataset.roleMemberId);
+    return;
+  }
   const toggleButton = event.target.closest(".admin-toggle-scorer-reconnect-btn");
   if (toggleButton) {
     await toggleScorerAutoReconnect(
