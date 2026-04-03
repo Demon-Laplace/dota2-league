@@ -2466,6 +2466,10 @@ function buildSeasonRewardSummary() {
       };
     })
     .sort((a, b) => {
+      if (b.total !== a.total) {
+        return b.total - a.total;
+      }
+
       const leaderboardRankA = leaderboardPlayers.findIndex((player) => (player.player_id || player.id) === a.id);
       const leaderboardRankB = leaderboardPlayers.findIndex((player) => (player.player_id || player.id) === b.id);
       if (leaderboardRankA !== -1 || leaderboardRankB !== -1) {
@@ -2482,9 +2486,9 @@ function buildRewardCategoryLineHtml(item) {
   const label = item.label || config.label;
   const metaText = item.count > 1 ? ` · ${item.count} 次` : "";
   return `
-    <div class="reward-category-line">
+    <div class="reward-category-line reward-category-line-${config.tone}">
       <span class="reward-category-name reward-category-name-${config.tone}">${escapeHtml(label)}</span>
-      <span class="reward-category-value">+${formatScore(item.amount)}${escapeHtml(metaText)}</span>
+      <span class="reward-category-value reward-category-value-${config.tone}">+${formatScore(item.amount)}${escapeHtml(metaText)}</span>
     </div>
   `;
 }

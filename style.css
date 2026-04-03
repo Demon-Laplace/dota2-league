@@ -453,11 +453,26 @@ button.season-total {
 }
 
 .reward-category-name-extra {
-  color: #bdf7eb;
+  color: #ffe7ad;
 }
 
 .reward-category-name-misc {
   color: #d8e4f6;
+}
+
+.reward-category-line-extra {
+  background:
+    linear-gradient(135deg, rgba(118, 82, 22, 0.34), rgba(92, 58, 14, 0.22)),
+    rgba(13, 31, 53, 0.58);
+  border: 1px solid rgba(240, 195, 106, 0.18);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 244, 219, 0.05),
+    0 0 18px rgba(240, 195, 106, 0.06);
+}
+
+.reward-category-value-extra {
+  color: #fff2c8;
+  text-shadow: 0 0 10px rgba(240, 195, 106, 0.14);
 }
 
 .reward-detail-list {
