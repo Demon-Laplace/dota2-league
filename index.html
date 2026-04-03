@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Dota2 宁德联赛</title>
-  <link rel="stylesheet" href="style.css?v=20260403-19" />
+  <link rel="stylesheet" href="style.css?v=20260403-20" />
 </head>
   <body>
   <div id="loadingScreen" class="loading-screen" aria-live="polite">
@@ -236,6 +236,17 @@
                 <span class="leaderboard-compact-icon leaderboard-compact-icon-dot" aria-hidden="true"></span>
               </button>
             </div>
+            <div class="leaderboard-head-actions">
+              <button
+                id="leaderboardCopyBtn"
+                class="season-chip leaderboard-copy-btn"
+                type="button"
+                aria-label="复制积分榜文本"
+                title="复制积分榜文本"
+              >
+                <span class="leaderboard-copy-icon" aria-hidden="true">⎙</span>
+              </button>
+            </div>
           </div>
           <div class="leaderboard-scroll-shell">
             <table class="leaderboard-table">
@@ -420,6 +431,6 @@
   </div>
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="app.js?v=20260403-28"></script>
+  <script src="app.js?v=20260403-29"></script>
 </body>
 </html>

@@ -84,6 +84,7 @@ const todayPlayersEmpty = document.getElementById("todayPlayersEmpty");
 const todayPlayersCount = document.getElementById("todayPlayersCount");
 const leaderboardCard = document.getElementById("leaderboardCard");
 const leaderboardCompactBtn = document.getElementById("leaderboardCompactBtn");
+const leaderboardCopyBtn = document.getElementById("leaderboardCopyBtn");
 const leaderboardBody = document.getElementById("leaderboardBody");
 const openMatchFormBtn = document.getElementById("openMatchFormBtn");
 const finishTodayMatchDayBtn = document.getElementById("finishTodayMatchDayBtn");
@@ -894,6 +895,84 @@ function getWinRateNumber(value, wins = 0, gamesPlayed = 0) {
 function formatWinRateValue(value, wins = 0, gamesPlayed = 0) {
   const resolvedValue = getWinRateNumber(value, wins, gamesPlayed);
   return `${resolvedValue.toFixed(1).replace(/\.0$/, "")}%`;
+}
+
+function buildLeaderboardShareText(players = leaderboardPlayers) {
+  const source = players || [];
+  if (!source.length) {
+    return "";
+  }
+
+  const header = activeSeason?.name
+    ? `${activeSeason.name}积分榜`
+    : "积分榜";
+
+  const lines = source.map((player, idx) => {
+    const playerName = stripPlayerNameMeta(player.display_name || "未知选手");
+    const score = formatScore(player.score);
+    const gamesPlayed = Number(player.games_played ?? 0);
+    return `${idx + 1}. ${playerName} ${score}分 ${gamesPlayed}场`;
+  });
+
+  return [
+    header,
+    "排名 玩家姓名 积分 场次",
+    ...lines,
+  ].join("\n");
+}
+
+async function copyTextToClipboard(text) {
+  if (!text) return false;
+
+  if (navigator.clipboard?.writeText) {
+    await navigator.clipboard.writeText(text);
+    return true;
+  }
+
+  const textarea = document.createElement("textarea");
+  textarea.value = text;
+  textarea.setAttribute("readonly", "readonly");
+  textarea.style.position = "fixed";
+  textarea.style.opacity = "0";
+  textarea.style.pointerEvents = "none";
+  document.body.appendChild(textarea);
+  textarea.select();
+  textarea.setSelectionRange(0, textarea.value.length);
+
+  let copied = false;
+  try {
+    copied = document.execCommand("copy");
+  } finally {
+    textarea.remove();
+  }
+  return copied;
+}
+
+async function copyLeaderboardSummary() {
+  const text = buildLeaderboardShareText();
+  if (!text) {
+    setMessage("当前暂无可复制的积分榜内容。", true);
+    return;
+  }
+
+  if (leaderboardCopyBtn) {
+    leaderboardCopyBtn.disabled = true;
+  }
+
+  try {
+    const copied = await copyTextToClipboard(text);
+    if (!copied) {
+      setMessage("积分榜复制失败，请稍后重试。", true);
+      return;
+    }
+    setMessage("积分榜文本已复制，可直接粘贴到微信。");
+  } catch (error) {
+    setMessage(`积分榜复制失败：${error.message || "未知错误"}`, true);
+  } finally {
+    if (leaderboardCopyBtn) {
+      leaderboardCopyBtn.disabled = false;
+    }
+  }
 }
 
 function getHeroDisplayName(heroName) {
@@ -7005,6 +7084,10 @@ clearHeroBtn.addEventListener("click", async () => {
 leaderboardCompactBtn.addEventListener("click", () => {
   setLeaderboardCompactMode(!isLeaderboardCompact);
 });
+
+if (leaderboardCopyBtn) {
+  leaderboardCopyBtn.addEventListener("click", copyLeaderboardSummary);
+}
 
 document.addEventListener("keydown", (event) => {
   if (event.key === "Escape" && !heroPickerModal.hidden) {
