@@ -2452,6 +2452,13 @@ function formatArchiveDate(value) {
   return `${year}-${month}-${day}`;
 }
 
+function formatMatchDaySummaryLabel(value) {
+  if (!value) return "历史比赛";
+  const matched = String(value).match(/^\d{4}-\d{2}-(\d{2})$/);
+  if (!matched) return String(value);
+  return `${Number(matched[1])}日`;
+}
+
 function parseSeasonStartDate(value) {
   if (!value) return null;
   if (typeof value === "string") {
@@ -6182,7 +6189,7 @@ function renderRecentMatches(groups) {
     details.innerHTML = `
       <summary>
         <div class="match-day-summary">
-          <strong>${escapeHtml(group.match_date || "历史比赛")}</strong>
+          <strong>${escapeHtml(formatMatchDaySummaryLabel(group.match_date))}</strong>
           <span class="queue-slot">${matches.length} 场</span>
           <span class="match-day-player-count">${matchDayPlayerCount} 人</span>
           ${playerSummaryHtml}
@@ -6198,9 +6205,6 @@ function renderRecentMatches(groups) {
           >
             <span class="leaderboard-copy-icon" aria-hidden="true">⎘</span>
           </button>
-        <span class="match-day-toggle">
-          <span class="match-day-toggle-icon" aria-hidden="true"></span>
-        </span>
         </span>
       </summary>
       <div class="match-day-content">

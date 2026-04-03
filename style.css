@@ -2168,8 +2168,8 @@ button:disabled {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  gap: 12px;
-  flex-wrap: wrap;
+  gap: 10px;
+  flex-wrap: nowrap;
   background: rgba(20, 43, 73, 0.62);
 }
 
@@ -2181,8 +2181,9 @@ button:disabled {
 .match-day-summary-actions {
   display: inline-flex;
   align-items: center;
-  gap: 8px;
+  justify-content: flex-end;
   flex: 0 0 auto;
+  margin-left: auto;
 }
 
 .match-day-copy-btn {
@@ -2198,6 +2199,7 @@ button:disabled {
   font-size: 0;
   line-height: 1;
   color: transparent;
+  margin-left: 8px;
   background: rgba(12, 28, 47, 0.38);
   border: 1px solid rgba(124, 165, 209, 0.14);
   box-shadow:
@@ -2213,7 +2215,7 @@ button:disabled {
   font-size: 12px;
 }
 
-.match-day-toggle-icon {
+.recent-match-season-summary .match-day-toggle-icon {
   width: 0;
   height: 0;
   border-top: 5px solid transparent;
@@ -2223,18 +2225,7 @@ button:disabled {
   transform-origin: 35% 50%;
 }
 
-.match-day-group[open] .match-day-toggle-icon {
-  transform: rotate(90deg);
-}
-
-.recent-match-season-group[open] .match-day-toggle-icon {
-  transform: rotate(90deg);
-}
-
-.match-day-group[data-expanded="true"] .match-day-toggle-icon {
-  transform: rotate(90deg);
-}
-
+.recent-match-season-group[open] .match-day-toggle-icon,
 .recent-match-season-group[data-expanded="true"] .match-day-toggle-icon {
   transform: rotate(90deg);
 }
@@ -2245,11 +2236,17 @@ button:disabled {
 
 .match-day-summary {
   display: flex;
-  gap: 8px;
+  gap: 6px;
   align-items: center;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   min-width: 0;
-  flex: 1 1 360px;
+  flex: 1 1 auto;
+}
+
+.match-day-summary strong,
+.match-day-summary .queue-slot,
+.match-day-player-count {
+  white-space: nowrap;
 }
 
 .match-day-player-count {
@@ -2270,7 +2267,7 @@ button:disabled {
   display: flex;
   align-items: center;
   gap: 0;
-  flex: 1 1 280px;
+  flex: 1 1 auto;
   min-width: 0;
   max-width: 100%;
   overflow: hidden;
@@ -4553,6 +4550,19 @@ button.score-detail-summary-card {
 }
 
 @media (max-width: 520px) {
+  .match-day-group summary,
+  .match-day-summary {
+    flex-wrap: wrap;
+  }
+
+  .match-day-summary-actions {
+    margin-left: 0;
+  }
+
+  .match-day-copy-btn {
+    margin-left: 0;
+  }
+
   .leaderboard-table thead th:nth-child(4),
   .leaderboard-table tbody td:nth-child(4),
   .leaderboard-table thead th:nth-child(5),
