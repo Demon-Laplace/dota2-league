@@ -2763,11 +2763,17 @@ function getExtraPenaltyMap(matches) {
     if (!hasRecordedWinner(match.winner_team)) return;
     parseRecentMatchPlayers(match.players).forEach((player) => {
       const playerId = player.player_id || player.id;
-      if (!playerId || player.team === match.winner_team) return;
+      if (!playerId) return;
       const scoreChange = Number(player.score_change ?? 0);
-      const extraPenalty = Math.max((-1) - scoreChange, 0);
-      if (extraPenalty <= 0) return;
-      penaltyMap.set(playerId, Number((penaltyMap.get(playerId) || 0) + extraPenalty));
+      const extraGain = player.team === match.winner_team
+        ? Math.max(scoreChange - 1, 0)
+        : 0;
+      const extraPenalty = player.team !== match.winner_team
+        ? Math.max((-1) - scoreChange, 0)
+        : 0;
+      const netPenalty = extraPenalty - extraGain;
+      if (!netPenalty) return;
+      penaltyMap.set(playerId, Number((penaltyMap.get(playerId) || 0) + netPenalty));
     });
   });
 
@@ -5225,7 +5231,7 @@ function renderLeaderboard(data) {
     }
 
     if (superDoubleIds.has(playerId)) {
-      tags.push({ icon: "⟡", label: "超级加倍", tone: "arcane", description: "因双倍等效果吃到的额外扣分最多的人" });
+      tags.push({ icon: "⟡", label: "超级加倍", tone: "arcane", description: "扣除额外加成后 双倍净扣分最多的人" });
     }
 
     if (teammateAffinity.unluckyId && teammateAffinity.unluckyId === playerId) {
