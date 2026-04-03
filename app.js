@@ -1171,6 +1171,7 @@ function setSeasonPanelOpen(isOpen) {
   isSeasonPanelOpen = isOpen;
   seasonPlayersPanel.hidden = !isOpen;
   seasonToggleBtn.setAttribute("aria-expanded", String(isOpen));
+  renderSeasonRolloverAction();
 }
 
 function setRewardPanelOpen(isOpen) {
@@ -2632,6 +2633,9 @@ function renderSeasonRolloverAction() {
 
   const canScore = isCurrentRoleScorer();
   seasonRolloverBlock.hidden = !canScore;
+  seasonRolloverBlock.style.display = canScore ? "" : "none";
+  seasonRolloverBtn.hidden = !canScore;
+  seasonRolloverStatus.hidden = !canScore;
   if (!canScore) {
     return;
   }
@@ -3564,7 +3568,6 @@ function renderTeamSelectionUI({
               title="个人双倍"
             >◉</button>
           </div>
-          ${buildPlayerKdaInputsHtml(formType, player.id)}
           <div class="player-double-options${singleDoublePickerOpen[formType][player.id] || getSingleDoubleTargetByUser(formType, player.id) ? " player-double-options-open" : ""}">
             ${buildSingleDoubleOptionsHtml(formType, player, getSelectedPlayersByFormType(formType))}
           </div>
@@ -4339,9 +4342,6 @@ function renderMatchForm() {
   recordMatchBtn.disabled = !canUseForm || !hasCompleteTeams;
   closeMatchFormBtn.disabled = false;
   openMatchFormBtn.disabled = isMatchFormOpen;
-  [...matchFormPanel.querySelectorAll('[data-role="player-kda-input"]')].forEach((input) => {
-    input.disabled = !canUseForm;
-  });
   [...matchFormPanel.querySelectorAll('[data-role="winner-toggle"]')].forEach((button) => {
     button.disabled = !canUseForm;
   });
@@ -4361,9 +4361,6 @@ function renderBackfillForm() {
   backfillMatchNoteInput.disabled = !hasSeason || !hasEnoughPlayers;
   recordBackfillBtn.disabled = !hasSeason || !hasEnoughPlayers || !backfillDateInput.value;
   recordBackfillBtn.textContent = editingMatchId ? "保存修改" : "保存补录比赛";
-  [...backfillFormPanel.querySelectorAll('[data-role="player-kda-input"]')].forEach((input) => {
-    input.disabled = !hasSeason || !hasEnoughPlayers;
-  });
   [...backfillFormPanel.querySelectorAll('[data-role="winner-toggle"]')].forEach((button) => {
     button.disabled = !hasSeason || !hasEnoughPlayers;
   });
@@ -7790,44 +7787,12 @@ matchFormPanel.addEventListener("click", (event) => {
   togglePlayerSelection(chip.dataset.formType || "match", chip.dataset.team, chip.dataset.playerId);
 });
 
-matchFormPanel.addEventListener("input", (event) => {
-  const kdaInput = event.target.closest('[data-role="player-kda-input"]');
-  if (!kdaInput) return;
-  setPlayerKdaField(
-    "match",
-    kdaInput.dataset.playerId || "",
-    kdaInput.dataset.kdaField || "",
-    kdaInput.value
-  );
-});
-
 backfillFormPanel.addEventListener("change", async (event) => {
   if (event.target === backfillSeasonSelect) {
     clearBackfillForm();
     await loadPlayersForSeason(backfillSeasonSelect.value);
     return;
   }
-
-  const kdaInput = event.target.closest('[data-role="player-kda-input"]');
-  if (kdaInput) {
-    setPlayerKdaField(
-      "backfill",
-      kdaInput.dataset.playerId || "",
-      kdaInput.dataset.kdaField || "",
-      kdaInput.value
-    );
-  }
-});
-
-backfillFormPanel.addEventListener("input", (event) => {
-  const kdaInput = event.target.closest('[data-role="player-kda-input"]');
-  if (!kdaInput) return;
-  setPlayerKdaField(
-    "backfill",
-    kdaInput.dataset.playerId || "",
-    kdaInput.dataset.kdaField || "",
-    kdaInput.value
-  );
 });
 
 backfillFormPanel.addEventListener("click", (event) => {
