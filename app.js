@@ -15,12 +15,35 @@ const REMEMBERED_SCORER_PLAYER_KEY = "nd_dota_remembered_scorer_player_v1";
 const SKIP_NEXT_SCORER_RECONNECT_KEY = "nd_dota_skip_next_scorer_reconnect_v1";
 const DEVICE_ID_STORAGE_KEY = "nd_dota_device_id_v1";
 const LEADERBOARD_COMPACT_STORAGE_KEY = "nd_dota_leaderboard_compact_v1";
+const RECENT_MATCH_SEASON_OPEN_STORAGE_KEY = "nd_dota_recent_match_seasons_open_v1";
 const MOBILE_LAYOUT_MEDIA_QUERY = "(max-width: 720px)";
 
 const db = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 function isMobileViewport() {
   return window.matchMedia(MOBILE_LAYOUT_MEDIA_QUERY).matches;
+}
+
+function readOpenRecentMatchSeasons() {
+  try {
+    const raw = window.localStorage.getItem(RECENT_MATCH_SEASON_OPEN_STORAGE_KEY);
+    if (!raw) return new Set();
+    const parsed = JSON.parse(raw);
+    return new Set(Array.isArray(parsed) ? parsed.filter(Boolean) : []);
+  } catch (_error) {
+    return new Set();
+  }
+}
+
+function writeOpenRecentMatchSeasons() {
+  try {
+    window.localStorage.setItem(
+      RECENT_MATCH_SEASON_OPEN_STORAGE_KEY,
+      JSON.stringify([...openRecentMatchSeasons].filter(Boolean))
+    );
+  } catch (_error) {
+    // Ignore storage failures and fall back to in-memory state.
+  }
 }
 
 const loadingScreen = document.getElementById("loadingScreen");
@@ -196,7 +219,7 @@ let recentMatchesData = [];
 let recentMatchDayGroupsData = [];
 let roleMembersSupportAutoReconnect = true;
 let openRecentMatchGroups = new Set();
-let openRecentMatchSeasons = new Set();
+let openRecentMatchSeasons = readOpenRecentMatchSeasons();
 let isMatchFormOpen = false;
 let isBackfillFormOpen = false;
 let isSeasonPanelOpen = false;
@@ -5752,15 +5775,16 @@ function getDateMonthKey(dateString) {
 
 function shouldOpenSeasonGroupByDefault(seasonMeta, groups) {
   if (!seasonMeta) return true;
-  if (openRecentMatchSeasons.has(seasonMeta.id)) return true;
+  const hasActiveDay = (groups || []).some((group) => group.day_is_active);
+  if (hasActiveDay) return true;
   if (activeSeason?.id && seasonMeta.id === activeSeason.id) return true;
+  if (openRecentMatchSeasons.has(seasonMeta.id)) return true;
 
   const todayMonth = getDateMonthKey(getBeijingBusinessDateString());
   const startMonth = getDateMonthKey(seasonMeta.start_date);
   const isEnded = Boolean(seasonMeta.end_date) || seasonMeta.is_active === false;
-  const hasActiveDay = (groups || []).some((group) => group.day_is_active);
 
-  if (hasActiveDay || seasonMeta.is_active) return true;
+  if (seasonMeta.is_active) return true;
   if (isEnded) return false;
   return Boolean(startMonth && startMonth === todayMonth);
 }
@@ -5939,17 +5963,22 @@ function renderRecentMatches(groups) {
     const matchDayCount = dayGroups.filter((group) => (group.matches?.length || 0) > 0).length;
     const restDayCount = Math.max(dayGroups.length - matchDayCount, 0);
     const isSeasonOpen = shouldOpenSeasonGroupByDefault(seasonMeta, dayGroups);
+    if (seasonEntry.season_id && isSeasonOpen) {
+      openRecentMatchSeasons.add(seasonEntry.season_id);
+      writeOpenRecentMatchSeasons();
+    }
     seasonDetails.className = "recent-match-season-group";
     seasonDetails.dataset.seasonId = seasonEntry.season_id || "";
     seasonDetails.open = isSeasonOpen;
     seasonDetails.dataset.expanded = isSeasonOpen ? "true" : "false";
     seasonDetails.addEventListener("toggle", () => {
       if (seasonEntry.season_id) {
-        if (seasonDetails.open) {
+        if (seasonDetails.open || (activeSeason?.id && seasonEntry.season_id === activeSeason.id)) {
           openRecentMatchSeasons.add(seasonEntry.season_id);
         } else {
           openRecentMatchSeasons.delete(seasonEntry.season_id);
         }
+        writeOpenRecentMatchSeasons();
       }
       seasonDetails.dataset.expanded = seasonDetails.open ? "true" : "false";
     });
