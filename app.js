@@ -3068,11 +3068,19 @@ function getMatchDayParticipantEntries(matches) {
 
 function buildMatchDayPlayerSummaryHtml(participants, attendanceNotes) {
   const participantIdSet = new Set((participants || []).map((entry) => entry.player_id).filter(Boolean));
+  const lateParticipantIdSet = new Set(
+    (attendanceNotes || [])
+      .filter((entry) => entry.status === "absent" && participantIdSet.has(entry.player_id))
+      .map((entry) => entry.player_id)
+      .filter(Boolean)
+  );
   const summaryEntries = [
     ...(participants || []).map((entry) => ({
       ...entry,
       display_name: stripPlayerNameMeta(entry.display_name || "未知选手") || "未知选手",
-      className: "match-day-player-name-participant",
+      className: lateParticipantIdSet.has(entry.player_id)
+        ? "match-day-player-name-late"
+        : "match-day-player-name-participant",
       sortOrder: 0,
     })),
     ...(attendanceNotes || [])
@@ -3085,11 +3093,12 @@ function buildMatchDayPlayerSummaryHtml(participants, attendanceNotes) {
       })),
     ...(attendanceNotes || [])
       .filter((entry) => entry.status === "absent")
+      .filter((entry) => !participantIdSet.has(entry.player_id))
       .map((entry) => ({
         ...entry,
         display_name: stripPlayerNameMeta(entry.display_name || "未知选手") || "未知选手",
-        className: participantIdSet.has(entry.player_id) ? "match-day-player-name-late" : "match-day-player-name-absent",
-        sortOrder: participantIdSet.has(entry.player_id) ? 1 : 2,
+        className: "match-day-player-name-absent",
+        sortOrder: 2,
       })),
   ];
 
