@@ -453,8 +453,17 @@ button.season-total {
   margin: 0;
 }
 
+.admin-panel-card p {
+  margin: 0;
+  line-height: 1.6;
+}
+
 .admin-panel-actions {
   align-items: stretch;
+}
+
+.scorer-panel-nav-btn {
+  min-width: 96px;
 }
 
 .admin-members-list {
@@ -2018,7 +2027,7 @@ button:disabled {
 .leaderboard-title-block {
   display: inline-flex;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
   min-width: 0;
 }
 
@@ -2027,25 +2036,34 @@ button:disabled {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 36px;
-  height: 36px;
-  min-width: 36px;
+  width: 24px;
+  height: 24px;
+  min-width: 24px;
   padding: 0;
-  font-size: 15px;
+  font-size: 11px;
   line-height: 1;
+  color: rgba(189, 209, 234, 0.9);
+  background: rgba(16, 34, 57, 0.56);
+  border: 1px solid rgba(124, 165, 209, 0.18);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.03),
+    0 6px 16px rgba(2, 10, 24, 0.14);
 }
 
 .leaderboard-compact-icon {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  transform: translateY(-1px);
+  transform: translateY(-0.5px);
 }
 
 .leaderboard-compact-btn[aria-pressed="true"] {
-  color: #fff8e6;
-  border-color: rgba(240, 195, 106, 0.4);
-  background: linear-gradient(135deg, rgba(94, 70, 22, 0.98), rgba(41, 33, 17, 0.98));
+  color: #ebf6ff;
+  border-color: rgba(126, 224, 216, 0.3);
+  background: linear-gradient(135deg, rgba(20, 72, 88, 0.86), rgba(14, 41, 64, 0.92));
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.04),
+    0 8px 18px rgba(4, 18, 32, 0.16);
 }
 
 .leaderboard-scroll-shell {
@@ -2075,7 +2093,7 @@ button:disabled {
 }
 
 .leaderboard-card-compact .leaderboard-scroll-shell {
-  max-height: 336px;
+  max-height: 372px;
   overflow: auto;
   overscroll-behavior: contain;
 }
@@ -2224,18 +2242,21 @@ ol {
   display: flex;
   align-items: center;
   justify-content: flex-end;
+  flex: 0 0 110px;
 }
 
-.queue-card-actions button {
+.queue-action-btn {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: auto;
-  min-width: 88px;
-  padding: 7px 10px;
+  width: 110px;
+  height: 34px;
+  padding: 0 10px;
   border-radius: 10px;
   font-size: 12px;
   line-height: 1.2;
+  text-align: center;
+  white-space: nowrap;
 }
 
 .queue-status-standby {
@@ -2474,6 +2495,58 @@ ol {
   font-size: 9px;
   line-height: 1;
   background: rgba(255, 255, 255, 0.06);
+}
+
+.leaderboard-card-compact .leaderboard-table tbody td {
+  padding: 10px 10px;
+}
+
+.leaderboard-card-compact .leaderboard-player-cell {
+  gap: 2px;
+}
+
+.leaderboard-card-compact .leaderboard-player-name {
+  font-size: 15px;
+}
+
+.leaderboard-card-compact .leaderboard-player-tags {
+  flex-wrap: nowrap;
+  gap: 4px;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.leaderboard-card-compact .leaderboard-tag {
+  gap: 4px;
+  padding: 1px 6px 1px 4px;
+  font-size: 9px;
+  line-height: 1.25;
+  white-space: nowrap;
+}
+
+.leaderboard-card-compact .leaderboard-tag-icon {
+  width: 13px;
+  height: 13px;
+  font-size: 8px;
+}
+
+.leaderboard-card-compact .leaderboard-score {
+  min-width: 48px;
+  font-size: 18px;
+}
+
+.leaderboard-card-compact .leaderboard-stat,
+.leaderboard-card-compact .leaderboard-reward {
+  min-width: 32px;
+  padding: 3px 8px;
+  font-size: 11px;
+}
+
+.leaderboard-card-compact .leaderboard-rank {
+  min-width: 30px;
+  height: 30px;
+  padding: 0 8px;
+  font-size: 13px;
 }
 
 .leaderboard-tag-gold {
@@ -2865,7 +2938,7 @@ ol {
   }
 
   .leaderboard-card-compact .leaderboard-scroll-shell {
-    max-height: 336px;
+    max-height: 372px;
   }
 
   #queueList {
@@ -2879,9 +2952,10 @@ ol {
 
   .queue-card-actions {
     justify-content: flex-start;
+    flex-basis: auto;
   }
 
-  .queue-card-actions button {
+  .queue-action-btn {
     width: 100%;
   }
 

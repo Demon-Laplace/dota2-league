@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Dota2 宁德联赛</title>
-  <link rel="stylesheet" href="style.css?v=20260403-05" />
+  <link rel="stylesheet" href="style.css?v=20260403-06" />
 </head>
   <body>
   <div id="loadingScreen" class="loading-screen" aria-live="polite">
@@ -31,6 +31,7 @@
         </h1>
       </div>
       <div class="page-head-meta">
+        <button id="scorerModeBtn" class="season-chip" type="button" hidden>记录员模式</button>
         <button id="adminModeBtn" class="season-chip" type="button" hidden>管理员模式</button>
         <button id="seasonToggleBtn" class="season-chip" type="button" aria-expanded="false">
           当前赛季：加载中...
@@ -39,6 +40,50 @@
       </div>
     </div>
     <p class="sub">测试版：报名队列 + 积分榜, 项目启动于北京时间 2026/4/1 19:30:59, 最后更新于 <span id="lastUpdatedText">读取中...</span></p>
+    <section id="scorerPanel" class="season-panel admin-panel" hidden>
+      <div class="section-head">
+        <div>
+          <h2>记录员面板</h2>
+          <p id="scorerPanelSummary" class="muted">加载中...</p>
+        </div>
+        <div class="row">
+          <button id="scorerExitModeBtn" class="button-danger" type="button">退出记录员模式</button>
+          <button id="closeScorerPanelBtn" class="button-secondary" type="button">收起</button>
+        </div>
+      </div>
+      <div class="admin-panel-grid">
+        <section class="admin-panel-card">
+          <div class="section-head">
+            <h3>快捷入口</h3>
+          </div>
+          <div class="row admin-panel-actions">
+            <button type="button" class="button-secondary scorer-panel-nav-btn" data-scroll-target="signupSection">报名</button>
+            <button type="button" class="button-secondary scorer-panel-nav-btn" data-scroll-target="queueSection">报名队列</button>
+            <button type="button" class="button-secondary scorer-panel-nav-btn" data-scroll-target="recordEntrySection">记录比赛</button>
+            <button type="button" class="button-secondary scorer-panel-nav-btn" data-scroll-target="recentMatchesSection">最近比赛</button>
+          </div>
+        </section>
+        <section class="admin-panel-card">
+          <div class="section-head">
+            <h3>当前状态</h3>
+          </div>
+          <p id="scorerPanelStatusText" class="muted">加载中...</p>
+        </section>
+        <section class="admin-panel-card">
+          <div class="section-head">
+            <h3>预留操作 A</h3>
+          </div>
+          <p class="muted">这里预留给记录员的快捷登记、批量处理或校验功能，后续可直接往本卡片扩展。</p>
+        </section>
+        <section class="admin-panel-card">
+          <div class="section-head">
+            <h3>预留操作 B</h3>
+          </div>
+          <p class="muted">这里预留给记录员的赛中辅助工具、临时面板或额外配置入口，后续可继续拆分。</p>
+        </section>
+      </div>
+      <p id="scorerPanelMessage" class="message"></p>
+    </section>
     <section id="adminPanel" class="season-panel admin-panel" hidden>
       <div class="section-head">
         <div>
@@ -140,7 +185,7 @@
           <p id="matchDayInfo" class="muted">请输入开始时间，留空默认19:30</p>
         </section>
 
-        <section class="card">
+        <section id="signupSection" class="card">
           <div class="section-head">
             <h2>报名</h2>
             <button id="signupAllBtn" class="button-secondary signup-all-btn" type="button" hidden>全部报名</button>
@@ -150,7 +195,7 @@
           <p id="message" class="message"></p>
         </section>
 
-        <section class="card">
+        <section id="queueSection" class="card">
           <div class="section-head">
             <h2>当前报名队列</h2>
             <div class="row">
@@ -308,7 +353,7 @@
           </div>
         </section>
 
-        <section class="card">
+        <section id="recentMatchesSection" class="card">
           <h2>最近比赛记录</h2>
           <div id="recentMatchesList" class="recent-matches"></div>
           <p id="recentMatchesEmpty" class="muted">暂无比赛记录</p>
@@ -373,6 +418,6 @@
   </div>
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="app.js?v=20260403-04"></script>
+  <script src="app.js?v=20260403-05"></script>
 </body>
 </html>

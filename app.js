@@ -27,10 +27,16 @@ const messageEl = document.getElementById("message");
 const seasonToggleBtn = document.getElementById("seasonToggleBtn");
 const adminSecretTrigger = document.getElementById("adminSecretTrigger");
 const adminLogoTrigger = document.getElementById("adminLogoTrigger");
+const scorerModeBtn = document.getElementById("scorerModeBtn");
 const adminModeBtn = document.getElementById("adminModeBtn");
+const scorerPanel = document.getElementById("scorerPanel");
 const adminPanel = document.getElementById("adminPanel");
+const closeScorerPanelBtn = document.getElementById("closeScorerPanelBtn");
 const closeAdminPanelBtn = document.getElementById("closeAdminPanelBtn");
+const scorerExitModeBtn = document.getElementById("scorerExitModeBtn");
 const adminExitModeBtn = document.getElementById("adminExitModeBtn");
+const scorerPanelSummary = document.getElementById("scorerPanelSummary");
+const scorerPanelStatusText = document.getElementById("scorerPanelStatusText");
 const adminPanelSummary = document.getElementById("adminPanelSummary");
 const scorerMembersCount = document.getElementById("scorerMembersCount");
 const scorerMembersList = document.getElementById("scorerMembersList");
@@ -38,6 +44,7 @@ const adminActionLogsList = document.getElementById("adminActionLogsList");
 const adminActionLogsEmpty = document.getElementById("adminActionLogsEmpty");
 const adminAddScorerSelect = document.getElementById("adminAddScorerSelect");
 const adminAddScorerBtn = document.getElementById("adminAddScorerBtn");
+const scorerPanelMessage = document.getElementById("scorerPanelMessage");
 const adminPanelMessage = document.getElementById("adminPanelMessage");
 const adminClearQueueBtn = document.getElementById("adminClearQueueBtn");
 const adminClearTodayPlayersBtn = document.getElementById("adminClearTodayPlayersBtn");
@@ -155,6 +162,7 @@ let isMatchFormOpen = false;
 let isBackfillFormOpen = false;
 let isSeasonPanelOpen = false;
 let isRewardPanelOpen = false;
+let isScorerPanelOpen = false;
 let isAdminPanelOpen = false;
 let isLeaderboardCompact = false;
 let editingMatchId = null;
@@ -909,12 +917,33 @@ function setRewardPanelOpen(isOpen) {
   seasonRewardTotal.setAttribute("aria-expanded", String(isOpen));
 }
 
+function isCurrentRoleScorerOnly() {
+  return currentAccessSession.role === "scorer";
+}
+
+function setScorerPanelOpen(isOpen) {
+  isScorerPanelOpen = Boolean(isOpen) && isCurrentRoleScorerOnly();
+  if (scorerPanel) {
+    scorerPanel.hidden = !isScorerPanelOpen;
+  }
+  if (scorerModeBtn) {
+    scorerModeBtn.setAttribute("aria-expanded", String(isScorerPanelOpen));
+    scorerModeBtn.textContent = isScorerPanelOpen ? "收起记录" : "记录员模式";
+  }
+  if (isScorerPanelOpen) {
+    setAdminPanelOpen(false);
+  }
+}
+
 function setAdminPanelOpen(isOpen) {
   isAdminPanelOpen = isOpen && isCurrentRoleAdmin();
   adminPanel.hidden = !isAdminPanelOpen;
   adminModeBtn.setAttribute("aria-expanded", String(isAdminPanelOpen));
   if (adminModeBtn) {
     adminModeBtn.textContent = isAdminPanelOpen ? "收起管理" : "管理员模式";
+  }
+  if (isAdminPanelOpen) {
+    setScorerPanelOpen(false);
   }
 }
 
@@ -1121,6 +1150,12 @@ function setAdminPanelMessage(text = "", isError = false) {
   adminPanelMessage.className = isError ? "message error" : "message";
 }
 
+function setScorerPanelMessage(text = "", isError = false) {
+  if (!scorerPanelMessage) return;
+  scorerPanelMessage.textContent = text;
+  scorerPanelMessage.className = isError ? "message error" : "message";
+}
+
 function setAccessMessage(text = "", isError = false) {
   if (!accessMessage) return;
   accessMessage.textContent = text;
@@ -1203,6 +1238,25 @@ function renderAdminAddScorerOptions() {
   adminAddScorerSelect.innerHTML = options.join("");
 }
 
+function renderScorerPanelSummary() {
+  if (!scorerPanelSummary || !scorerPanelStatusText) return;
+
+  if (!isCurrentRoleScorerOnly()) {
+    scorerPanelSummary.textContent = "当前未进入记录员模式。";
+    scorerPanelStatusText.textContent = "记录员面板仅在记录员身份下显示。";
+    return;
+  }
+
+  const actorLabel = getCurrentAccessActorLabel();
+  const seasonLabel = activeSeason?.name || "未选择赛季";
+  const matchDayLabel = activeMatchDay ? "当日比赛进行中" : "未发起当日比赛";
+  const queueCount = queueEntries.filter((row) => row.is_active === true && row.status !== "confirmed").length;
+  const todayCount = todayPlayers.length;
+
+  scorerPanelSummary.textContent = `${actorLabel} · ${seasonLabel} · ${matchDayLabel}`;
+  scorerPanelStatusText.textContent = `当前可直接处理报名、队列到齐、当日名单与比赛记录。报名队列 ${queueCount} 人，当日选手 ${todayCount} 人。`;
+}
+
 function renderRoleMembers() {
   const admins = getRoleMembersByRole("admin");
   const scorers = getRoleMembersByRole("scorer");
@@ -1241,6 +1295,7 @@ function renderRoleMembers() {
   renderAccessScorerOptions();
   renderAdminAddScorerOptions();
   renderAdminActionLogs();
+  renderScorerPanelSummary();
 }
 
 function getRoleAssignmentById(id) {
@@ -1275,6 +1330,12 @@ function validateStoredAccessSession() {
 function applyRolePermissions() {
   const canScore = isCurrentRoleScorer();
   const isAdmin = isCurrentRoleAdmin();
+  const isScorerOnly = isCurrentRoleScorerOnly();
+
+  if (scorerModeBtn) {
+    scorerModeBtn.hidden = !isScorerOnly;
+    scorerModeBtn.textContent = isScorerPanelOpen ? "收起记录" : "记录员模式";
+  }
 
   if (adminModeBtn) {
     adminModeBtn.hidden = !isAdmin;
@@ -1333,7 +1394,11 @@ function applyRolePermissions() {
   if (!isAdmin) {
     setAdminPanelOpen(false);
   }
+  if (!isScorerOnly) {
+    setScorerPanelOpen(false);
+  }
 
+  renderScorerPanelSummary();
   renderSeasonPlayersPanel();
   renderRecentMatches(recentMatchesData);
 }
@@ -2743,6 +2808,7 @@ function renderQueue(data) {
 
   if (visibleRows.length === 0) {
     queueEmpty.style.display = "block";
+    renderScorerPanelSummary();
     return;
   }
 
@@ -2778,12 +2844,12 @@ function renderQueue(data) {
     }
 
     const actionHtml = isCancelled
-      ? `<button class="button-secondary queue-resignup-btn" data-entry-id="${row.id}" data-player-name="${escapeHtml(playerName)}">恢复报名</button>`
+      ? `<button class="button-secondary queue-action-btn queue-resignup-btn" data-entry-id="${row.id}" data-player-name="${escapeHtml(playerName)}">恢复报名</button>`
       : hasArrived
         ? (canScore
-            ? `<button class="button-danger queue-unready-btn" data-roster-entry-id="${readyEntry.id}" data-player-name="${escapeHtml(playerName)}">取消到场</button>`
+            ? `<button class="button-danger queue-action-btn queue-unready-btn" data-roster-entry-id="${readyEntry.id}" data-player-name="${escapeHtml(playerName)}">取消到场</button>`
             : "")
-        : `<button class="button-secondary queue-ready-btn" data-entry-id="${row.id}" data-player-id="${row.player_id}" data-player-name="${escapeHtml(playerName)}">标记到场</button>`;
+        : `<button class="button-secondary queue-action-btn queue-ready-btn" data-entry-id="${row.id}" data-player-id="${row.player_id}" data-player-name="${escapeHtml(playerName)}">标记到场</button>`;
     const tagsHtml = [
       laneLabel ? `<span class="queue-slot">${escapeHtml(laneLabel)}</span>` : "",
       `<span class="${statusClass}">${statusLabel}</span>`,
@@ -2817,6 +2883,8 @@ function renderQueue(data) {
     `;
     queueList.appendChild(li);
   });
+
+  renderScorerPanelSummary();
 }
 
 function renderTodayPlayers() {
@@ -2825,6 +2893,7 @@ function renderTodayPlayers() {
 
   if (todayPlayers.length === 0) {
     todayPlayersEmpty.style.display = "block";
+    renderScorerPanelSummary();
     return;
   }
 
@@ -2847,6 +2916,8 @@ function renderTodayPlayers() {
     `;
     todayPlayersList.appendChild(li);
   });
+
+  renderScorerPanelSummary();
 }
 
 function renderLeaderboard(data) {
@@ -3684,6 +3755,17 @@ function clearRememberedScorerAutoLogin({ silent = false } = {}) {
   }
 }
 
+function scrollToPanelTarget(targetId) {
+  const target = document.getElementById(targetId);
+  if (!target) {
+    setScorerPanelMessage("目标区域不存在，暂时无法跳转。", true);
+    return;
+  }
+
+  target.scrollIntoView({ behavior: "smooth", block: "start" });
+  setScorerPanelMessage("");
+}
+
 function exitAccessRole() {
   const previousRole = currentAccessSession.role;
   if (previousRole === "scorer") {
@@ -3694,6 +3776,7 @@ function exitAccessRole() {
   clearStoredAccessSession();
   renderRoleMembers();
   applyRolePermissions();
+  setScorerPanelOpen(false);
   setAdminPanelOpen(false);
   setMessage(previousRole === "admin" ? "已退出管理员模式。" : "已退出记分员身份。");
 }
@@ -5226,12 +5309,18 @@ function subscribeRealtime() {
 seasonToggleBtn.addEventListener("click", () => {
   setSeasonPanelOpen(!isSeasonPanelOpen);
 });
+scorerModeBtn.addEventListener("click", () => {
+  if (!isCurrentRoleScorerOnly()) return;
+  setScorerPanelOpen(!isScorerPanelOpen);
+});
 adminModeBtn.addEventListener("click", () => {
   if (!isCurrentRoleAdmin()) return;
   setAdminPanelOpen(!isAdminPanelOpen);
   applyRolePermissions();
 });
+scorerExitModeBtn.addEventListener("click", exitAccessRole);
 adminExitModeBtn.addEventListener("click", exitAccessRole);
+closeScorerPanelBtn.addEventListener("click", () => setScorerPanelOpen(false));
 closeAdminPanelBtn.addEventListener("click", () => setAdminPanelOpen(false));
 resetSeasonBtn.addEventListener("click", resetCurrentSeason);
 startMatchDayBtn.addEventListener("click", async () => {
@@ -5622,12 +5711,6 @@ rewardLogsList.addEventListener("click", async (event) => {
 });
 
 if (adminLogoTrigger) {
-  adminLogoTrigger.addEventListener("click", () => {
-    if (currentAccessSession.role === "scorer") {
-      exitAccessRole();
-    }
-  });
-
   adminLogoTrigger.addEventListener("dblclick", (event) => {
     if (isCurrentRoleAdmin() || currentAccessSession.role === "scorer") return;
     event.preventDefault();
@@ -5686,6 +5769,14 @@ scorerMembersList.addEventListener("click", async (event) => {
   if (!button) return;
   await removeScorerRole(button.dataset.roleMemberId);
 });
+
+if (scorerPanel) {
+  scorerPanel.addEventListener("click", (event) => {
+    const button = event.target.closest(".scorer-panel-nav-btn");
+    if (!button) return;
+    scrollToPanelTarget(button.dataset.scrollTarget || "");
+  });
+}
 
 closeHeroPickerBtn.addEventListener("click", closeHeroPicker);
 heroPickerBackdrop.addEventListener("click", closeHeroPicker);
