@@ -66,6 +66,7 @@ const matchStartTimeInput = document.getElementById("matchStartTimeInput");
 const matchDayStatus = document.getElementById("matchDayStatus");
 const matchStartTimeDisplay = document.getElementById("matchStartTimeDisplay");
 const matchDayInfo = document.getElementById("matchDayInfo");
+const signupAllBtn = document.getElementById("signupAllBtn");
 const confirmQueueBtn = document.getElementById("confirmQueueBtn");
 const clearQueueBtn = document.getElementById("clearQueueBtn");
 const queueList = document.getElementById("queueList");
@@ -76,6 +77,9 @@ const clearTodayPlayersBtn = document.getElementById("clearTodayPlayersBtn");
 const todayPlayersList = document.getElementById("todayPlayersList");
 const todayPlayersEmpty = document.getElementById("todayPlayersEmpty");
 const todayPlayersCount = document.getElementById("todayPlayersCount");
+const leaderboardCard = document.getElementById("leaderboardCard");
+const leaderboardCompactBtn = document.getElementById("leaderboardCompactBtn");
+const leaderboardViewHint = document.getElementById("leaderboardViewHint");
 const leaderboardBody = document.getElementById("leaderboardBody");
 const openMatchFormBtn = document.getElementById("openMatchFormBtn");
 const openBackfillFormBtn = document.getElementById("openBackfillFormBtn");
@@ -152,6 +156,7 @@ let isBackfillFormOpen = false;
 let isSeasonPanelOpen = false;
 let isRewardPanelOpen = false;
 let isAdminPanelOpen = false;
+let isLeaderboardCompact = false;
 let editingMatchId = null;
 let matchTeamSelections = {
   teamA: [],
@@ -897,6 +902,21 @@ function setAdminPanelOpen(isOpen) {
   }
 }
 
+function setLeaderboardCompactMode(isCompact) {
+  isLeaderboardCompact = Boolean(isCompact);
+  leaderboardCard?.classList.toggle("leaderboard-card-compact", isLeaderboardCompact);
+  if (leaderboardCompactBtn) {
+    leaderboardCompactBtn.textContent = isLeaderboardCompact ? "展开榜" : "短榜";
+    leaderboardCompactBtn.setAttribute("aria-pressed", String(isLeaderboardCompact));
+    leaderboardCompactBtn.title = isLeaderboardCompact ? "切回展开榜" : "切换为短榜";
+  }
+  if (leaderboardViewHint) {
+    leaderboardViewHint.textContent = isLeaderboardCompact
+      ? "短榜已启用，可用滚轮上下查看完整榜单。"
+      : "展开榜显示更多条目，切换短榜后可用滚轮上下查看。";
+  }
+}
+
 function readStoredAccessSession() {
   try {
     const raw = window.localStorage.getItem(ACCESS_SESSION_STORAGE_KEY);
@@ -1267,6 +1287,9 @@ function applyRolePermissions() {
 
   startMatchDayBtn.hidden = false;
   matchStartTimeInput.disabled = Boolean(activeMatchDay);
+  if (signupAllBtn) {
+    signupAllBtn.hidden = !canScore;
+  }
   confirmQueueBtn.hidden = !canScore;
   addTodayPlayerBtn.hidden = !canScore;
   todayAddPlayerSelect.hidden = !canScore;
@@ -2451,6 +2474,9 @@ function renderSignupOptions() {
   });
 
   const participants = seasonPlayers.filter((player) => player.is_in_season);
+  if (signupAllBtn) {
+    signupAllBtn.disabled = !isCurrentRoleScorer() || !activeMatchDay || participants.length === 0;
+  }
 
   if (!participants.length) {
     signupEmpty.style.display = "block";
@@ -2504,6 +2530,108 @@ function renderSignupOptions() {
   todayAddPlayerSelect.disabled = !canAddTodayPlayers;
   addTodayPlayerBtn.disabled = !canAddTodayPlayers;
   clearTodayPlayersBtn.disabled = !activeMatchDay;
+}
+
+async function signupAllPlayers() {
+  if (!ensureScorerAccess("仅记分员或管理员可全部报名。")) return;
+  if (!activeMatchDay) {
+    setMessage("请先发起当日比赛，再开启全部报名。", true);
+    return;
+  }
+
+  const participants = seasonPlayers.filter((player) => player.is_in_season);
+  if (!participants.length) {
+    setMessage("当前赛季暂无可报名选手。", true);
+    return;
+  }
+
+  if (signupAllBtn) {
+    signupAllBtn.disabled = true;
+  }
+
+  setMessage("正在为全部参赛选手报名...");
+
+  const queueByPlayerId = new Map();
+  queueEntries.forEach((row) => {
+    if (row.status === "confirmed") return;
+    queueByPlayerId.set(row.player_id, row);
+  });
+
+  let createdCount = 0;
+  let resumedCount = 0;
+  let skippedCount = 0;
+  const actionTime = new Date().toISOString();
+
+  for (const player of participants) {
+    const entry = queueByPlayerId.get(player.id);
+    const isActive = entry?.is_active === true && entry?.status !== "confirmed";
+    const isCancelled = entry?.status === "cancelled" || entry?.is_active === false;
+    let error = null;
+
+    if (isActive) {
+      skippedCount += 1;
+      continue;
+    }
+
+    if (isCancelled && entry?.id) {
+      ({ error } = await db
+        .from("signup_queue")
+        .update({
+          is_active: true,
+          status: "active",
+          cancelled_at: null,
+          created_at: actionTime,
+        })
+        .eq("id", entry.id));
+
+      if (!error) {
+        resumedCount += 1;
+        continue;
+      }
+    } else {
+      const payload = {
+        player_id: player.id,
+        is_active: true,
+        status: "active",
+      };
+
+      if (activeSeason?.id) {
+        payload.season_id = activeSeason.id;
+      }
+
+      ({ error } = await db.from("signup_queue").insert([payload]));
+
+      if (!error) {
+        createdCount += 1;
+        continue;
+      }
+    }
+
+    if (error?.message?.includes("signup_queue_one_active_per_player")) {
+      skippedCount += 1;
+      continue;
+    }
+
+    if (signupAllBtn) {
+      signupAllBtn.disabled = false;
+    }
+    setMessage(`全部报名失败：${error?.message || "未知错误"}`, true);
+    await loadQueue();
+    return;
+  }
+
+  if (signupAllBtn) {
+    signupAllBtn.disabled = false;
+  }
+
+  if (!createdCount && !resumedCount) {
+    setMessage("当前可报名选手都已经在报名队列中。");
+  } else {
+    setMessage(
+      `全部报名完成：新增 ${createdCount} 人，恢复 ${resumedCount} 人${skippedCount ? `，跳过 ${skippedCount} 人` : ""}。`
+    );
+  }
+  requestImmediateRefresh({ queue: true });
 }
 
 function renderMatchForm() {
@@ -2999,12 +3127,13 @@ function getTeamLabel(team) {
 function getMatchEffectLogsByTeam(match, players, doubleDowns) {
   const playerMap = new Map(players.map((player) => [player.player_id, player]));
   const logsByTeam = { A: [], B: [] };
-  const formatEffectText = (hasWinner, hasPositiveGain, hasExtraPenalty, hasFloorProtection) => {
+  const formatEffectText = (hasWinner, hasPositiveGain, hasExtraPenalty, hasFloorProtection, scope = "personal") => {
+    const prefix = scope === "team" ? "团队" : "";
     if (!hasWinner) return "结果待补";
-    if (hasPositiveGain) return "积分 +100%";
-    if (hasExtraPenalty && hasFloorProtection) return "积分 -100%，部分保底";
-    if (hasExtraPenalty) return "积分 -100%";
-    if (hasFloorProtection) return "保底生效，仅正常扣分";
+    if (hasPositiveGain) return `${prefix}积分 +100%`;
+    if (hasExtraPenalty && hasFloorProtection) return `${prefix}积分 -100%，部分保底`;
+    if (hasExtraPenalty) return `${prefix}积分 -100%`;
+    if (hasFloorProtection) return prefix ? `${prefix}保底生效，仅正常扣分` : "保底生效，仅正常扣分";
     return "结果待补";
   };
 
@@ -3020,7 +3149,13 @@ function getMatchEffectLogsByTeam(match, players, doubleDowns) {
     const hasPositiveGain = targetPlayers.some((player) => Number(player.score_change ?? 0) > 1);
     const hasExtraPenalty = targetPlayers.some((player) => Number(player.score_change ?? 0) <= -2);
     const hasFloorProtection = targetPlayers.some((player) => Number(player.score_change ?? 0) === -1);
-    const effectText = formatEffectText(hasWinner, hasPositiveGain, hasExtraPenalty, hasFloorProtection);
+    const effectText = formatEffectText(
+      hasWinner,
+      hasPositiveGain,
+      hasExtraPenalty,
+      hasFloorProtection,
+      item.mode === "team" ? "team" : "personal"
+    );
     let tone = "gold";
 
     if (hasExtraPenalty && hasFloorProtection) {
@@ -3052,7 +3187,7 @@ function getMatchEffectLogsByTeam(match, players, doubleDowns) {
     const koiPlayer = players.find((player) => player.player_id === koiPlayerId && player.team === match.winner_team);
     if (koiPlayer) {
       logsByTeam[match.winner_team].push({
-        text: `${koiPlayer.display_name || "锦鲤"}锦鲤效果，积分 +25%`,
+        text: `${koiPlayer.display_name || "锦鲤"}锦鲤效果，团队积分 +25%`,
         tone: "gold",
       });
     }
@@ -5083,6 +5218,7 @@ startMatchDayBtn.addEventListener("click", async () => {
 });
 confirmQueueBtn.addEventListener("click", confirmQueueToTodayPlayers);
 clearQueueBtn.addEventListener("click", clearSignupQueueForTesting);
+signupAllBtn.addEventListener("click", signupAllPlayers);
 addTodayPlayerBtn.addEventListener("click", addTodayPlayer);
 clearTodayPlayersBtn.addEventListener("click", clearTodayPlayersForTesting);
 adminClearQueueBtn.addEventListener("click", clearSignupQueueForTesting);
@@ -5554,6 +5690,9 @@ clearHeroBtn.addEventListener("click", async () => {
   heroSelect.value = "";
   await saveHeroSelection("");
 });
+leaderboardCompactBtn.addEventListener("click", () => {
+  setLeaderboardCompactMode(!isLeaderboardCompact);
+});
 
 document.addEventListener("keydown", (event) => {
   if (event.key === "Escape" && !heroPickerModal.hidden) {
@@ -5579,6 +5718,7 @@ async function init() {
     setBackfillFormOpen(false);
     setSeasonPanelOpen(false);
     setRewardPanelOpen(false);
+    setLeaderboardCompactMode(false);
     renderHeroOptions();
     matchStartTimeInput.value = formatTime24(readStoredMatchDayStartTime()?.startTime || "");
     backfillDateInput.value = getBeijingBusinessDateString();

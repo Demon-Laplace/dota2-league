@@ -141,7 +141,10 @@
         </section>
 
         <section class="card">
-          <h2>报名</h2>
+          <div class="section-head">
+            <h2>报名</h2>
+            <button id="signupAllBtn" class="button-secondary signup-all-btn" type="button" hidden>全部报名</button>
+          </div>
           <div id="signupPlayerGrid" class="signup-player-grid"></div>
           <p id="signupEmpty" class="muted">加载中...</p>
           <p id="message" class="message"></p>
@@ -175,20 +178,28 @@
       </div>
 
       <div class="layout-right">
-        <section class="card leaderboard-card">
-          <h2>积分榜</h2>
-          <table class="leaderboard-table">
-            <thead>
-              <tr>
-                <th>排名</th>
-                <th>玩家</th>
-                <th>积分</th>
-                <th>场次</th>
-                <th>赞助</th>
-              </tr>
-            </thead>
-            <tbody id="leaderboardBody"></tbody>
-          </table>
+        <section id="leaderboardCard" class="card leaderboard-card">
+          <div class="section-head leaderboard-head">
+            <div class="leaderboard-title-block">
+              <h2>积分榜</h2>
+              <p id="leaderboardViewHint" class="muted leaderboard-view-hint">展开榜显示更多条目，切换短榜后可用滚轮上下查看。</p>
+            </div>
+            <button id="leaderboardCompactBtn" class="season-chip leaderboard-compact-btn" type="button" aria-pressed="false">短榜</button>
+          </div>
+          <div class="leaderboard-scroll-shell">
+            <table class="leaderboard-table">
+              <thead>
+                <tr>
+                  <th>排名</th>
+                  <th>玩家</th>
+                  <th>积分</th>
+                  <th>场次</th>
+                  <th>赞助</th>
+                </tr>
+              </thead>
+              <tbody id="leaderboardBody"></tbody>
+            </table>
+          </div>
         </section>
 
         <section id="recordEntrySection" class="card">
