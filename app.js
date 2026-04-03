@@ -904,19 +904,19 @@ function buildLeaderboardShareText(players = leaderboardPlayers) {
   }
 
   const header = activeSeason?.name
-    ? `${activeSeason.name}积分榜`
-    : "积分榜";
+    ? `【${activeSeason.name}积分榜】`
+    : "【积分榜】";
 
   const lines = source.map((player, idx) => {
     const playerName = stripPlayerNameMeta(player.display_name || "未知选手");
     const score = formatScore(player.score);
     const gamesPlayed = Number(player.games_played ?? 0);
-    return `${idx + 1}. ${playerName} ${score}分 ${gamesPlayed}场`;
+    const winRate = formatWinRateValue(player.win_rate, player.wins, player.games_played);
+    return `${idx + 1}. ${playerName}｜${score}分｜${gamesPlayed}场｜${winRate}`;
   });
 
   return [
     header,
-    "排名 玩家姓名 积分 场次",
     ...lines,
   ].join("\n");
 }
