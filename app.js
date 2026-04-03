@@ -3227,13 +3227,12 @@ function renderLeaderboard(data) {
       tags.push({ icon: "★", label: "MVP", tone: "royal" });
     }
 
-    const tagTitle = tags.map((tag) => tag.label).join(" · ");
     const tagsHtml = `
-      <div class="leaderboard-player-tags${tags.length ? "" : " leaderboard-player-tags-empty"}"${tagTitle ? ` title="${escapeHtml(tagTitle)}"` : ""}>
+      <div class="leaderboard-player-tags${tags.length ? "" : " leaderboard-player-tags-empty"}">
         ${tags.map((tag) => `
-        <span class="leaderboard-tag leaderboard-tag-${tag.tone}">
+        <span class="leaderboard-tag leaderboard-tag-${tag.tone}" title="${escapeHtml(tag.label)}" aria-label="${escapeHtml(tag.label)}">
           <span class="leaderboard-tag-icon">${escapeHtml(tag.icon)}</span>
-          <span>${escapeHtml(tag.label)}</span>
+          <span class="leaderboard-tag-label">${escapeHtml(tag.label)}</span>
         </span>
       `).join("")}
       </div>

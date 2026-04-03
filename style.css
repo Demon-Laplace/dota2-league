@@ -2468,10 +2468,10 @@ ol {
 
 .leaderboard-player-cell {
   display: grid;
-  grid-template-rows: minmax(0, auto) 22px;
-  align-content: center;
-  gap: 4px;
-  min-height: 48px;
+  grid-template-columns: minmax(0, 1fr) 132px;
+  align-items: center;
+  gap: 12px;
+  min-height: 52px;
 }
 
 .leaderboard-player-name {
@@ -2585,32 +2585,36 @@ ol {
 }
 
 .leaderboard-player-tags {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  min-height: 22px;
-  min-width: 0;
-  overflow: hidden;
-  flex-wrap: nowrap;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-auto-rows: minmax(18px, auto);
+  align-content: center;
+  justify-items: stretch;
+  gap: 4px;
+  width: 132px;
+  min-width: 132px;
+  min-height: 40px;
 }
 
 .leaderboard-player-tags-empty {
-  opacity: 0;
+  visibility: hidden;
   pointer-events: none;
 }
 
 .leaderboard-tag {
   display: inline-flex;
   align-items: center;
-  gap: 5px;
-  padding: 2px 8px 2px 6px;
-  border-radius: 999px;
-  font-size: 10px;
-  line-height: 1.4;
+  justify-content: center;
+  gap: 0;
+  width: 100%;
+  min-width: 0;
+  min-height: 18px;
+  padding: 1px 4px;
+  border-radius: 8px;
+  font-size: 9px;
+  line-height: 1.2;
   font-weight: 600;
   letter-spacing: 0.02em;
-  white-space: nowrap;
-  flex: 0 0 auto;
   border: 1px solid rgba(124, 165, 209, 0.2);
   background: rgba(16, 34, 57, 0.68);
   color: #dce9f8;
@@ -2620,12 +2624,16 @@ ol {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 16px;
-  height: 16px;
-  border-radius: 999px;
-  font-size: 9px;
+  width: 100%;
+  height: 100%;
+  border-radius: 6px;
+  font-size: 10px;
   line-height: 1;
   background: rgba(255, 255, 255, 0.06);
+}
+
+.leaderboard-tag-label {
+  display: none;
 }
 
 .leaderboard-card-compact .leaderboard-table tbody td {
@@ -2633,7 +2641,9 @@ ol {
 }
 
 .leaderboard-card-compact .leaderboard-player-cell {
-  gap: 2px;
+  grid-template-columns: minmax(0, 1fr) 108px;
+  gap: 10px;
+  min-height: 46px;
 }
 
 .leaderboard-card-compact .leaderboard-player-name {
@@ -2641,21 +2651,18 @@ ol {
 }
 
 .leaderboard-card-compact .leaderboard-player-tags {
-  gap: 4px;
-  min-height: 18px;
+  width: 108px;
+  min-width: 108px;
+  min-height: 34px;
+  gap: 3px;
 }
 
 .leaderboard-card-compact .leaderboard-tag {
-  gap: 4px;
-  padding: 1px 6px 1px 4px;
-  font-size: 9px;
-  line-height: 1.25;
-  white-space: nowrap;
+  min-height: 15px;
+  padding: 1px 3px;
 }
 
 .leaderboard-card-compact .leaderboard-tag-icon {
-  width: 13px;
-  height: 13px;
   font-size: 8px;
 }
 
