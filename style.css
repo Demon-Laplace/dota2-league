@@ -711,6 +711,18 @@ button.season-total {
   vertical-align: top;
 }
 
+.season-player-name-plain {
+  display: inline-block;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: #eef5ff;
+  font-family: var(--font-brand);
+  font-weight: 700;
+  letter-spacing: 0.03em;
+}
+
 .season-player-actions {
   display: flex;
   gap: 6px;

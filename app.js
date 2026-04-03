@@ -3129,8 +3129,6 @@ function renderSeasonPlayersPanel() {
     support: seasonPlayers.filter((player) => player.player_rank === "support"),
     idle: seasonPlayers.filter((player) => !player.player_rank),
   };
-  const highestRewardIds = getHighestRewardPlayerIds(leaderboardPlayers);
-  const hardcoreLoseIds = getHardcoreLoseTaggedPlayerIds(leaderboardPlayers);
   const canScore = isCurrentRoleScorer();
 
   const renderPlayerCard = (player) => {
@@ -3140,11 +3138,7 @@ function renderSeasonPlayersPanel() {
     item.innerHTML = `
       <div class="season-player-main">
         <div class="season-player-name">
-          ${buildDecoratedPlayerNameHtml(player.id, player.display_name, {
-            players: leaderboardPlayers,
-            highestRewardIds,
-            hardcoreLoseIds,
-          })}
+          <span class="season-player-name-plain">${escapeHtml(player.display_name || "未知选手")}</span>
         </div>
       </div>
       ${canScore ? `
