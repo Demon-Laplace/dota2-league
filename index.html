@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Dota2 宁德联赛</title>
-  <link rel="stylesheet" href="style.css?v=20260403-11" />
+  <link rel="stylesheet" href="style.css?v=20260403-12" />
 </head>
   <body>
   <div id="loadingScreen" class="loading-screen" aria-live="polite">
@@ -212,13 +212,6 @@
             <h2>当日选手名单</h2>
             <span id="todayPlayersCount" class="muted">0 人</span>
           </div>
-          <div class="row">
-            <select id="todayAddPlayerSelect">
-              <option value="">请选择临时添加选手</option>
-            </select>
-            <button id="addTodayPlayerBtn">临时添加选手</button>
-            <button id="clearTodayPlayersBtn" class="button-danger" hidden>测试清空当日选手</button>
-          </div>
           <ul id="todayPlayersList" class="today-players-list"></ul>
           <p id="todayPlayersEmpty" class="muted">今日尚未确认到场选手</p>
         </section>
@@ -418,6 +411,6 @@
   </div>
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="app.js?v=20260403-10"></script>
+  <script src="app.js?v=20260403-11"></script>
 </body>
 </html>

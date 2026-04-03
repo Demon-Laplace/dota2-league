@@ -79,9 +79,6 @@ const confirmQueueBtn = document.getElementById("confirmQueueBtn");
 const clearQueueBtn = document.getElementById("clearQueueBtn");
 const queueList = document.getElementById("queueList");
 const queueEmpty = document.getElementById("queueEmpty");
-const todayAddPlayerSelect = document.getElementById("todayAddPlayerSelect");
-const addTodayPlayerBtn = document.getElementById("addTodayPlayerBtn");
-const clearTodayPlayersBtn = document.getElementById("clearTodayPlayersBtn");
 const todayPlayersList = document.getElementById("todayPlayersList");
 const todayPlayersEmpty = document.getElementById("todayPlayersEmpty");
 const todayPlayersCount = document.getElementById("todayPlayersCount");
@@ -1366,7 +1363,6 @@ function applyRolePermissions() {
 
   resetSeasonBtn.hidden = true;
   clearQueueBtn.hidden = true;
-  clearTodayPlayersBtn.hidden = true;
   if (recordEntrySection) {
     recordEntrySection.hidden = !canScore;
   }
@@ -1380,8 +1376,6 @@ function applyRolePermissions() {
     signupAllBtn.hidden = !canScore;
   }
   confirmQueueBtn.hidden = !canScore;
-  addTodayPlayerBtn.hidden = !canScore;
-  todayAddPlayerSelect.hidden = !canScore;
   openMatchFormBtn.hidden = !canScore;
   openBackfillFormBtn.hidden = !canScore;
   recordMatchBtn.hidden = !canScore;
@@ -2973,15 +2967,6 @@ function renderSignupOptions() {
     signupPlayerGrid.appendChild(chip);
   });
 
-  const todayPlayerIds = new Set(todayPlayers.map((player) => player.player_id || player.id));
-  const addablePlayers = seasonPlayers.filter((player) => player.is_in_season && !todayPlayerIds.has(player.id));
-  const canAddTodayPlayers = Boolean(activeMatchDay) && addablePlayers.length > 0;
-  todayAddPlayerSelect.innerHTML = canAddTodayPlayers
-    ? buildOptionsFromPlayers(addablePlayers)
-    : `<option value="">${activeMatchDay ? "暂无可添加选手" : "请先发起当日比赛"}</option>`;
-  todayAddPlayerSelect.disabled = !canAddTodayPlayers;
-  addTodayPlayerBtn.disabled = !canAddTodayPlayers;
-  clearTodayPlayersBtn.disabled = !activeMatchDay;
 }
 
 async function signupAllPlayers() {
@@ -3277,19 +3262,11 @@ function renderTodayPlayers() {
   todayPlayersEmpty.style.display = "none";
 
   todayPlayers.forEach((player, idx) => {
-    const sourceLabel = player.source === "queue" ? "队列到齐" : "临时添加";
     const li = document.createElement("li");
     li.className = "today-player-item";
     li.innerHTML = `
-      <div class="today-player-main">
-        <span class="queue-slot">当日 #${idx + 1}</span>
-        <strong>${escapeHtml(player.display_name)}</strong>
-        <span class="today-player-source">${sourceLabel}</span>
-      </div>
-      <div class="queue-actions">
-        <span class="muted">${escapeHtml(formatLocalTime(player.created_at))}</span>
-        <button class="button-danger remove-today-player-btn" data-entry-id="${player.id}">移出名单</button>
-      </div>
+      <span class="today-player-index">${idx + 1}</span>
+      <strong>${escapeHtml(player.display_name)}</strong>
     `;
     todayPlayersList.appendChild(li);
   });
@@ -5040,14 +5017,11 @@ async function clearTodayPlayersForTesting() {
     return;
   }
 
-  clearTodayPlayersBtn.disabled = true;
   setMessage("正在清空当日选手名单...");
 
   const { data, error } = await db.rpc("clear_today_players_for_testing", {
     p_season_id: activeSeason?.id || null,
   });
-
-  clearTodayPlayersBtn.disabled = false;
 
   if (error) {
     setMessage(`清空当日选手名单失败：${error.message}`, true);
@@ -5130,44 +5104,6 @@ async function cancelMatchDay() {
   });
 }
 
-async function addTodayPlayer() {
-  if (!ensureScorerAccess("仅记分员或管理员可临时添加选手。")) return;
-  const playerId = todayAddPlayerSelect.value;
-
-  if (!playerId) {
-    setMessage("请先选择要临时添加的选手。", true);
-    return;
-  }
-
-  const payload = {
-    player_id: playerId,
-    play_date: getBeijingBusinessDateString(),
-    source: "manual",
-  };
-
-  if (activeSeason?.id) {
-    payload.season_id = activeSeason.id;
-  }
-
-  addTodayPlayerBtn.disabled = true;
-  setMessage("正在添加当日选手...");
-
-  const { error } = await db.from("daily_player_roster").insert([payload]);
-  addTodayPlayerBtn.disabled = false;
-
-  if (error) {
-    setMessage(`添加当日选手失败：${error.message}`, true);
-    return;
-  }
-
-  setMessage("已加入当日选手名单。");
-  appendAdminActionLog(`添加了当日选手 ${seasonPlayers.find((player) => player.id === playerId)?.display_name || "该选手"}。`);
-  requestImmediateRefresh({
-    playerDriven: true,
-    queue: true,
-  });
-}
-
 async function markQueuePlayerReady(playerId, playerName, buttonEl) {
   if (!activeMatchDay) {
     setMessage("请先发起当日比赛。", true);
@@ -5242,34 +5178,6 @@ async function cancelQueuePlayerReady(entryId, playerName, buttonEl) {
   }
 
   setMessage(`${playerName || "该玩家"} 已取消就位。`);
-  requestImmediateRefresh({
-    playerDriven: true,
-    queue: true,
-  });
-}
-
-async function removeTodayPlayer(entryId, buttonEl) {
-  if (!ensureScorerAccess("仅记分员或管理员可移出当日选手。")) return;
-  if (!entryId) return;
-
-  if (buttonEl) {
-    buttonEl.disabled = true;
-  }
-
-  setMessage("正在移出当日名单...");
-
-  const { error } = await db.from("daily_player_roster").delete().eq("id", entryId);
-
-  if (error) {
-    if (buttonEl) {
-      buttonEl.disabled = false;
-    }
-    setMessage(`移出当日名单失败：${error.message}`, true);
-    return;
-  }
-
-  setMessage("已移出当日名单。");
-  appendAdminActionLog("移出了一名当日选手。");
   requestImmediateRefresh({
     playerDriven: true,
     queue: true,
@@ -6000,8 +5908,6 @@ startMatchDayBtn.addEventListener("click", async () => {
 confirmQueueBtn.addEventListener("click", confirmQueueToTodayPlayers);
 clearQueueBtn.addEventListener("click", clearSignupQueueForTesting);
 signupAllBtn.addEventListener("click", signupAllPlayers);
-addTodayPlayerBtn.addEventListener("click", addTodayPlayer);
-clearTodayPlayersBtn.addEventListener("click", clearTodayPlayersForTesting);
 adminClearQueueBtn.addEventListener("click", clearSignupQueueForTesting);
 adminClearTodayPlayersBtn.addEventListener("click", clearTodayPlayersForTesting);
 adminResetSeasonBtn.addEventListener("click", resetCurrentSeason);
@@ -6273,13 +6179,6 @@ signupPlayerGrid.addEventListener("click", async (event) => {
       button
     );
   }
-});
-
-todayPlayersList.addEventListener("click", async (event) => {
-  const button = event.target.closest(".remove-today-player-btn");
-  if (!button) return;
-
-  await removeTodayPlayer(button.dataset.entryId, button);
 });
 
 recentMatchesList.addEventListener("click", async (event) => {
