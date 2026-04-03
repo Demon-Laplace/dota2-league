@@ -2332,9 +2332,9 @@ button:disabled {
 
 .match-day-attendance-form {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-columns: 1fr;
   gap: 8px;
-  align-items: center;
+  align-items: stretch;
 }
 
 .match-day-attendance-form-actions {
@@ -2342,6 +2342,22 @@ button:disabled {
   align-items: center;
   gap: 8px;
   flex-wrap: wrap;
+}
+
+.match-day-attendance-player-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.match-day-attendance-player-chip {
+  box-shadow: none;
+}
+
+.match-day-attendance-player-chip-participant {
+  border-color: rgba(99, 213, 208, 0.2);
+  background: rgba(16, 42, 58, 0.58);
+  color: #ddf6f5;
 }
 
 .match-day-attendance-list {
@@ -3563,6 +3579,21 @@ ol {
 .leaderboard-tag-abyss .leaderboard-tag-icon {
   background: linear-gradient(135deg, rgba(246, 162, 176, 0.22), rgba(180, 45, 72, 0.22));
   color: #ffe1e6;
+}
+
+.leaderboard-tag-dove {
+  color: #f3f6fa;
+  border-color: rgba(182, 191, 203, 0.34);
+  background:
+    linear-gradient(135deg, rgba(108, 117, 130, 0.36), rgba(76, 84, 96, 0.28));
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.08),
+    0 0 12px rgba(179, 188, 198, 0.08);
+}
+
+.leaderboard-tag-dove .leaderboard-tag-icon {
+  background: linear-gradient(135deg, rgba(232, 236, 241, 0.24), rgba(183, 191, 201, 0.2));
+  color: #f8fafc;
 }
 
 .reward-glow-tier-base {
