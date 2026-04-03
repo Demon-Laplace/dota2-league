@@ -2846,7 +2846,7 @@ function updateFinishTodayMatchDayButtonLabel() {
   const label = actionContext.isRestMode ? "今日无比赛" : "结束比赛日";
   finishTodayMatchDayBtn.textContent = label;
   finishTodayMatchDayBtn.title = actionContext.isRestMode
-    ? "今日无比赛，将由系统自动按休战处理"
+    ? ""
     : (
       actionContext.targetDate === actionContext.businessDate
         ? "结束今日比赛日并结算比赛日未参赛加减分"
@@ -6997,7 +6997,6 @@ async function finishTodayMatchDay() {
 
   const actionContext = getFinishMatchDayActionContext(activeSeason.id);
   if (actionContext.isRestMode) {
-    setMessage("今日无比赛时无需手动点击，系统会自动按休战处理。");
     return;
   }
   const todayMatchCount = getTodayRecordedMatchCount(activeSeason.id);
