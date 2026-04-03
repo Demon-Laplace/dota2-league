@@ -1806,8 +1806,9 @@ button:disabled {
 }
 
 .match-day-player-name:not(:last-child)::after {
-  content: " · ";
+  content: "·";
   color: rgba(173, 197, 226, 0.42);
+  margin: 0 5px 0 4px;
 }
 
 .match-day-player-name-participant {

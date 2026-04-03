@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Dota2 宁德联赛</title>
-  <link rel="stylesheet" href="style.css?v=20260403-13" />
+  <link rel="stylesheet" href="style.css?v=20260403-14" />
 </head>
   <body>
   <div id="loadingScreen" class="loading-screen" aria-live="polite">
@@ -174,6 +174,15 @@
       <div class="layout-left">
         <section class="card">
           <div class="section-head">
+            <h2>当日选手名单</h2>
+            <span id="todayPlayersCount" class="muted">0 人</span>
+          </div>
+          <ul id="todayPlayersList" class="today-players-list"></ul>
+          <p id="todayPlayersEmpty" class="muted">今日尚未确认到场选手</p>
+        </section>
+
+        <section class="card">
+          <div class="section-head">
             <h2>当日比赛</h2>
             <span id="matchDayStatus" class="muted">未发起</span>
           </div>
@@ -207,14 +216,6 @@
           <p id="queueEmpty" class="muted">当前无人报名</p>
         </section>
 
-        <section class="card">
-          <div class="section-head">
-            <h2>当日选手名单</h2>
-            <span id="todayPlayersCount" class="muted">0 人</span>
-          </div>
-          <ul id="todayPlayersList" class="today-players-list"></ul>
-          <p id="todayPlayersEmpty" class="muted">今日尚未确认到场选手</p>
-        </section>
       </div>
 
       <div class="layout-right">
@@ -411,6 +412,6 @@
   </div>
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="app.js?v=20260403-12"></script>
+  <script src="app.js?v=20260403-14"></script>
 </body>
 </html>

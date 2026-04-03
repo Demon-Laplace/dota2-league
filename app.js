@@ -908,7 +908,7 @@ function setMatchFormOpen(isOpen) {
   isMatchFormOpen = isOpen && isCurrentRoleScorer();
   matchFormPanel.hidden = !isMatchFormOpen;
   openMatchFormBtn.textContent = isMatchFormOpen ? "正在录入比赛" : "添加当日比赛";
-  openMatchFormBtn.disabled = !isCurrentRoleScorer() || isMatchFormOpen || !activeMatchDay;
+  openMatchFormBtn.disabled = !isCurrentRoleScorer() || isMatchFormOpen;
 }
 
 function setBackfillFormOpen(isOpen) {
@@ -1952,6 +1952,32 @@ function getTodayMatchPlayers() {
     display_name: player.display_name,
     player_rank: seasonRankMap.get(player.player_id || player.id) || null,
   }));
+}
+
+function getLinkedTodayPlayers() {
+  const linkedPlayers = [];
+  const seen = new Set();
+  const matchDate = activeMatchDay?.match_date || getBeijingBusinessDateString();
+  const todayGroup = (recentMatchDayGroupsData || []).find((group) => group.match_date === matchDate);
+
+  const pushEntry = (entry, source = "roster") => {
+    if (!entry) return;
+    const playerId = entry.player_id || entry.id || null;
+    const displayName = stripPlayerNameMeta(entry.display_name || "未知选手");
+    const key = playerId || displayName;
+    if (!key || seen.has(key)) return;
+    seen.add(key);
+    linkedPlayers.push({
+      player_id: playerId,
+      display_name: displayName,
+      source,
+    });
+  };
+
+  (todayPlayers || []).forEach((entry) => pushEntry(entry, entry.source || "roster"));
+  (todayGroup?.participants || []).forEach((entry) => pushEntry(entry, "record"));
+
+  return linkedPlayers;
 }
 
 function createEmptySingleDoubleEntry() {
@@ -3069,7 +3095,7 @@ function renderMatchForm() {
   matchNoteInput.disabled = !hasActiveMatchDay;
   recordMatchBtn.disabled = !hasActiveMatchDay || !hasCompleteTeams;
   closeMatchFormBtn.disabled = false;
-  openMatchFormBtn.disabled = isMatchFormOpen || !hasActiveMatchDay;
+  openMatchFormBtn.disabled = isMatchFormOpen;
   [...matchFormPanel.querySelectorAll('[data-role="winner-toggle"]')].forEach((button) => {
     button.disabled = !hasActiveMatchDay;
   });
@@ -3237,10 +3263,11 @@ function renderQueue(data) {
 }
 
 function renderTodayPlayers() {
+  const displayPlayers = getLinkedTodayPlayers();
   todayPlayersList.innerHTML = "";
-  todayPlayersCount.textContent = `${todayPlayers.length} 人`;
+  todayPlayersCount.textContent = `${displayPlayers.length} 人`;
 
-  if (todayPlayers.length === 0) {
+  if (displayPlayers.length === 0) {
     todayPlayersEmpty.style.display = "block";
     renderScorerPanelSummary();
     return;
@@ -3248,7 +3275,7 @@ function renderTodayPlayers() {
 
   todayPlayersEmpty.style.display = "none";
 
-  todayPlayers.forEach((player, idx) => {
+  displayPlayers.forEach((player, idx) => {
     const li = document.createElement("li");
     li.className = "today-player-item";
     li.innerHTML = `
@@ -3829,10 +3856,12 @@ function renderRecentMatches(groups) {
 
   if (!recentMatchDayGroupsData || recentMatchDayGroupsData.length === 0) {
     recentMatchesEmpty.style.display = "block";
+    renderTodayPlayers();
     return;
   }
 
   recentMatchesEmpty.style.display = "none";
+  renderTodayPlayers();
 
   recentMatchDayGroupsData.forEach((group) => {
     const details = document.createElement("details");
@@ -5906,6 +5935,10 @@ recordMatchBtn.addEventListener("click", recordMatch);
 recordBackfillBtn.addEventListener("click", recordBackfillMatch);
 
 openMatchFormBtn.addEventListener("click", () => {
+  if (!activeMatchDay) {
+    setMessage("请先发起当日比赛。", true);
+    return;
+  }
   clearMatchForm();
   setMatchFormOpen(true);
   setBackfillFormOpen(false);
