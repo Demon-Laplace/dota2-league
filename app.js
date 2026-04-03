@@ -206,8 +206,10 @@ let heroPickerState = null;
 let realtimeChannel = null;
 let refreshTimer = null;
 let refreshFlushPromise = null;
+let placeholderEnsureAttemptKey = "";
 const loadingStartedAt = Date.now();
 const REFRESH_DEBOUNCE_MS = 150;
+const REFRESH_SELF_SUPPRESS_MS = 1200;
 const DOTA_HEROES = [
   "Abaddon", "Alchemist", "Ancient Apparition", "Anti-Mage", "Arc Warden", "Axe",
   "Bane", "Batrider", "Beastmaster", "Bloodseeker", "Bounty Hunter", "Brewmaster",
@@ -547,6 +549,14 @@ const refreshState = {
   rewardLogs: false,
   recentMatches: false,
 };
+const refreshSuppressUntil = {
+  seasonContext: 0,
+  playerDriven: 0,
+  queue: 0,
+  leaderboard: 0,
+  rewardLogs: 0,
+  recentMatches: 0,
+};
 
 function hasPendingRefresh() {
   return Object.values(refreshState).some(Boolean);
@@ -558,6 +568,14 @@ function consumeRefreshState() {
     refreshState[key] = false;
   });
   return snapshot;
+}
+
+function markRefreshSuppression(flags, durationMs = REFRESH_SELF_SUPPRESS_MS) {
+  const until = Date.now() + durationMs;
+  Object.entries(flags).forEach(([key, value]) => {
+    if (!value || !(key in refreshSuppressUntil)) return;
+    refreshSuppressUntil[key] = Math.max(refreshSuppressUntil[key], until);
+  });
 }
 
 async function flushRefreshQueue() {
@@ -618,12 +636,27 @@ async function flushRefreshQueue() {
   return refreshFlushPromise;
 }
 
-function scheduleRefresh(flags) {
+function scheduleRefresh(flags, options = {}) {
+  const respectSuppression = options.respectSuppression !== false;
+  const now = Date.now();
+  let hasScheduledFlag = false;
+
   Object.entries(flags).forEach(([key, value]) => {
-    if (value && key in refreshState) {
-      refreshState[key] = true;
+    if (!value || !(key in refreshState)) {
+      return;
     }
+
+    if (respectSuppression && refreshSuppressUntil[key] > now) {
+      return;
+    }
+
+    refreshState[key] = true;
+    hasScheduledFlag = true;
   });
+
+  if (!hasScheduledFlag) {
+    return;
+  }
 
   if (refreshFlushPromise || refreshTimer) {
     return;
@@ -636,7 +669,8 @@ function scheduleRefresh(flags) {
 }
 
 function requestImmediateRefresh(flags) {
-  scheduleRefresh(flags);
+  markRefreshSuppression(flags);
+  scheduleRefresh(flags, { respectSuppression: false });
   flushRefreshQueue();
 }
 
@@ -1891,12 +1925,257 @@ function getBackfillDateMaxValue() {
   return latestPastDate;
 }
 
+function getPlaceholderEnsureAttemptKey() {
+  return `${activeSeason?.id || "global"}:${getBeijingBusinessDateString()}`;
+}
+
+async function ensurePreviousMatchDayPlaceholderOnce() {
+  const attemptKey = getPlaceholderEnsureAttemptKey();
+  if (placeholderEnsureAttemptKey === attemptKey) {
+    return;
+  }
+
+  placeholderEnsureAttemptKey = attemptKey;
+
+  try {
+    await db.rpc("ensure_previous_match_day_placeholder", {
+      p_season_id: activeSeason?.id || null,
+    });
+  } catch (error) {
+    // Ignore when the latest SQL has not been applied yet.
+  }
+}
+
 function getQueueTimestamp(row) {
   const value = row.status === "cancelled" || row.is_active === false
     ? row.cancelled_at || row.created_at
     : row.created_at;
   const time = new Date(value).getTime();
   return Number.isNaN(time) ? 0 : time;
+}
+
+function sortQueueEntriesLocally() {
+  queueEntries = [...(queueEntries || [])].sort((a, b) => getQueueTimestamp(a) - getQueueTimestamp(b));
+}
+
+function rerenderQueueLocally() {
+  sortQueueEntriesLocally();
+  renderQueue(queueEntries);
+  renderSignupOptions();
+}
+
+function rerenderPlayerDrivenLocally() {
+  renderTodayPlayers();
+  renderQueue(queueEntries);
+  renderSignupOptions();
+  renderMatchForm();
+}
+
+function getPlayerDisplayNameById(playerId) {
+  return seasonPlayers.find((player) => player.id === playerId)?.display_name || "未知选手";
+}
+
+function createOptimisticQueueEntry(playerId, displayName, overrides = {}) {
+  return {
+    id: overrides.id || `temp-queue-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+    created_at: overrides.created_at || new Date().toISOString(),
+    player_id: playerId,
+    is_active: overrides.is_active ?? true,
+    status: overrides.status || "active",
+    cancelled_at: overrides.cancelled_at ?? null,
+    season_id: overrides.season_id ?? (activeSeason?.id || null),
+    players: {
+      display_name: displayName || getPlayerDisplayNameById(playerId),
+    },
+  };
+}
+
+function createOptimisticTodayPlayer(playerId, displayName, overrides = {}) {
+  return {
+    id: overrides.id || `temp-roster-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+    season_id: overrides.season_id ?? (activeSeason?.id || null),
+    play_date: overrides.play_date || getBeijingBusinessDateString(),
+    player_id: playerId,
+    display_name: displayName || getPlayerDisplayNameById(playerId),
+    source: overrides.source || "queue",
+    note: overrides.note || null,
+    created_at: overrides.created_at || new Date().toISOString(),
+  };
+}
+
+function addTodayPlayerLocally(entry) {
+  const playerId = entry?.player_id || entry?.id;
+  if (!playerId) return;
+  if (todayPlayers.some((player) => (player.player_id || player.id) === playerId)) return;
+  todayPlayers = [...todayPlayers, entry];
+}
+
+function removeTodayPlayerLocallyByEntryId(entryId) {
+  const existing = todayPlayers.find((player) => player.id === entryId) || null;
+  if (!existing) return null;
+  todayPlayers = todayPlayers.filter((player) => player.id !== entryId);
+  return existing;
+}
+
+function removeTodayPlayerLocallyByPlayerId(playerId) {
+  const existing = todayPlayers.find((player) => (player.player_id || player.id) === playerId) || null;
+  if (!existing) return null;
+  todayPlayers = todayPlayers.filter((player) => (player.player_id || player.id) !== playerId);
+  return existing;
+}
+
+function sortRecentMatchDayGroupsLocally() {
+  recentMatchDayGroupsData = [...(recentMatchDayGroupsData || [])].sort((a, b) => {
+    if (a.match_date !== b.match_date) {
+      return String(b.match_date).localeCompare(String(a.match_date), "zh-CN");
+    }
+    const aStarted = new Date(a.started_at || 0).getTime();
+    const bStarted = new Date(b.started_at || 0).getTime();
+    return bStarted - aStarted;
+  });
+}
+
+function getOrCreateRecentMatchDayGroup(matchDayId, matchDate, seasonId, options = {}) {
+  const groupKey = getMatchDayGroupKey(matchDayId, matchDate);
+  let group = (recentMatchDayGroupsData || []).find((item) => item.group_key === groupKey);
+
+  if (!group) {
+    group = {
+      group_key: groupKey,
+      match_day_id: matchDayId || null,
+      season_id: seasonId || null,
+      match_date: matchDate || "历史比赛",
+      started_at: options.started_at || new Date().toISOString(),
+      closed_at: options.closed_at || null,
+      day_is_active: Boolean(options.day_is_active),
+      note: options.note || "",
+      matches: [],
+      attendance_notes: [],
+      participants: [],
+    };
+    recentMatchDayGroupsData = [...(recentMatchDayGroupsData || []), group];
+  }
+
+  return group;
+}
+
+function syncRecentMatchDayGroupParticipants(group) {
+  if (!group) return;
+  group.matches.sort((a, b) => new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime());
+  group.attendance_notes.sort((a, b) => new Date(a.created_at || 0).getTime() - new Date(b.created_at || 0).getTime());
+  group.participants = getMatchDayParticipantEntries(group.matches);
+}
+
+function addMatchDayAttendanceNoteLocally(matchDayId, seasonId, matchDate, playerId, status, noteId = "") {
+  const group = getOrCreateRecentMatchDayGroup(matchDayId, matchDate, seasonId, {
+    day_is_active: Boolean(activeMatchDay && activeMatchDay.id === matchDayId),
+  });
+  if (group.attendance_notes.some((entry) => entry.player_id === playerId && entry.status === status)) {
+    return "";
+  }
+
+  const optimisticId = noteId || `temp-attendance-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+  group.attendance_notes.push({
+    id: optimisticId,
+    match_day_id: matchDayId || null,
+    season_id: seasonId || activeSeason?.id || null,
+    match_date: matchDate || null,
+    player_id: playerId,
+    status,
+    note: null,
+    created_at: new Date().toISOString(),
+    display_name: getPlayerDisplayNameById(playerId),
+  });
+  syncRecentMatchDayGroupParticipants(group);
+  sortRecentMatchDayGroupsLocally();
+  renderRecentMatches(recentMatchDayGroupsData);
+  return optimisticId;
+}
+
+function removeMatchDayAttendanceNoteLocally(noteId) {
+  let removedEntry = null;
+  let removedGroupKey = "";
+
+  recentMatchDayGroupsData.forEach((group) => {
+    const entry = group.attendance_notes.find((item) => item.id === noteId);
+    if (!entry) return;
+    removedEntry = { ...entry };
+    removedGroupKey = group.group_key;
+    group.attendance_notes = group.attendance_notes.filter((item) => item.id !== noteId);
+    syncRecentMatchDayGroupParticipants(group);
+  });
+
+  if (removedEntry) {
+    renderRecentMatches(recentMatchDayGroupsData);
+  }
+
+  return removedEntry ? { entry: removedEntry, groupKey: removedGroupKey } : null;
+}
+
+function restoreMatchDayAttendanceNoteLocally(entry) {
+  if (!entry) return;
+  const group = getOrCreateRecentMatchDayGroup(entry.match_day_id, entry.match_date, entry.season_id, {
+    day_is_active: Boolean(activeMatchDay && activeMatchDay.id === entry.match_day_id),
+  });
+  if (!group.attendance_notes.some((item) => item.id === entry.id)) {
+    group.attendance_notes.push(entry);
+    syncRecentMatchDayGroupParticipants(group);
+    sortRecentMatchDayGroupsLocally();
+    renderRecentMatches(recentMatchDayGroupsData);
+  }
+}
+
+function buildOptimisticMatchRecord(matchId, seasonId, matchDayId, matchDate, winner, note, teamAIds, teamBIds, assignments, doubleDowns, createdAt = new Date().toISOString()) {
+  const playerMap = new Map(seasonPlayers.map((player) => [player.id, player.display_name]));
+  const buildPlayerRows = (ids, team) => ids.map((playerId) => ({
+    player_id: playerId,
+    display_name: playerMap.get(playerId) || "未知选手",
+    team,
+    hero_name: assignments[playerId] || null,
+    score_change: 0,
+    reward_change: 0,
+  }));
+
+  return {
+    match_id: matchId,
+    match_day_id: matchDayId || null,
+    season_id: seasonId || null,
+    match_date: matchDate || getBeijingBusinessDateString(),
+    day_is_active: Boolean(activeMatchDay && activeMatchDay.id === matchDayId),
+    winner_team: winner,
+    note: note || "",
+    created_at: createdAt,
+    players: [
+      ...buildPlayerRows(teamAIds, "A"),
+      ...buildPlayerRows(teamBIds, "B"),
+    ],
+    double_downs: doubleDowns || [],
+  };
+}
+
+function upsertRecentMatchLocally(match) {
+  if (!match?.match_id) return;
+
+  const existingIndex = recentMatchesData.findIndex((item) => item.match_id === match.match_id);
+  if (existingIndex >= 0) {
+    recentMatchesData[existingIndex] = match;
+  } else {
+    recentMatchesData = [match, ...recentMatchesData];
+  }
+
+  const group = getOrCreateRecentMatchDayGroup(match.match_day_id, match.match_date, match.season_id, {
+    day_is_active: Boolean(match.day_is_active),
+    started_at: match.created_at,
+  });
+  const groupMatchIndex = group.matches.findIndex((item) => item.match_id === match.match_id);
+  if (groupMatchIndex >= 0) {
+    group.matches[groupMatchIndex] = match;
+  } else {
+    group.matches.unshift(match);
+  }
+  syncRecentMatchDayGroupParticipants(group);
+  sortRecentMatchDayGroupsLocally();
+  renderRecentMatches(recentMatchDayGroupsData);
 }
 
 function sortQueueEntries(data) {
@@ -3504,8 +3783,6 @@ async function loadRewardLogs() {
   if (activeSeason?.id) {
     query = query.eq("season_id", activeSeason.id);
   }
-
-  const { data, error } = await query;
   let doubleDownQuery = db
     .from("match_double_downs")
     .select("user_player_id, mode");
@@ -3515,8 +3792,10 @@ async function loadRewardLogs() {
   } else {
     doubleDownQuery = doubleDownQuery.is("season_id", null);
   }
-
-  const doubleDownResult = await doubleDownQuery;
+  const [{ data, error }, doubleDownResult] = await Promise.all([
+    query,
+    doubleDownQuery,
+  ]);
 
   const localExternalLogs = readExternalDonationLogs(activeSeason?.id || null);
   rewardCardUsageSummary = new Map();
@@ -4493,11 +4772,13 @@ async function loadTodayPlayers() {
 }
 
 async function refreshPlayerDrivenViews() {
-  await loadActiveMatchDay();
-  await loadSeasonPlayers();
-  await loadRoleMembers();
-  await loadSeasons();
-  await loadTodayPlayers();
+  await Promise.all([
+    loadActiveMatchDay(),
+    loadSeasonPlayers(),
+    loadRoleMembers(),
+    loadSeasons(),
+    loadTodayPlayers(),
+  ]);
   renderQueue(queueEntries);
   renderSignupOptions();
   renderMatchForm();
@@ -4558,13 +4839,7 @@ async function loadLeaderboard() {
 }
 
 async function loadRecentMatches() {
-  try {
-    await db.rpc("ensure_previous_match_day_placeholder", {
-      p_season_id: activeSeason?.id || null,
-    });
-  } catch (error) {
-    // Ignore when the latest SQL has not been applied yet.
-  }
+  await ensurePreviousMatchDayPlaceholderOnce();
 
   let dayQuery = db
     .from("match_days")
@@ -4881,9 +5156,17 @@ async function signup() {
     payload.season_id = activeSeason.id;
   }
 
+  const optimisticEntry = createOptimisticQueueEntry(playerId, getPlayerDisplayNameById(playerId), {
+    season_id: payload.season_id ?? null,
+  });
+  queueEntries = [...queueEntries, optimisticEntry];
+  rerenderQueueLocally();
+
   const { error } = await db.from("signup_queue").insert([payload]);
 
   if (error) {
+    queueEntries = queueEntries.filter((entry) => entry.id !== optimisticEntry.id);
+    rerenderQueueLocally();
     if (error.message.includes("signup_queue_one_active_per_player")) {
       setMessage("该玩家已经在报名队列中。", true);
       return;
@@ -4907,6 +5190,15 @@ async function cancelSignupByEntry(entryId, playerName, buttonEl) {
     buttonEl.disabled = true;
   }
 
+  const targetEntry = queueEntries.find((row) => row.id === entryId) || null;
+  const previousEntry = targetEntry ? { ...targetEntry } : null;
+  if (targetEntry) {
+    targetEntry.is_active = false;
+    targetEntry.status = "cancelled";
+    targetEntry.cancelled_at = new Date().toISOString();
+    rerenderQueueLocally();
+  }
+
   setMessage(`正在取消 ${playerName || "该玩家"} 的报名...`);
 
   const { error } = await db
@@ -4919,6 +5211,10 @@ async function cancelSignupByEntry(entryId, playerName, buttonEl) {
     .eq("id", entryId);
 
   if (error) {
+    if (targetEntry && previousEntry) {
+      Object.assign(targetEntry, previousEntry);
+      rerenderQueueLocally();
+    }
     if (buttonEl) {
       buttonEl.disabled = false;
     }
@@ -4953,6 +5249,16 @@ async function reSignupByEntry(entryId, playerName, buttonEl) {
     buttonEl.disabled = true;
   }
 
+  const targetEntry = queueEntries.find((row) => row.id === entryId) || null;
+  const previousEntry = targetEntry ? { ...targetEntry } : null;
+  if (targetEntry) {
+    targetEntry.is_active = true;
+    targetEntry.status = "active";
+    targetEntry.cancelled_at = null;
+    targetEntry.created_at = new Date().toISOString();
+    rerenderQueueLocally();
+  }
+
   setMessage(`正在为 ${playerName || "该玩家"} 重新报名...`);
 
   const { error } = await db
@@ -4966,6 +5272,10 @@ async function reSignupByEntry(entryId, playerName, buttonEl) {
     .eq("id", entryId);
 
   if (error) {
+    if (targetEntry && previousEntry) {
+      Object.assign(targetEntry, previousEntry);
+      rerenderQueueLocally();
+    }
     if (buttonEl) {
       buttonEl.disabled = false;
     }
@@ -5148,6 +5458,13 @@ async function markQueuePlayerReady(playerId, playerName, buttonEl) {
     buttonEl.disabled = true;
   }
 
+  const optimisticEntry = createOptimisticTodayPlayer(playerId, playerName, {
+    season_id: activeSeason?.id || null,
+    source: "queue",
+  });
+  addTodayPlayerLocally(optimisticEntry);
+  rerenderPlayerDrivenLocally();
+
   setMessage(`正在将 ${playerName || "该玩家"} 标记为就位...`);
 
   const payload = {
@@ -5167,6 +5484,8 @@ async function markQueuePlayerReady(playerId, playerName, buttonEl) {
   }
 
   if (error) {
+    removeTodayPlayerLocallyByEntryId(optimisticEntry.id);
+    rerenderPlayerDrivenLocally();
     setMessage(`选手就位失败：${error.message}`, true);
     return;
   }
@@ -5189,11 +5508,20 @@ async function cancelQueuePlayerReady(entryId, playerName, buttonEl) {
     buttonEl.disabled = true;
   }
 
+  const removedEntry = removeTodayPlayerLocallyByEntryId(entryId);
+  if (removedEntry) {
+    rerenderPlayerDrivenLocally();
+  }
+
   setMessage(`正在取消 ${playerName || "该玩家"} 的就位状态...`);
 
   const { error } = await db.from("daily_player_roster").delete().eq("id", entryId);
 
   if (error) {
+    if (removedEntry) {
+      addTodayPlayerLocally(removedEntry);
+      rerenderPlayerDrivenLocally();
+    }
     if (buttonEl) {
       buttonEl.disabled = false;
     }
@@ -5219,6 +5547,7 @@ async function addMatchDayAttendanceNote(matchDayId, seasonId, matchDate, status
     buttonEl.disabled = true;
   }
 
+  const optimisticNoteId = addMatchDayAttendanceNoteLocally(matchDayId, seasonId, matchDate, playerId, status);
   setMessage(`正在补记${status === "standby" ? "替补" : "未到场"}名单...`);
 
   const payload = {
@@ -5236,6 +5565,9 @@ async function addMatchDayAttendanceNote(matchDayId, seasonId, matchDate, status
   }
 
   if (error) {
+    if (optimisticNoteId) {
+      removeMatchDayAttendanceNoteLocally(optimisticNoteId);
+    }
     setMessage(`补记名单失败：${error.message}。请先在 Supabase 执行最新 SQL。`, true);
     return;
   }
@@ -5257,6 +5589,7 @@ async function removeMatchDayAttendanceNote(noteId, playerName, buttonEl) {
     buttonEl.disabled = true;
   }
 
+  const removedState = removeMatchDayAttendanceNoteLocally(noteId);
   setMessage(`正在移除 ${playerName || "该选手"} 的补记状态...`);
 
   const { error } = await db.from("match_day_attendance_notes").delete().eq("id", noteId);
@@ -5266,6 +5599,9 @@ async function removeMatchDayAttendanceNote(noteId, playerName, buttonEl) {
   }
 
   if (error) {
+    if (removedState?.entry) {
+      restoreMatchDayAttendanceNoteLocally(removedState.entry);
+    }
     setMessage(`移除补记名单失败：${error.message}。请先在 Supabase 执行最新 SQL。`, true);
     return;
   }
@@ -5518,6 +5854,8 @@ async function recordMatch() {
   const teamAIds = getSelectedTeamIds("teamA");
   const teamBIds = getSelectedTeamIds("teamB");
   const winner = winnerSelect.value || null;
+  const matchNoteValue = matchNoteInput.value.trim() || null;
+  const currentMatchHeroAssignments = { ...matchHeroAssignments };
   const { error: doubleError, payload: doubleDownPayload } = buildDoubleDownPayload("match");
   const validationError = validateMatchPlayers(teamAIds, teamBIds);
 
@@ -5542,7 +5880,7 @@ async function recordMatch() {
       p_team_a_player_ids: teamAIds,
       p_team_b_player_ids: teamBIds,
       p_winner_team: winner,
-      p_note: matchNoteInput.value.trim() || null,
+      p_note: matchNoteValue,
       p_created_by: null,
       p_season_id: activeSeason?.id || null,
       p_double_downs: doubleDownPayload,
@@ -5552,7 +5890,7 @@ async function recordMatch() {
       p_team_a_player_ids: teamAIds,
       p_team_b_player_ids: teamBIds,
       p_winner_team: winner,
-      p_note: matchNoteInput.value.trim() || null,
+      p_note: matchNoteValue,
       p_created_by: null,
       p_season_id: activeSeason?.id || null,
       p_match_date: getBeijingBusinessDateString(),
@@ -5589,6 +5927,19 @@ async function recordMatch() {
   clearMatchForm();
   setMatchFormOpen(false);
   renderMatchForm();
+  upsertRecentMatchLocally(buildOptimisticMatchRecord(
+    matchId,
+    activeSeason?.id || null,
+    activeMatchDay?.id || null,
+    activeMatchDay?.match_date || getBeijingBusinessDateString(),
+    winner,
+    matchNoteValue,
+    teamAIds,
+    teamBIds,
+    currentMatchHeroAssignments,
+    doubleDownPayload,
+    new Date().toISOString()
+  ));
   setMatchMessage(winner ? "比赛记录成功，积分榜已刷新。" : "比赛记录已保存，当前未计分，补填胜负后才会变动积分。");
   appendAdminActionLog("添加了一场比赛记录。");
   requestImmediateRefresh({
@@ -5603,6 +5954,8 @@ async function recordBackfillMatch() {
   const teamBIds = [...backfillTeamSelections.teamB];
   const winner = backfillWinnerSelect.value || null;
   const isEditing = Boolean(editingMatchId);
+  const backfillNoteValue = backfillMatchNoteInput.value.trim() || null;
+  const currentBackfillHeroAssignments = { ...backfillHeroAssignments };
   const { error: doubleError, payload: doubleDownPayload } = buildDoubleDownPayload("backfill");
   const heroAssignments = [
     ...teamAIds.map((playerId) => ({ player_id: playerId, hero_name: backfillHeroAssignments[playerId] || null })),
@@ -5632,7 +5985,7 @@ async function recordBackfillMatch() {
       p_team_a_player_ids: teamAIds,
       p_team_b_player_ids: teamBIds,
       p_winner_team: winner,
-      p_note: backfillMatchNoteInput.value.trim() || null,
+      p_note: backfillNoteValue,
       p_created_by: null,
       p_season_id: backfillSeasonSelect.value,
       p_match_date: backfillDateInput.value,
@@ -5644,7 +5997,7 @@ async function recordBackfillMatch() {
       p_team_a_player_ids: teamAIds,
       p_team_b_player_ids: teamBIds,
       p_winner_team: winner,
-      p_note: backfillMatchNoteInput.value.trim() || null,
+      p_note: backfillNoteValue,
       p_created_by: null,
       p_season_id: backfillSeasonSelect.value,
       p_match_date: backfillDateInput.value,
@@ -5675,6 +6028,21 @@ async function recordBackfillMatch() {
   clearBackfillForm();
   setBackfillFormOpen(false);
   renderBackfillForm();
+  if (!isEditing) {
+    upsertRecentMatchLocally(buildOptimisticMatchRecord(
+      matchId,
+      backfillSeasonSelect.value,
+      null,
+      backfillDateInput.value,
+      winner,
+      backfillNoteValue,
+      teamAIds,
+      teamBIds,
+      currentBackfillHeroAssignments,
+      doubleDownPayload,
+      new Date().toISOString()
+    ));
+  }
   setMessage(
     isEditing
       ? (winner ? "比赛修改成功，积分已按全部记录重算。" : "比赛修改成功，当前未计分，补填胜负后才会变动积分。")
