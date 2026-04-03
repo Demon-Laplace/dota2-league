@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Dota2 宁德联赛</title>
-  <link rel="stylesheet" href="style.css?v=20260403-06" />
+  <link rel="stylesheet" href="style.css?v=20260403-08" />
 </head>
   <body>
   <div id="loadingScreen" class="loading-screen" aria-live="polite">
@@ -138,8 +138,8 @@
     <section id="rewardPanel" class="season-panel" hidden>
       <div class="section-head">
         <div>
-          <h2>自愿赞助</h2>
-          <p class="muted">选择选手并添加额外赞助额，积分榜显示为最低值加额外赞助额。</p>
+          <h2>赛季赞助</h2>
+          <p class="muted">这里汇总报名费、积分卡和额外赞助；下方仍可登记额外赞助与场外赞助。</p>
         </div>
         <button id="closeRewardPanelBtn" class="button-secondary" type="button">收起</button>
       </div>
@@ -151,10 +151,10 @@
         <input id="rewardExtraInput" type="number" min="0" step="1" placeholder="额外赞助额" />
         <button id="addRewardBtn" type="button">添加赞助</button>
       </div>
-      <p id="rewardMinimumHint" class="muted">请选择选手后添加额外赞助额。</p>
+      <p id="rewardMinimumHint" class="muted">请选择选手后添加额外赞助。</p>
       <p id="rewardMessage" class="message"></p>
       <div id="rewardLogsList" class="reward-logs"></div>
-      <p id="rewardLogsEmpty" class="muted">暂无赞助记录</p>
+      <p id="rewardLogsEmpty" class="muted">暂无赛季赞助数据</p>
     </section>
     <section id="seasonPlayersPanel" class="season-panel" hidden>
       <div class="section-head">
@@ -237,7 +237,7 @@
                 aria-label="收起积分榜"
                 title="收起积分榜"
               >
-                <span class="leaderboard-compact-icon" aria-hidden="true">⇅</span>
+                <span class="leaderboard-compact-icon leaderboard-compact-icon-dot" aria-hidden="true"></span>
               </button>
             </div>
           </div>
@@ -249,7 +249,7 @@
                   <th>玩家</th>
                   <th>积分</th>
                   <th>场次</th>
-                  <th>赞助</th>
+                  <th>胜率</th>
                 </tr>
               </thead>
               <tbody id="leaderboardBody"></tbody>
@@ -418,6 +418,6 @@
   </div>
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="app.js?v=20260403-05"></script>
+  <script src="app.js?v=20260403-07"></script>
 </body>
 </html>

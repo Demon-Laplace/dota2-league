@@ -153,6 +153,7 @@ let allSeasons = [];
 let backfillPlayers = [];
 let leaderboardPlayers = [];
 let rewardLogs = [];
+let rewardCardUsageSummary = new Map();
 let seasonPlayerRewardTotal = 0;
 let externalRewardTotal = 0;
 let recentMatchesData = [];
@@ -842,6 +843,19 @@ function formatScore(value) {
   const numericValue = Number(value ?? 0);
   if (Number.isNaN(numericValue)) return "0";
   return numericValue.toFixed(2).replace(/\.00$/, "").replace(/(\.\d)0$/, "$1");
+}
+
+function getWinRateNumber(value, wins = 0, gamesPlayed = 0) {
+  const numericValue = Number(value);
+  const resolvedValue = Number.isFinite(numericValue)
+    ? numericValue
+    : (Number(gamesPlayed ?? 0) > 0 ? (Number(wins ?? 0) / Number(gamesPlayed ?? 0)) * 100 : 0);
+  return Math.max(0, Math.min(100, resolvedValue));
+}
+
+function formatWinRateValue(value, wins = 0, gamesPlayed = 0) {
+  const resolvedValue = getWinRateNumber(value, wins, gamesPlayed);
+  return `${resolvedValue.toFixed(1).replace(/\.0$/, "")}%`;
 }
 
 function getHeroDisplayName(heroName) {
@@ -2299,6 +2313,182 @@ function refreshSeasonRewardTotal() {
   updateSeasonRewardTotal(seasonPlayerRewardTotal + externalRewardTotal);
 }
 
+const REWARD_CATEGORY_CONFIG = {
+  signup_fee: { label: "报名费", tone: "base", order: 10 },
+  team_card: { label: "团队积分卡", tone: "card", order: 20 },
+  single_card: { label: "双倍积分卡", tone: "card", order: 30 },
+  extra_donation: { label: "额外赞助", tone: "extra", order: 40 },
+  misc_item: { label: "其它道具", tone: "misc", order: 50 },
+};
+
+function getRewardCategoryConfig(kind) {
+  return REWARD_CATEGORY_CONFIG[kind] || REWARD_CATEGORY_CONFIG.misc_item;
+}
+
+function appendRewardCategory(categories, entry) {
+  const amount = Number(entry?.amount ?? 0);
+  if (!Number.isFinite(amount) || amount <= 0) return;
+
+  const resolvedLabel = entry.label || getRewardCategoryConfig(entry.kind).label;
+  const count = Math.max(Number(entry.count ?? 0), 0);
+  const existing = categories.find(
+    (item) => item.kind === entry.kind && (item.label || getRewardCategoryConfig(item.kind).label) === resolvedLabel
+  );
+
+  if (existing) {
+    existing.amount += amount;
+    existing.count = Math.max(Number(existing.count ?? 0), 0) + count;
+    return;
+  }
+
+  categories.push({
+    ...entry,
+    amount,
+    count,
+    label: resolvedLabel,
+  });
+}
+
+function getSeasonRewardPlayerMap() {
+  const playerMap = new Map();
+
+  seasonPlayers
+    .filter((player) => player.is_in_season)
+    .forEach((player) => {
+      playerMap.set(player.id, {
+        id: player.id,
+        display_name: player.display_name,
+        reward_floor_bonus: Number(player.reward_floor_bonus ?? 0),
+        reward_double_bonus: Number(player.reward_double_bonus ?? 0),
+        reward_extra_points: Number(player.reward_extra_points ?? 0),
+      });
+    });
+
+  leaderboardPlayers.forEach((player) => {
+    const playerId = player.player_id || player.id;
+    if (!playerId) return;
+    const current = playerMap.get(playerId) || {
+      id: playerId,
+      display_name: player.display_name || "未知选手",
+      reward_floor_bonus: 0,
+      reward_double_bonus: 0,
+      reward_extra_points: 0,
+    };
+    playerMap.set(playerId, {
+      ...current,
+      display_name: player.display_name || current.display_name,
+      reward_floor_bonus: Number(player.reward_floor_bonus ?? current.reward_floor_bonus ?? 0),
+      reward_double_bonus: Number(player.reward_double_bonus ?? current.reward_double_bonus ?? 0),
+      reward_extra_points: Number(player.reward_extra_points ?? current.reward_extra_points ?? 0),
+    });
+  });
+
+  return playerMap;
+}
+
+function buildSeasonRewardSummary() {
+  const playerMap = getSeasonRewardPlayerMap();
+  const extraDonationSummary = new Map();
+
+  rewardLogs.forEach((log) => {
+    if (!log.player_id || log.is_cancelled) return;
+    const current = extraDonationSummary.get(log.player_id) || { total: 0, count: 0 };
+    current.total += Number(log.amount ?? 0);
+    current.count += 1;
+    extraDonationSummary.set(log.player_id, current);
+  });
+
+  return [...playerMap.values()]
+    .map((player) => {
+      const categories = [];
+      const cardUsage = rewardCardUsageSummary.get(player.id) || null;
+      const extraDonation = extraDonationSummary.get(player.id) || { total: 0, count: 0 };
+
+      appendRewardCategory(categories, {
+        kind: "signup_fee",
+        amount: 20,
+        count: 1,
+      });
+
+      if (cardUsage?.teamAmount > 0) {
+        appendRewardCategory(categories, {
+          kind: "team_card",
+          amount: cardUsage.teamAmount,
+          count: cardUsage.teamCount,
+        });
+      }
+
+      if (cardUsage?.singleAmount > 0) {
+        appendRewardCategory(categories, {
+          kind: "single_card",
+          amount: cardUsage.singleAmount,
+          count: cardUsage.singleCount,
+        });
+      }
+
+      const fallbackCardAmount = Math.max(
+        player.reward_double_bonus - Number(cardUsage?.teamAmount ?? 0) - Number(cardUsage?.singleAmount ?? 0),
+        0
+      );
+      if (fallbackCardAmount > 0) {
+        appendRewardCategory(categories, {
+          kind: "misc_item",
+          amount: fallbackCardAmount,
+          count: 1,
+          label: "其它积分卡",
+        });
+      }
+
+      if (player.reward_floor_bonus > 0) {
+        appendRewardCategory(categories, {
+          kind: "misc_item",
+          amount: player.reward_floor_bonus,
+          count: 1,
+          label: "其它道具",
+        });
+      }
+
+      if (player.reward_extra_points > 0) {
+        appendRewardCategory(categories, {
+          kind: "extra_donation",
+          amount: player.reward_extra_points,
+          count: extraDonation.count,
+        });
+      }
+
+      const total = categories.reduce((sum, item) => sum + Number(item.amount ?? 0), 0);
+      return {
+        ...player,
+        categories: categories.sort(
+          (a, b) => getRewardCategoryConfig(a.kind).order - getRewardCategoryConfig(b.kind).order
+        ),
+        total,
+      };
+    })
+    .sort((a, b) => {
+      const leaderboardRankA = leaderboardPlayers.findIndex((player) => (player.player_id || player.id) === a.id);
+      const leaderboardRankB = leaderboardPlayers.findIndex((player) => (player.player_id || player.id) === b.id);
+      if (leaderboardRankA !== -1 || leaderboardRankB !== -1) {
+        if (leaderboardRankA === -1) return 1;
+        if (leaderboardRankB === -1) return -1;
+        return leaderboardRankA - leaderboardRankB;
+      }
+      return a.display_name.localeCompare(b.display_name, "zh-CN");
+    });
+}
+
+function buildRewardCategoryLineHtml(item) {
+  const config = getRewardCategoryConfig(item.kind);
+  const label = item.label || config.label;
+  const metaText = item.count > 1 ? ` · ${item.count} 次` : "";
+  return `
+    <div class="reward-category-line">
+      <span class="reward-category-name reward-category-name-${config.tone}">${escapeHtml(label)}</span>
+      <span class="reward-category-value">+${formatScore(item.amount)}${escapeHtml(metaText)}</span>
+    </div>
+  `;
+}
+
 function renderRewardPlayerOptions() {
   const options = ['<option value="">请选择选手</option>'];
   const sortedPlayers = [...leaderboardPlayers].sort((a, b) =>
@@ -2344,21 +2534,72 @@ function updateRewardMinimumHint() {
     return;
   }
 
-  rewardMinimumHint.textContent = `${selectedPlayer.display_name} 当前最低值 ${Number(selectedPlayer.reward_minimum ?? 20)}，当前额外赞助额 ${Number(selectedPlayer.reward_extra_points ?? 0)}。`;
+  rewardMinimumHint.textContent = `${selectedPlayer.display_name} 当前基础项 ${Number(selectedPlayer.reward_minimum ?? 20)}，当前额外赞助 ${Number(selectedPlayer.reward_extra_points ?? 0)}。`;
 }
 
 function renderRewardLogs() {
   rewardLogsList.innerHTML = "";
   const canScore = isCurrentRoleScorer();
+  const rewardSummary = buildSeasonRewardSummary();
+  const detailLogs = rewardLogs.filter((log) => !log.is_cancelled || log.cancelled_at);
 
-  if (!rewardLogs.length) {
+  if (!rewardSummary.length && !detailLogs.length) {
     rewardLogsEmpty.style.display = "block";
     return;
   }
 
   rewardLogsEmpty.style.display = "none";
 
-  rewardLogs.forEach((log) => {
+  if (rewardSummary.length) {
+    const summarySection = document.createElement("section");
+    summarySection.className = "reward-summary-section";
+    summarySection.innerHTML = `
+      <div class="section-head">
+        <div>
+          <h3>选手赞助构成</h3>
+          <p class="muted">报名费固定计入；积分卡、额外赞助和后续道具按分类汇总。</p>
+        </div>
+      </div>
+      <div class="reward-summary-grid"></div>
+    `;
+    const summaryGrid = summarySection.querySelector(".reward-summary-grid");
+
+    rewardSummary.forEach((player) => {
+      const item = document.createElement("article");
+      item.className = "reward-summary-card";
+      item.innerHTML = `
+        <div class="reward-summary-head">
+          <strong>${escapeHtml(player.display_name)}</strong>
+          <span class="reward-log-amount">总额 ${formatScore(player.total)}</span>
+        </div>
+        <div class="reward-category-list">
+          ${player.categories.map((category) => buildRewardCategoryLineHtml(category)).join("")}
+        </div>
+      `;
+      summaryGrid.appendChild(item);
+    });
+
+    rewardLogsList.appendChild(summarySection);
+  }
+
+  if (!detailLogs.length) {
+    return;
+  }
+
+  const detailSection = document.createElement("section");
+  detailSection.className = "reward-summary-section";
+  detailSection.innerHTML = `
+    <div class="section-head">
+      <div>
+        <h3>额外赞助明细</h3>
+        <p class="muted">这里保留额外赞助与场外赞助的逐笔记录，方便后续核对或取消。</p>
+      </div>
+    </div>
+    <div class="reward-detail-list"></div>
+  `;
+  const detailList = detailSection.querySelector(".reward-detail-list");
+
+  detailLogs.forEach((log) => {
     const item = document.createElement("div");
     const playerName = log.players?.display_name || log.donor_name || "未知赞助人";
     const statusBadge = log.is_cancelled
@@ -2374,7 +2615,7 @@ function renderRewardLogs() {
     item.innerHTML = `
       <div class="reward-log-main">
         <strong>${escapeHtml(playerName)}</strong>
-        ${log.player_id ? "" : '<span class="queue-slot">场外赞助</span>'}
+        ${log.player_id ? '<span class="queue-slot">额外赞助</span>' : '<span class="queue-slot">场外赞助</span>'}
         ${statusBadge}
         <span class="muted">${escapeHtml(formatLocalTime(log.created_at))}</span>
       </div>
@@ -2383,8 +2624,10 @@ function renderRewardLogs() {
         ${actionHtml}
       </div>
     `;
-    rewardLogsList.appendChild(item);
+    detailList.appendChild(item);
   });
+
+  rewardLogsList.appendChild(detailSection);
 }
 
 function renderSeasonPlayersPanel() {
@@ -2980,14 +3223,19 @@ function renderLeaderboard(data) {
       tags.push({ icon: "★", label: "MVP", tone: "royal" });
     }
 
-    const tagsHtml = tags.length
-      ? `<div class="leaderboard-player-tags">${tags.map((tag) => `
+    const tagTitle = tags.map((tag) => tag.label).join(" · ");
+    const tagsHtml = `
+      <div class="leaderboard-player-tags${tags.length ? "" : " leaderboard-player-tags-empty"}"${tagTitle ? ` title="${escapeHtml(tagTitle)}"` : ""}>
+        ${tags.map((tag) => `
         <span class="leaderboard-tag leaderboard-tag-${tag.tone}">
           <span class="leaderboard-tag-icon">${escapeHtml(tag.icon)}</span>
           <span>${escapeHtml(tag.label)}</span>
         </span>
-      `).join("")}</div>`
-      : "";
+      `).join("")}
+      </div>
+    `;
+    const winRateNumber = getWinRateNumber(player.win_rate, player.wins, player.games_played);
+    const winRateLabel = formatWinRateValue(player.win_rate, player.wins, player.games_played);
 
     if (rank === 1) {
       tr.className = "leaderboard-row-top1";
@@ -3015,7 +3263,12 @@ function renderLeaderboard(data) {
       </td>
       <td><span class="leaderboard-score">${formatScore(player.score)}</span></td>
       <td><span class="leaderboard-stat">${player.games_played ?? 0}</span></td>
-      <td><span class="leaderboard-reward">${Number(player.reward_points ?? 0)}</span></td>
+      <td>
+        <div class="leaderboard-rate" style="--rate-percent: ${winRateNumber}%; --rate-glow: ${Math.max(14, winRateNumber)}%;">
+          <span class="leaderboard-rate-bar" aria-hidden="true"></span>
+          <span class="leaderboard-rate-value">${winRateLabel}</span>
+        </div>
+      </td>
     `;
     leaderboardBody.appendChild(tr);
   });
@@ -3118,8 +3371,47 @@ async function loadRewardLogs() {
   }
 
   const { data, error } = await query;
+  let doubleDownQuery = db
+    .from("match_double_downs")
+    .select("user_player_id, mode");
+
+  if (activeSeason?.id) {
+    doubleDownQuery = doubleDownQuery.eq("season_id", activeSeason.id);
+  } else {
+    doubleDownQuery = doubleDownQuery.is("season_id", null);
+  }
+
+  const doubleDownResult = await doubleDownQuery;
 
   const localExternalLogs = readExternalDonationLogs(activeSeason?.id || null);
+  rewardCardUsageSummary = new Map();
+
+  if (!doubleDownResult.error) {
+    const usageMap = new Map();
+    (doubleDownResult.data || []).forEach((row) => {
+      const playerId = row.user_player_id;
+      if (!playerId) return;
+      const usage = usageMap.get(playerId) || { teamCount: 0, singleCount: 0 };
+      if (row.mode === "team") {
+        usage.teamCount += 1;
+      } else if (row.mode === "single") {
+        usage.singleCount += 1;
+      }
+      usageMap.set(playerId, usage);
+    });
+
+    rewardCardUsageSummary = new Map(
+      [...usageMap.entries()].map(([playerId, usage]) => {
+        const paidSingleCount = Math.max(usage.singleCount - 2, 0);
+        return [playerId, {
+          teamCount: usage.teamCount,
+          teamAmount: usage.teamCount * 10,
+          singleCount: paidSingleCount,
+          singleAmount: paidSingleCount * 5,
+        }];
+      })
+    );
+  }
 
   if (error) {
     console.error("加载赞助记录失败：", error);
@@ -3867,7 +4159,7 @@ async function loadActiveMatchDay() {
 async function loadSeasonPlayers() {
   const playersResult = await db
     .from("players")
-    .select("id, display_name, reward_floor_bonus, reward_extra_points")
+    .select("id, display_name, reward_floor_bonus, reward_double_bonus, reward_extra_points")
     .order("display_name", { ascending: true });
 
   if (playersResult.error) {
@@ -3911,7 +4203,9 @@ async function loadSeasonPlayers() {
       is_in_season: participantIds.has(player.id),
       player_rank: participantRanks.get(player.id) || null,
       display_name: player.display_name,
-      reward_points: stats?.reward_points ?? (20 + Number(player.reward_floor_bonus ?? 0) + Number(player.reward_extra_points ?? 0)),
+      reward_floor_bonus: Number(stats?.reward_floor_bonus ?? player.reward_floor_bonus ?? 0),
+      reward_double_bonus: Number(stats?.reward_double_bonus ?? player.reward_double_bonus ?? 0),
+      reward_points: stats?.reward_points ?? (20 + Number(player.reward_floor_bonus ?? 0) + Number(player.reward_double_bonus ?? 0) + Number(player.reward_extra_points ?? 0)),
       reward_minimum: 20 + Number(stats?.reward_floor_bonus ?? player.reward_floor_bonus ?? 0) + Number(stats?.reward_double_bonus ?? 0),
       reward_extra_points: stats?.reward_extra_points ?? player.reward_extra_points ?? 0,
     };
@@ -5276,6 +5570,7 @@ function subscribeRealtime() {
       () => {
         scheduleRefresh({
           leaderboard: true,
+          rewardLogs: true,
           recentMatches: true,
         });
       }
@@ -5286,6 +5581,18 @@ function subscribeRealtime() {
       () => {
         scheduleRefresh({
           leaderboard: true,
+          rewardLogs: true,
+          recentMatches: true,
+        });
+      }
+    )
+    .on(
+      "postgres_changes",
+      { event: "*", schema: "public", table: "match_double_downs" },
+      () => {
+        scheduleRefresh({
+          leaderboard: true,
+          rewardLogs: true,
           recentMatches: true,
         });
       }
