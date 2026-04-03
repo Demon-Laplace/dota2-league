@@ -2810,13 +2810,15 @@ function renderQueue(data) {
     }
 
     li.innerHTML = `
-      <div class="queue-card-head">
-        <strong>${escapeHtml(playerName)}</strong>
+      <div class="queue-card-main">
+        <div class="queue-card-head">
+          <strong>${escapeHtml(playerName)}</strong>
+          <div class="queue-card-tags">
+            ${tagsHtml}
+          </div>
+        </div>
+        <p class="muted queue-card-time">${escapeHtml(metaText || "记录时间未知")}</p>
       </div>
-      <div class="queue-card-tags">
-        ${tagsHtml}
-      </div>
-      <p class="muted queue-card-time">${escapeHtml(metaText || "记录时间未知")}</p>
       ${actionHtml ? `<div class="queue-card-actions">${actionHtml}</div>` : ""}
     `;
     queueList.appendChild(li);
