@@ -577,6 +577,34 @@ button.season-total {
   gap: 8px;
 }
 
+.admin-log-details {
+  display: grid;
+  gap: 10px;
+}
+
+.admin-log-summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  cursor: pointer;
+  list-style: none;
+}
+
+.admin-log-summary::-webkit-details-marker {
+  display: none;
+}
+
+.admin-log-summary::after {
+  content: "展开";
+  color: #9fb8d3;
+  font-size: 13px;
+}
+
+.admin-log-details[open] .admin-log-summary::after {
+  content: "收起";
+}
+
 .admin-member-card {
   display: flex;
   align-items: center;
@@ -4064,6 +4092,11 @@ ol {
   input,
   select {
     width: 100%;
+  }
+
+  .admin-log-summary {
+    align-items: flex-start;
+    flex-direction: column;
   }
 }
 

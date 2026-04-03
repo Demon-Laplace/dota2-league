@@ -5739,6 +5739,41 @@ function clearRememberedScorerAutoLogin({ silent = false } = {}) {
   }
 }
 
+async function clearAllScorerAutoReconnect() {
+  if (!ensureAdminAccess("仅管理员可清空所有记分员自动登录。")) return;
+
+  const confirmed = window.confirm("确认清空所有记分员的自动登录状态吗？这会让所有已绑定设备失效，需要重新登录。");
+  if (!confirmed) return;
+
+  if (adminClearScorerRememberBtn) {
+    adminClearScorerRememberBtn.disabled = true;
+  }
+
+  setAdminPanelMessage("正在清空所有记分员自动登录状态...");
+
+  const { error } = await db
+    .from("app_role_members")
+    .update({
+      allow_auto_reconnect: false,
+      auto_reconnect_device_id: null,
+    })
+    .eq("role", "scorer");
+
+  if (adminClearScorerRememberBtn) {
+    adminClearScorerRememberBtn.disabled = !isCurrentRoleAdmin();
+  }
+
+  if (error) {
+    setAdminPanelMessage(`清空失败：${error.message}。`, true);
+    return;
+  }
+
+  clearRememberedScorerAutoLogin({ silent: true });
+  setAdminPanelMessage("已清空所有记分员自动登录状态。");
+  appendAdminActionLog(`${getCurrentAccessActorLabel()} 清空了所有记分员自动登录状态。`);
+  await loadRoleMembers();
+}
+
 function scrollToPanelTarget(targetId) {
   const target = document.getElementById(targetId);
   if (!target) {
@@ -5929,6 +5964,9 @@ async function loadSeasonPlayers() {
   });
 
   renderSeasonPlayersPanel();
+  renderAdminAddScorerOptions();
+  renderScorerManualScoreOptions();
+  renderAdminManualScoreOptions();
 }
 
 async function loadTodayPlayers() {
@@ -8083,10 +8121,7 @@ signupAllBtn.addEventListener("click", signupAllPlayers);
 adminClearQueueBtn.addEventListener("click", clearSignupQueueForTesting);
 adminClearTodayPlayersBtn.addEventListener("click", clearTodayPlayersForTesting);
 adminResetSeasonBtn.addEventListener("click", resetCurrentSeason);
-adminClearScorerRememberBtn.addEventListener("click", () => {
-  if (!ensureAdminAccess("仅管理员可清空本机记分员自动登录。")) return;
-  clearRememberedScorerAutoLogin();
-});
+adminClearScorerRememberBtn.addEventListener("click", clearAllScorerAutoReconnect);
 adminAddScorerBtn.addEventListener("click", () => addScorerRoleByPlayer(adminAddScorerSelect.value));
 recordMatchBtn.addEventListener("click", recordMatch);
 recordBackfillBtn.addEventListener("click", recordBackfillMatch);

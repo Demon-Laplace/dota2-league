@@ -71,16 +71,14 @@
         </section>
         <section class="admin-panel-card">
           <div class="section-head">
-            <h3>快捷维护</h3>
+            <div>
+              <h3>记分员特别操作</h3>
+              <p class="muted">集中处理重算、队列维护和人工积分。</p>
+            </div>
           </div>
           <div class="row admin-panel-actions">
             <button id="scorerRecalculateScoresBtn" class="button-secondary" type="button">重新汇算当前分数</button>
             <button id="scorerClearQueueBtn" class="button-danger" type="button">清空报名队列</button>
-          </div>
-        </section>
-        <section class="admin-panel-card">
-          <div class="section-head">
-            <h3>人工积分</h3>
           </div>
           <div class="row">
             <select id="scorerManualScorePlayerSelect">
@@ -110,13 +108,26 @@
       <div class="admin-panel-grid">
         <section class="admin-panel-card">
           <div class="section-head">
-            <h3>快捷操作</h3>
+            <div>
+              <h3>管理员特别操作</h3>
+              <p class="muted">集中处理维护、重算、人工积分和自动登录清理。</p>
+            </div>
           </div>
           <div class="row admin-panel-actions">
+            <button id="adminRecalculateScoresBtn" class="button-secondary" type="button">重新汇算当前分数</button>
             <button id="adminClearQueueBtn" class="button-danger" type="button">清空报名队列</button>
             <button id="adminClearTodayPlayersBtn" class="button-danger" type="button">清空当日选手</button>
             <button id="adminResetSeasonBtn" class="button-danger" type="button">重置当前赛季</button>
-            <button id="adminClearScorerRememberBtn" class="button-secondary" type="button">清空本机记分员自动登录</button>
+            <button id="adminClearScorerRememberBtn" class="button-secondary" type="button">清空所有记分员自动登录</button>
+          </div>
+          <div class="row">
+            <select id="adminManualScorePlayerSelect">
+              <option value="">请选择当前赛季选手</option>
+            </select>
+          </div>
+          <div class="row admin-panel-actions">
+            <button id="adminDeathFingerBtn" class="button-danger" type="button">死亡一指 -1</button>
+            <button id="adminHealingHandBtn" class="button-secondary" type="button">治疗之手 +1</button>
           </div>
         </section>
         <section class="admin-panel-card">
@@ -135,42 +146,14 @@
           <div id="scorerMembersList" class="admin-members-list"></div>
         </section>
         <section class="admin-panel-card">
-          <div class="section-head">
-            <div>
-              <h3>今日日志</h3>
-              <p class="muted">北京时间凌晨 2 点自动清空</p>
-            </div>
-          </div>
-          <div id="adminActionLogsList" class="admin-action-logs"></div>
-          <p id="adminActionLogsEmpty" class="muted">当前还没有操作记录</p>
-        </section>
-        <section class="admin-panel-card">
-          <div class="section-head">
-            <div>
-              <h3>高级维护</h3>
-              <p class="muted">用于按当前数据库规则重新汇算当前赛季积分、场次与胜负。</p>
-            </div>
-          </div>
-          <div class="row admin-panel-actions">
-            <button id="adminRecalculateScoresBtn" class="button-secondary" type="button">高级重新汇算当前分数</button>
-          </div>
-        </section>
-        <section class="admin-panel-card">
-          <div class="section-head">
-            <div>
-              <h3>人工积分</h3>
-              <p class="muted">管理员也可直接执行死亡一指和治疗之手，规则与记分员一致。</p>
-            </div>
-          </div>
-          <div class="row">
-            <select id="adminManualScorePlayerSelect">
-              <option value="">请选择当前赛季选手</option>
-            </select>
-          </div>
-          <div class="row admin-panel-actions">
-            <button id="adminDeathFingerBtn" class="button-danger" type="button">死亡一指 -1</button>
-            <button id="adminHealingHandBtn" class="button-secondary" type="button">治疗之手 +1</button>
-          </div>
+          <details class="admin-log-details">
+            <summary class="admin-log-summary">
+              <span>今日日志</span>
+              <span class="muted">北京时间凌晨 2 点自动清空</span>
+            </summary>
+            <div id="adminActionLogsList" class="admin-action-logs"></div>
+            <p id="adminActionLogsEmpty" class="muted">当前还没有操作记录</p>
+          </details>
         </section>
       </div>
       <p id="adminPanelMessage" class="message"></p>
