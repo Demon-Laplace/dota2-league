@@ -1946,8 +1946,13 @@ function getSelectedBackfillPlayerIds() {
 }
 
 function getTodayMatchPlayers() {
+  const linkedPlayers = getLinkedTodayPlayers();
   const seasonRankMap = new Map(seasonPlayers.map((player) => [player.id, player.player_rank || null]));
-  return todayPlayers.map((player) => ({
+  const basePlayers = linkedPlayers.length
+    ? linkedPlayers
+    : seasonPlayers.filter((player) => player.is_in_season);
+
+  return basePlayers.map((player) => ({
     id: player.player_id || player.id,
     display_name: player.display_name,
     player_rank: seasonRankMap.get(player.player_id || player.id) || null,
@@ -1978,6 +1983,10 @@ function getLinkedTodayPlayers() {
   (todayGroup?.participants || []).forEach((entry) => pushEntry(entry, "record"));
 
   return linkedPlayers;
+}
+
+function canUseMatchRecordingForm() {
+  return Boolean(activeMatchDay || activeSeason?.id);
 }
 
 function createEmptySingleDoubleEntry() {
@@ -3088,16 +3097,16 @@ function renderMatchForm() {
   refreshMatchSelectOptions();
   renderDoublePanel("match");
 
-  const hasActiveMatchDay = Boolean(activeMatchDay);
+  const canUseForm = canUseMatchRecordingForm();
   const hasCompleteTeams = matchTeamSelections.teamA.length === TEAM_SIZE && matchTeamSelections.teamB.length === TEAM_SIZE;
-  renderInlineTeamDoubleControls("match", !hasActiveMatchDay);
-  winnerSelect.disabled = !hasActiveMatchDay;
-  matchNoteInput.disabled = !hasActiveMatchDay;
-  recordMatchBtn.disabled = !hasActiveMatchDay || !hasCompleteTeams;
+  renderInlineTeamDoubleControls("match", !canUseForm);
+  winnerSelect.disabled = !canUseForm;
+  matchNoteInput.disabled = !canUseForm;
+  recordMatchBtn.disabled = !canUseForm || !hasCompleteTeams;
   closeMatchFormBtn.disabled = false;
   openMatchFormBtn.disabled = isMatchFormOpen;
   [...matchFormPanel.querySelectorAll('[data-role="winner-toggle"]')].forEach((button) => {
-    button.disabled = !hasActiveMatchDay;
+    button.disabled = !canUseForm;
   });
   setWinnerSelection("match", winnerSelect.value);
 }
@@ -5500,6 +5509,10 @@ function validateBackfillPlayers(teamAIds, teamBIds) {
 
 async function recordMatch() {
   if (!ensureScorerAccess("仅记分员或管理员可登记比赛。")) return;
+  if (!activeMatchDay && !activeSeason?.id) {
+    setMatchMessage("当前缺少可用赛季，暂时无法保存今日比赛。", true);
+    return;
+  }
   const teamAIds = getSelectedTeamIds("teamA");
   const teamBIds = getSelectedTeamIds("teamB");
   const winner = winnerSelect.value || null;
@@ -5517,17 +5530,33 @@ async function recordMatch() {
   }
 
   recordMatchBtn.disabled = true;
-  setMatchMessage("正在记录比赛...");
+  setMatchMessage(activeMatchDay ? "正在记录比赛..." : "正在保存今日比赛...");
 
-  const { data: matchId, error } = await db.rpc("record_match_result", {
-    p_team_a_player_ids: teamAIds,
-    p_team_b_player_ids: teamBIds,
-    p_winner_team: winner,
-    p_note: matchNoteInput.value.trim() || null,
-    p_created_by: null,
-    p_season_id: activeSeason?.id || null,
-    p_double_downs: doubleDownPayload,
-  });
+  let matchId = null;
+  let error = null;
+
+  if (activeMatchDay) {
+    ({ data: matchId, error } = await db.rpc("record_match_result", {
+      p_team_a_player_ids: teamAIds,
+      p_team_b_player_ids: teamBIds,
+      p_winner_team: winner,
+      p_note: matchNoteInput.value.trim() || null,
+      p_created_by: null,
+      p_season_id: activeSeason?.id || null,
+      p_double_downs: doubleDownPayload,
+    }));
+  } else {
+    ({ data: matchId, error } = await db.rpc("record_match_result_backfill", {
+      p_team_a_player_ids: teamAIds,
+      p_team_b_player_ids: teamBIds,
+      p_winner_team: winner,
+      p_note: matchNoteInput.value.trim() || null,
+      p_created_by: null,
+      p_season_id: activeSeason?.id || null,
+      p_match_date: getBeijingBusinessDateString(),
+      p_double_downs: doubleDownPayload,
+    }));
+  }
 
   recordMatchBtn.disabled = false;
 
@@ -5935,8 +5964,8 @@ recordMatchBtn.addEventListener("click", recordMatch);
 recordBackfillBtn.addEventListener("click", recordBackfillMatch);
 
 openMatchFormBtn.addEventListener("click", () => {
-  if (!activeMatchDay) {
-    setMessage("请先发起当日比赛。", true);
+  if (!canUseMatchRecordingForm()) {
+    setMessage("当前缺少可用赛季，暂时无法添加当日比赛。", true);
     return;
   }
   clearMatchForm();
@@ -5981,7 +6010,7 @@ matchFormPanel.addEventListener("click", (event) => {
     const formType = teamDoubleToggle.dataset.formType || "match";
     const team = teamDoubleToggle.dataset.team || "A";
     teamDoublePickerOpen[formType][team] = !teamDoublePickerOpen[formType][team];
-    renderInlineTeamDoubleControls(formType, !activeMatchDay);
+    renderInlineTeamDoubleControls(formType, !canUseMatchRecordingForm());
     return;
   }
 
@@ -5990,7 +6019,7 @@ matchFormPanel.addEventListener("click", (event) => {
     const team = teamDoubleClear.dataset.team === "A" ? "A" : "B";
     matchDoubleState[team === "A" ? "teamAUserId" : "teamBUserId"] = "";
     teamDoublePickerOpen.match[team] = true;
-    renderInlineTeamDoubleControls("match", !activeMatchDay);
+    renderInlineTeamDoubleControls("match", !canUseMatchRecordingForm());
     return;
   }
 
@@ -6001,7 +6030,7 @@ matchFormPanel.addEventListener("click", (event) => {
     const currentValue = matchDoubleState[team === "A" ? "teamAUserId" : "teamBUserId"];
     matchDoubleState[team === "A" ? "teamAUserId" : "teamBUserId"] = currentValue === playerId ? "" : playerId;
     teamDoublePickerOpen.match[team] = true;
-    renderInlineTeamDoubleControls("match", !activeMatchDay);
+    renderInlineTeamDoubleControls("match", !canUseMatchRecordingForm());
     return;
   }
 
