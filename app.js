@@ -15,8 +15,13 @@ const REMEMBERED_SCORER_PLAYER_KEY = "nd_dota_remembered_scorer_player_v1";
 const SKIP_NEXT_SCORER_RECONNECT_KEY = "nd_dota_skip_next_scorer_reconnect_v1";
 const DEVICE_ID_STORAGE_KEY = "nd_dota_device_id_v1";
 const LEADERBOARD_COMPACT_STORAGE_KEY = "nd_dota_leaderboard_compact_v1";
+const MOBILE_LAYOUT_MEDIA_QUERY = "(max-width: 720px)";
 
 const db = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+function isMobileViewport() {
+  return window.matchMedia(MOBILE_LAYOUT_MEDIA_QUERY).matches;
+}
 
 const loadingScreen = document.getElementById("loadingScreen");
 const lastUpdatedText = document.getElementById("lastUpdatedText");
@@ -9126,6 +9131,7 @@ if (adminLogoTrigger) {
 
 if (adminSecretTrigger) {
   adminSecretTrigger.addEventListener("dblclick", (event) => {
+    if (isMobileViewport()) return;
     if (isCurrentRoleAdmin()) return;
     event.preventDefault();
     if (tryReconnectRememberedAdmin()) {
