@@ -3915,11 +3915,103 @@ ol {
   }
 
   .leaderboard-scroll-shell {
-    overflow-x: auto;
+    overflow-x: hidden;
   }
 
   .leaderboard-card-compact .leaderboard-scroll-shell {
     max-height: 372px;
+  }
+
+  .leaderboard-table {
+    width: 100%;
+    min-width: 0;
+    table-layout: fixed;
+  }
+
+  .leaderboard-table thead th,
+  .leaderboard-table tbody td {
+    padding-left: 6px;
+    padding-right: 6px;
+  }
+
+  .leaderboard-table thead th {
+    font-size: 10px;
+    letter-spacing: 0.04em;
+  }
+
+  .leaderboard-table thead th:nth-child(1),
+  .leaderboard-table tbody td:nth-child(1) {
+    width: 42px;
+    max-width: 42px;
+    text-align: center;
+  }
+
+  .leaderboard-table thead th:nth-child(3),
+  .leaderboard-table tbody td:nth-child(3) {
+    width: 72px;
+    max-width: 72px;
+  }
+
+  .leaderboard-table thead th:nth-child(4),
+  .leaderboard-table tbody td:nth-child(4) {
+    width: 52px;
+    max-width: 52px;
+  }
+
+  .leaderboard-table thead th:nth-child(5),
+  .leaderboard-table tbody td:nth-child(5) {
+    width: 66px;
+    max-width: 66px;
+  }
+
+  .leaderboard-player-cell {
+    grid-template-columns: minmax(0, 1fr);
+    min-height: 0;
+    gap: 0;
+  }
+
+  .leaderboard-player-name {
+    display: block;
+    font-size: 14px;
+    line-height: 1.2;
+    letter-spacing: 0.02em;
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
+
+  .leaderboard-player-tags,
+  .leaderboard-player-tags-empty {
+    display: none;
+  }
+
+  .leaderboard-score {
+    min-width: 0;
+    width: 100%;
+    padding: 4px 8px;
+    font-size: 18px;
+  }
+
+  .leaderboard-stat,
+  .leaderboard-rate {
+    min-width: 0;
+    width: 100%;
+    padding: 4px 6px;
+    font-size: 11px;
+  }
+
+  .leaderboard-rate {
+    min-height: 24px;
+  }
+
+  .leaderboard-rate-value {
+    font-size: 11px;
+  }
+
+  .leaderboard-rank {
+    min-width: 28px;
+    height: 28px;
+    padding: 0 6px;
+    font-size: 12px;
   }
 
   .score-detail-dialog {
@@ -3972,5 +4064,36 @@ ol {
   input,
   select {
     width: 100%;
+  }
+}
+
+@media (max-width: 520px) {
+  .leaderboard-table thead th:nth-child(4),
+  .leaderboard-table tbody td:nth-child(4),
+  .leaderboard-table thead th:nth-child(5),
+  .leaderboard-table tbody td:nth-child(5) {
+    display: none;
+  }
+
+  .leaderboard-table thead th:nth-child(1),
+  .leaderboard-table tbody td:nth-child(1) {
+    width: 38px;
+    max-width: 38px;
+  }
+
+  .leaderboard-table thead th:nth-child(3),
+  .leaderboard-table tbody td:nth-child(3) {
+    width: 68px;
+    max-width: 68px;
+  }
+
+  .leaderboard-table thead th,
+  .leaderboard-table tbody td {
+    padding-top: 10px;
+    padding-bottom: 10px;
+  }
+
+  .leaderboard-player-name {
+    font-size: 15px;
   }
 }
