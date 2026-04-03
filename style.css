@@ -2012,18 +2012,14 @@ button:disabled {
 .leaderboard-head {
   position: relative;
   z-index: 1;
-  align-items: flex-start;
+  align-items: center;
 }
 
 .leaderboard-title-block {
-  display: grid;
-  gap: 5px;
-}
-
-.leaderboard-view-hint {
-  margin: 0;
-  max-width: 560px;
-  line-height: 1.5;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
 }
 
 .leaderboard-compact-btn {
@@ -2035,7 +2031,7 @@ button:disabled {
   height: 36px;
   min-width: 36px;
   padding: 0;
-  font-size: 16px;
+  font-size: 15px;
   line-height: 1;
 }
 
@@ -2079,17 +2075,9 @@ button:disabled {
 }
 
 .leaderboard-card-compact .leaderboard-scroll-shell {
-  max-height: 248px;
+  max-height: 336px;
   overflow: auto;
   overscroll-behavior: contain;
-}
-
-.leaderboard-card-compact .leaderboard-view-hint {
-  color: #b7cade;
-}
-
-.leaderboard-card-compact .leaderboard-compact-icon {
-  transform: translateY(-1px) rotate(90deg);
 }
 
 table {
@@ -2151,12 +2139,6 @@ ol {
 
 #queueList li {
   margin: 0;
-}
-
-#queueList li.queue-cutoff {
-  margin: 0;
-  padding: 0;
-  border-bottom: 0;
 }
 
 .queue-item {
@@ -2875,11 +2857,7 @@ ol {
   }
 
   .leaderboard-head {
-    align-items: stretch;
-  }
-
-  .leaderboard-compact-btn {
-    align-self: flex-end;
+    align-items: center;
   }
 
   .leaderboard-scroll-shell {
@@ -2887,7 +2865,7 @@ ol {
   }
 
   .leaderboard-card-compact .leaderboard-scroll-shell {
-    max-height: 220px;
+    max-height: 336px;
   }
 
   #queueList {

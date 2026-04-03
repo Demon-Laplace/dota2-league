@@ -184,18 +184,17 @@
           <div class="section-head leaderboard-head">
             <div class="leaderboard-title-block">
               <h2>积分榜</h2>
-              <p id="leaderboardViewHint" class="muted leaderboard-view-hint">展开榜显示完整积分榜，收起后可用滚轮上下查看。</p>
+              <button
+                id="leaderboardCompactBtn"
+                class="season-chip leaderboard-compact-btn"
+                type="button"
+                aria-pressed="false"
+                aria-label="收起积分榜"
+                title="收起积分榜"
+              >
+                <span class="leaderboard-compact-icon" aria-hidden="true">⇅</span>
+              </button>
             </div>
-            <button
-              id="leaderboardCompactBtn"
-              class="season-chip leaderboard-compact-btn"
-              type="button"
-              aria-pressed="false"
-              aria-label="收起积分榜"
-              title="收起积分榜"
-            >
-              <span class="leaderboard-compact-icon" aria-hidden="true">↕</span>
-            </button>
           </div>
           <div class="leaderboard-scroll-shell">
             <table class="leaderboard-table">

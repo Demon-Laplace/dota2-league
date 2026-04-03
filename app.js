@@ -80,7 +80,6 @@ const todayPlayersEmpty = document.getElementById("todayPlayersEmpty");
 const todayPlayersCount = document.getElementById("todayPlayersCount");
 const leaderboardCard = document.getElementById("leaderboardCard");
 const leaderboardCompactBtn = document.getElementById("leaderboardCompactBtn");
-const leaderboardViewHint = document.getElementById("leaderboardViewHint");
 const leaderboardBody = document.getElementById("leaderboardBody");
 const openMatchFormBtn = document.getElementById("openMatchFormBtn");
 const openBackfillFormBtn = document.getElementById("openBackfillFormBtn");
@@ -927,11 +926,6 @@ function setLeaderboardCompactMode(isCompact) {
     leaderboardCompactBtn.setAttribute("aria-pressed", String(isLeaderboardCompact));
     leaderboardCompactBtn.setAttribute("aria-label", isLeaderboardCompact ? "展开积分榜" : "收起积分榜");
     leaderboardCompactBtn.title = isLeaderboardCompact ? "展开积分榜" : "收起积分榜";
-  }
-  if (leaderboardViewHint) {
-    leaderboardViewHint.textContent = isLeaderboardCompact
-      ? "短榜已启用，可用滚轮上下查看完整榜单。"
-      : "展开榜显示完整积分榜，收起后可用滚轮上下查看。";
   }
 }
 
