@@ -278,7 +278,8 @@ begin
       absent_players as (
         select
           sp.player_id,
-          sps.score
+          sps.score,
+          coalesce(sps.games_played, 0) as games_played
         from public.season_players sp
         join public.season_player_stats sps
           on sps.season_id = sp.season_id
@@ -296,17 +297,48 @@ begin
           min(score) as min_score
         from absent_players
       ),
+      priority_bounds as (
+        select
+          (
+            select max(ap.games_played)
+            from absent_players ap
+            cross join score_bounds sb
+            where ap.score = sb.max_score
+          ) as max_score_games_played,
+          (
+            select max(ap.games_played)
+            from absent_players ap
+            cross join score_bounds sb
+            where ap.score = sb.min_score
+          ) as min_score_games_played
+      ),
       adjustments as (
         select
           ap.player_id,
           (
-            case when ap.score = sb.min_score then 1 else 0 end
-            + case when ap.score = sb.max_score then -1 else 0 end
+            case
+              when ap.score = sb.min_score
+                and ap.games_played = pb.min_score_games_played
+              then 1
+              else 0
+            end
+            + case
+              when ap.score = sb.max_score
+                and ap.games_played = pb.max_score_games_played
+              then -1
+              else 0
+            end
           )::numeric(10,2) as delta
         from absent_players ap
         cross join score_bounds sb
-        where ap.score = sb.min_score
-           or ap.score = sb.max_score
+        cross join priority_bounds pb
+        where (
+          ap.score = sb.min_score
+          and ap.games_played = pb.min_score_games_played
+        ) or (
+          ap.score = sb.max_score
+          and ap.games_played = pb.max_score_games_played
+        )
       )
       update public.season_player_stats sps
       set score = sps.score + adj.delta
@@ -325,7 +357,8 @@ begin
       absent_players as (
         select
           sp.player_id,
-          sps.score
+          sps.score,
+          coalesce(sps.games_played, 0) as games_played
         from public.season_players sp
         join public.season_player_stats sps
           on sps.season_id = sp.season_id
@@ -343,17 +376,48 @@ begin
           min(score) as min_score
         from absent_players
       ),
+      priority_bounds as (
+        select
+          (
+            select max(ap.games_played)
+            from absent_players ap
+            cross join score_bounds sb
+            where ap.score = sb.max_score
+          ) as max_score_games_played,
+          (
+            select max(ap.games_played)
+            from absent_players ap
+            cross join score_bounds sb
+            where ap.score = sb.min_score
+          ) as min_score_games_played
+      ),
       adjustments as (
         select
           ap.player_id,
           (
-            case when ap.score = sb.min_score then 1 else 0 end
-            + case when ap.score = sb.max_score then -1 else 0 end
+            case
+              when ap.score = sb.min_score
+                and ap.games_played = pb.min_score_games_played
+              then 1
+              else 0
+            end
+            + case
+              when ap.score = sb.max_score
+                and ap.games_played = pb.max_score_games_played
+              then -1
+              else 0
+            end
           )::numeric(10,2) as delta
         from absent_players ap
         cross join score_bounds sb
-        where ap.score = sb.min_score
-           or ap.score = sb.max_score
+        cross join priority_bounds pb
+        where (
+          ap.score = sb.min_score
+          and ap.games_played = pb.min_score_games_played
+        ) or (
+          ap.score = sb.max_score
+          and ap.games_played = pb.max_score_games_played
+        )
       )
       update public.players p
       set score = p.score + adj.delta

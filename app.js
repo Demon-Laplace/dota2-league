@@ -5585,13 +5585,13 @@ async function cancelMatchDay() {
 }
 
 async function finishTodayMatchDay() {
-  if (!ensureScorerAccess("仅记分员或管理员可结束今日比赛。")) return;
+  if (!ensureScorerAccess("仅记分员或管理员可设置今日休战。")) return;
   if (!activeSeason?.id) {
-    setMessage("当前缺少可用赛季，暂时无法结束今日比赛。", true);
+    setMessage("当前缺少可用赛季，暂时无法设置今日休战。", true);
     return;
   }
 
-  const confirmed = window.confirm("确认结束今日比赛吗？这会立刻结算“未参赛最高 -1 / 最低 +1”，并清空今日报名队列与当日名单。若之后今天又新增或补录比赛，系统仍会自动重新回算。");
+  const confirmed = window.confirm("确认设置今日休战吗？这会立刻结算“未参赛最高 -1 / 最低 +1”，并清空今日报名队列与当日名单。若之后今天又新增或补录比赛，系统仍会自动重新回算。");
   if (!confirmed) {
     return;
   }
@@ -5600,8 +5600,8 @@ async function finishTodayMatchDay() {
     finishTodayMatchDayBtn.disabled = true;
   }
 
-  setMessage("正在结束今日比赛并结算...");
-  setMatchMessage("正在结束今日比赛并结算...");
+  setMessage("正在设置今日休战并结算...");
+  setMatchMessage("正在设置今日休战并结算...");
   setBackfillMessage("");
 
   const { data, error } = await db.rpc("finalize_active_match_day", {
@@ -5613,22 +5613,22 @@ async function finishTodayMatchDay() {
   }
 
   if (error) {
-    setMessage(`结束今日比赛失败：${error.message}。请先在 Supabase 执行最新 SQL。`, true);
-    setMatchMessage(`结束今日比赛失败：${error.message}。请先在 Supabase 执行最新 SQL。`, true);
+    setMessage(`设置今日休战失败：${error.message}。请先在 Supabase 执行最新 SQL。`, true);
+    setMatchMessage(`设置今日休战失败：${error.message}。请先在 Supabase 执行最新 SQL。`, true);
     return;
   }
 
   if (!data) {
-    setMessage("今日暂无可结束的比赛记录。");
-    setMatchMessage("今日暂无可结束的比赛记录。");
+    setMessage("今日暂无可休战的比赛记录。");
+    setMatchMessage("今日暂无可休战的比赛记录。");
     return;
   }
 
   clearStoredMatchDayStartTime();
   matchStartTimeInput.value = "";
-  setMessage("今日比赛已结束，未参赛加减分已完成结算。");
-  setMatchMessage("今日比赛已结束，未参赛加减分已完成结算。");
-  appendAdminActionLog("手动结束了今日比赛并结算未参赛加减分。");
+  setMessage("今日已休战，未参赛加减分已完成结算。");
+  setMatchMessage("今日已休战，未参赛加减分已完成结算。");
+  appendAdminActionLog("手动设置了今日休战并结算未参赛加减分。");
   requestImmediateRefresh({
     playerDriven: true,
     queue: true,
