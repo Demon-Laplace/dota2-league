@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Dota2 宁德联赛</title>
-  <link rel="stylesheet" href="style.css?v=20260403-16" />
+  <link rel="stylesheet" href="style.css?v=20260403-17" />
 </head>
   <body>
   <div id="loadingScreen" class="loading-screen" aria-live="polite">
@@ -181,17 +181,19 @@
           <p id="todayPlayersEmpty" class="muted">今日尚未确认到场选手</p>
         </section>
 
-        <section class="card">
-          <div class="section-head">
+        <section class="card match-day-card">
+          <div class="section-head match-day-head">
             <h2>当日比赛</h2>
-            <span id="matchDayStatus" class="muted">未发起</span>
+            <span id="matchDayStatus" class="muted match-day-status-pill">未发起</span>
           </div>
-          <div class="row">
+          <div class="match-day-start-row">
             <input id="matchStartTimeInput" type="text" inputmode="numeric" placeholder="请输入开始时间，留空默认19:30" maxlength="5" />
             <button id="startMatchDayBtn">发起当日比赛</button>
           </div>
-          <p id="matchStartTimeDisplay" class="muted"></p>
-          <p id="matchDayInfo" class="muted">请输入开始时间，留空默认19:30</p>
+          <div class="match-day-meta">
+            <p id="matchStartTimeDisplay" class="muted"></p>
+            <p id="matchDayInfo" class="muted"></p>
+          </div>
         </section>
 
         <section id="signupSection" class="card">
@@ -415,6 +417,6 @@
   </div>
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="app.js?v=20260403-21"></script>
+  <script src="app.js?v=20260403-22"></script>
 </body>
 </html>

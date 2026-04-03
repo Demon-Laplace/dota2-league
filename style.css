@@ -1188,6 +1188,55 @@ button:disabled {
   color: #ffc1c1;
 }
 
+.match-day-card {
+  display: grid;
+  gap: 12px;
+}
+
+.match-day-head {
+  align-items: flex-start;
+}
+
+.match-day-status-pill {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 30px;
+  padding: 4px 12px;
+  border: 1px solid rgba(122, 155, 194, 0.18);
+  border-radius: 999px;
+  background: rgba(10, 25, 42, 0.56);
+  text-align: center;
+  white-space: nowrap;
+}
+
+.match-day-start-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: stretch;
+  gap: 12px;
+}
+
+#matchStartTimeInput {
+  width: 100%;
+  min-width: 0;
+}
+
+#startMatchDayBtn {
+  min-width: 136px;
+  justify-self: end;
+}
+
+.match-day-meta {
+  display: grid;
+  gap: 6px;
+  min-height: 24px;
+}
+
+.match-day-meta p {
+  margin: 0;
+}
+
 .match-form-panel {
   margin-top: 16px;
   padding: 18px;
@@ -2064,12 +2113,22 @@ button:disabled {
 }
 
 .match-order-btn {
-  min-width: 34px;
-  min-height: 34px;
+  min-width: 28px;
+  min-height: 28px;
   padding: 0;
-  border-radius: 10px;
-  font-size: 16px;
+  border-radius: 9px;
+  border-color: rgba(106, 136, 173, 0.18);
+  background: linear-gradient(180deg, rgba(35, 52, 74, 0.78), rgba(22, 35, 52, 0.78));
+  box-shadow: none;
+  color: rgba(225, 236, 250, 0.74);
+  font-size: 13px;
+  font-weight: 600;
   line-height: 1;
+}
+
+.match-order-btn:hover:not(:disabled) {
+  box-shadow: none;
+  filter: brightness(1.03);
 }
 
 .recent-match-title strong {
@@ -3353,6 +3412,15 @@ ol {
 
   .match-grid {
     grid-template-columns: 1fr;
+  }
+
+  .match-day-start-row {
+    grid-template-columns: 1fr;
+  }
+
+  #startMatchDayBtn {
+    width: 100%;
+    justify-self: stretch;
   }
 
   .match-meta-grid {

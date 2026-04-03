@@ -833,7 +833,11 @@ function clearStoredMatchDayStartTime() {
 
 function readStoredLeaderboardCompactState() {
   try {
-    return window.localStorage.getItem(LEADERBOARD_COMPACT_STORAGE_KEY) === "1";
+    const raw = window.localStorage.getItem(LEADERBOARD_COMPACT_STORAGE_KEY);
+    if (raw !== "1" && raw !== "0") {
+      return false;
+    }
+    return raw === "1";
   } catch {
     return false;
   }
@@ -3224,8 +3228,9 @@ function renderMatchDayStatus() {
 
   if (activeMatchDay) {
     matchDayStatus.textContent = `${activeMatchDay.match_date} 进行中`;
-    matchDayStatus.className = "muted day-status-active";
-    matchDayInfo.textContent = "当前比赛日已发起。北京时间次日凌晨 2 点会自动结束并清空报名队列与当日选手。";
+    matchDayStatus.className = "muted match-day-status-pill day-status-active";
+    matchDayInfo.textContent = "次日 02:00 自动结束并清空当日报名。";
+    matchDayInfo.hidden = false;
     startMatchDayBtn.textContent = "取消发起";
     startMatchDayBtn.classList.add("button-cancel-state");
     startMatchDayBtn.disabled = false;
@@ -3241,17 +3246,20 @@ function renderMatchDayStatus() {
     } else {
       matchStartTimeDisplay.textContent = "";
     }
+    matchStartTimeDisplay.hidden = !matchStartTimeDisplay.textContent;
     return;
   }
 
   matchDayStatus.textContent = "未发起";
-  matchDayStatus.className = "muted day-status-inactive";
-  matchDayInfo.textContent = "请输入开始时间，留空默认19:30";
+  matchDayStatus.className = "muted match-day-status-pill day-status-inactive";
+  matchDayInfo.textContent = "";
+  matchDayInfo.hidden = true;
   startMatchDayBtn.textContent = "发起当日比赛";
   startMatchDayBtn.classList.remove("button-cancel-state");
   startMatchDayBtn.disabled = false;
   matchStartTimeInput.disabled = false;
   matchStartTimeDisplay.textContent = "";
+  matchStartTimeDisplay.hidden = true;
 }
 
 function renderSignupOptions() {
