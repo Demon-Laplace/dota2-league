@@ -2475,7 +2475,12 @@ function getTodayRecordedMatchCount(seasonId = activeSeason?.id) {
 
 function getFinishMatchDayActionContext(seasonId = activeSeason?.id) {
   const businessDate = getBeijingBusinessDateString();
-  const activeDate = activeMatchDay?.season_id === seasonId
+  const hasMatchingActiveDay = Boolean(
+    activeMatchDay
+    && seasonId
+    && activeMatchDay.season_id === seasonId
+  );
+  const activeDate = hasMatchingActiveDay
     ? (activeMatchDay.match_date || businessDate)
     : null;
   const targetDate = activeDate || businessDate;
