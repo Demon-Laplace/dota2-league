@@ -36,8 +36,7 @@ body {
   background:
     radial-gradient(circle at top left, rgba(122, 28, 26, 0.18), transparent 24%),
     radial-gradient(circle at top right, rgba(178, 69, 43, 0.12), transparent 22%),
-    linear-gradient(rgba(15, 7, 10, 0.76), rgba(6, 12, 22, 0.92)),
-    url("./assets/dota-bg.jpg") center / cover no-repeat;
+    linear-gradient(rgba(15, 7, 10, 0.76), rgba(6, 12, 22, 0.92));
   color: var(--text);
   min-height: 100vh;
   text-rendering: optimizeLegibility;
@@ -49,6 +48,16 @@ body::before {
   content: "";
   position: fixed;
   inset: 0;
+  z-index: -2;
+  pointer-events: none;
+  background: url("./assets/dota-bg.jpg") center center / cover no-repeat;
+}
+
+body::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: -1;
   pointer-events: none;
   background:
     linear-gradient(180deg, rgba(161, 46, 46, 0.08), transparent 26%),
