@@ -8,6 +8,7 @@ create table if not exists public.manual_score_adjustments (
   player_id uuid not null references public.players(id) on delete cascade,
   delta numeric(10,2) not null check (delta in (-1.00, 1.00)),
   kind text not null check (kind in ('death_finger', 'healing_hand')),
+  note text,
   created_by_role_member_id uuid not null references public.app_role_members(id) on delete restrict,
   created_by_name text not null default '未知记分员',
   created_at timestamptz not null default now(),
@@ -26,6 +27,9 @@ add column if not exists created_by_name text not null default '未知记分员'
 
 alter table public.manual_score_adjustments
 add column if not exists revoked_by_name text;
+
+alter table public.manual_score_adjustments
+add column if not exists note text;
 
 create index if not exists idx_manual_score_adjustments_season_player
 on public.manual_score_adjustments (season_id, player_id, created_at desc);
@@ -57,12 +61,15 @@ to anon, authenticated
 using (true)
 with check (true);
 
+drop function if exists public.apply_manual_score_adjustment(uuid, uuid, numeric, text, uuid);
+
 create or replace function public.apply_manual_score_adjustment(
   p_season_id uuid,
   p_player_id uuid,
   p_delta numeric,
   p_kind text,
-  p_role_member_id uuid
+  p_role_member_id uuid,
+  p_note text default null
 )
 returns uuid
 language plpgsql
@@ -123,6 +130,7 @@ begin
     player_id,
     delta,
     kind,
+    note,
     created_by_role_member_id,
     created_by_name
   )
@@ -131,6 +139,7 @@ begin
     p_player_id,
     p_delta,
     p_kind,
+    nullif(btrim(coalesce(p_note, '')), ''),
     p_role_member_id,
     coalesce(v_created_by_name, '未知记分员')
   )
@@ -210,7 +219,7 @@ end;
 $$;
 
 grant select, insert, update on public.manual_score_adjustments to anon, authenticated;
-grant execute on function public.apply_manual_score_adjustment(uuid, uuid, numeric, text, uuid) to anon, authenticated;
+grant execute on function public.apply_manual_score_adjustment(uuid, uuid, numeric, text, uuid, text) to anon, authenticated;
 grant execute on function public.revoke_manual_score_adjustment(uuid, uuid) to anon, authenticated;
 
 commit;

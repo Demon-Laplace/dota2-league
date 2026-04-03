@@ -43,9 +43,13 @@ const scorerMembersList = document.getElementById("scorerMembersList");
 const scorerRecalculateScoresBtn = document.getElementById("scorerRecalculateScoresBtn");
 const scorerClearQueueBtn = document.getElementById("scorerClearQueueBtn");
 const scorerManualScorePlayerSelect = document.getElementById("scorerManualScorePlayerSelect");
+const scorerManualScoreNoteInput = document.getElementById("scorerManualScoreNoteInput");
+const scorerManualScoreHint = document.getElementById("scorerManualScoreHint");
 const scorerDeathFingerBtn = document.getElementById("scorerDeathFingerBtn");
 const scorerHealingHandBtn = document.getElementById("scorerHealingHandBtn");
 const adminManualScorePlayerSelect = document.getElementById("adminManualScorePlayerSelect");
+const adminManualScoreNoteInput = document.getElementById("adminManualScoreNoteInput");
+const adminManualScoreHint = document.getElementById("adminManualScoreHint");
 const adminDeathFingerBtn = document.getElementById("adminDeathFingerBtn");
 const adminHealingHandBtn = document.getElementById("adminHealingHandBtn");
 const adminActionLogsList = document.getElementById("adminActionLogsList");
@@ -1353,7 +1357,7 @@ async function getScoreDetailSeasonData(seasonId) {
     .eq("season_id", seasonId);
   const adjustmentsQuery = db
     .from("manual_score_adjustments")
-    .select("id, season_id, player_id, delta, kind, created_at, revoked_at, created_by_role_member_id, created_by_name, revoked_by_role_member_id, revoked_by_name")
+    .select("id, season_id, player_id, delta, kind, note, created_at, revoked_at, created_by_role_member_id, created_by_name, revoked_by_role_member_id, revoked_by_name")
     .eq("season_id", seasonId)
     .order("created_at", { ascending: true });
 
@@ -1569,6 +1573,7 @@ function buildScoreDetailEntries(player, seasonData) {
       title: adjustment.kind === "death_finger" ? "死亡一指" : "治疗之手",
       subtitle: `${adjustment.created_by_name || "未知记分员"} 执行`,
       meta: formatLocalTime(adjustment.created_at) || "人工积分调整",
+      note: String(adjustment.note || "").trim(),
       badges: [
         { label: "人工积分", tone: "team" },
         { label: delta > 0 ? "+1" : "-1", tone: delta > 0 ? "win" : "lose" },
@@ -1636,6 +1641,7 @@ function renderScoreDetailContent(player, detail) {
         <span class="score-detail-delta ${entry.delta >= 0 ? "score-detail-delta-positive" : "score-detail-delta-negative"}">${formatSignedScore(entry.delta)}</span>
       </div>
       <p class="score-detail-item-meta muted">${escapeHtml(entry.meta)}</p>
+      ${entry.note ? `<p class="score-detail-item-note">${escapeHtml(`备注：${entry.note}`)}</p>` : ""}
       <div class="score-detail-badges">
         ${entry.badges.map((badge) => `<span class="score-detail-badge score-detail-badge-${badge.tone}">${escapeHtml(badge.label)}</span>`).join("")}
       </div>
@@ -1998,6 +2004,59 @@ function renderAdminManualScoreOptions() {
   adminManualScorePlayerSelect.innerHTML = options.join("");
 }
 
+function getManualScoreControlConfig(mode = "scorer") {
+  if (mode === "admin") {
+    return {
+      playerSelect: adminManualScorePlayerSelect,
+      noteInput: adminManualScoreNoteInput,
+      hintEl: adminManualScoreHint,
+      deathBtn: adminDeathFingerBtn,
+      healBtn: adminHealingHandBtn,
+      canUse: isCurrentRoleAdmin() && Boolean(activeSeason?.id),
+    };
+  }
+
+  return {
+    playerSelect: scorerManualScorePlayerSelect,
+    noteInput: scorerManualScoreNoteInput,
+    hintEl: scorerManualScoreHint,
+    deathBtn: scorerDeathFingerBtn,
+    healBtn: scorerHealingHandBtn,
+    canUse: isCurrentRoleScorer() && Boolean(activeSeason?.id),
+  };
+}
+
+function updateManualScoreControlState(mode = "scorer") {
+  const config = getManualScoreControlConfig(mode);
+  const playerSelect = config.playerSelect;
+  const noteInput = config.noteInput;
+  const hintEl = config.hintEl;
+  const deathBtn = config.deathBtn;
+  const healBtn = config.healBtn;
+  const selectedPlayer = seasonPlayers.find((item) => item.id === (playerSelect?.value || "") && item.is_in_season);
+  const canAct = config.canUse && Boolean(selectedPlayer);
+
+  if (playerSelect) {
+    playerSelect.disabled = !config.canUse;
+  }
+  if (noteInput) {
+    noteInput.disabled = !config.canUse;
+  }
+  if (deathBtn) {
+    deathBtn.disabled = !canAct;
+    deathBtn.textContent = selectedPlayer ? `对 ${selectedPlayer.display_name} -1` : "死亡一指 -1";
+  }
+  if (healBtn) {
+    healBtn.disabled = !canAct;
+    healBtn.textContent = selectedPlayer ? `给 ${selectedPlayer.display_name} +1` : "治疗之手 +1";
+  }
+  if (hintEl) {
+    hintEl.textContent = selectedPlayer
+      ? `当前目标：${selectedPlayer.display_name}${String(noteInput?.value || "").trim() ? `；备注：${String(noteInput.value).trim()}` : ""}`
+      : "先选择当前赛季选手，再执行加减分；备注非必填。";
+  }
+}
+
 function renderScorerPanelSummary() {
   if (!scorerPanelSummary || !scorerPanelStatusText) return;
 
@@ -2056,6 +2115,8 @@ function renderRoleMembers() {
   renderAdminAddScorerOptions();
   renderScorerManualScoreOptions();
   renderAdminManualScoreOptions();
+  updateManualScoreControlState("scorer");
+  updateManualScoreControlState("admin");
   renderAdminActionLogs();
   renderScorerPanelSummary();
 }
@@ -2155,21 +2216,11 @@ function applyRolePermissions() {
   if (scorerManualScorePlayerSelect) {
     scorerManualScorePlayerSelect.disabled = !canScore || !activeSeason?.id;
   }
-  if (scorerDeathFingerBtn) {
-    scorerDeathFingerBtn.disabled = !canScore || !activeSeason?.id;
-  }
-  if (scorerHealingHandBtn) {
-    scorerHealingHandBtn.disabled = !canScore || !activeSeason?.id;
-  }
   if (adminManualScorePlayerSelect) {
     adminManualScorePlayerSelect.disabled = !isAdmin || !activeSeason?.id;
   }
-  if (adminDeathFingerBtn) {
-    adminDeathFingerBtn.disabled = !isAdmin || !activeSeason?.id;
-  }
-  if (adminHealingHandBtn) {
-    adminHealingHandBtn.disabled = !isAdmin || !activeSeason?.id;
-  }
+  updateManualScoreControlState("scorer");
+  updateManualScoreControlState("admin");
   if (seasonRolloverBtn) {
     seasonRolloverBtn.hidden = !canScore;
   }
@@ -6476,6 +6527,7 @@ async function clearSignupQueueForScorer() {
 async function applyManualScoreAdjustment(kind, options = {}) {
   if (!ensureScorerAccess("仅记分员或管理员可执行人工积分调整。")) return;
   const panelMessage = options.messageTarget === "admin" ? setAdminPanelMessage : setScorerPanelMessage;
+  const mode = options.messageTarget === "admin" ? "admin" : "scorer";
   if (!activeSeason?.id) {
     panelMessage("当前没有可操作的赛季。", true);
     return;
@@ -6486,7 +6538,9 @@ async function applyManualScoreAdjustment(kind, options = {}) {
   }
 
   const sourceSelect = options.playerSelect || scorerManualScorePlayerSelect;
+  const noteInput = options.noteInput || (mode === "admin" ? adminManualScoreNoteInput : scorerManualScoreNoteInput);
   const playerId = sourceSelect?.value || "";
+  const note = String(noteInput?.value || "").trim();
   const player = seasonPlayers.find((item) => item.id === playerId && item.is_in_season);
   if (!player) {
     panelMessage("请先选择一名当前赛季选手。", true);
@@ -6508,6 +6562,7 @@ async function applyManualScoreAdjustment(kind, options = {}) {
     p_delta: delta,
     p_kind: kind,
     p_role_member_id: currentAccessSession.memberId,
+    p_note: note || null,
   });
 
   if (error) {
@@ -6516,9 +6571,13 @@ async function applyManualScoreAdjustment(kind, options = {}) {
   }
 
   scoreDetailSeasonCache.clear();
-  panelMessage(`${player.display_name} 已执行${actionLabel}（${scoreLabel}）。`);
-  setMessage(`${player.display_name} 已执行${actionLabel}（${scoreLabel}）。`);
-  appendAdminActionLog(`${getCurrentAccessActorLabel()} 对 ${player.display_name} 执行了${actionLabel}（${scoreLabel}）。`);
+  if (noteInput) {
+    noteInput.value = "";
+  }
+  updateManualScoreControlState(mode);
+  panelMessage(`${player.display_name} 已执行${actionLabel}（${scoreLabel}）${note ? `，备注：${note}` : ""}。`);
+  setMessage(`${player.display_name} 已执行${actionLabel}（${scoreLabel}）${note ? `，备注：${note}` : ""}。`);
+  appendAdminActionLog(`${getCurrentAccessActorLabel()} 对 ${player.display_name} 执行了${actionLabel}（${scoreLabel}）${note ? `，备注：${note}` : ""}。`);
   requestImmediateRefresh({
     leaderboard: true,
     recentMatches: true,
@@ -8089,21 +8148,39 @@ if (scorerRecalculateScoresBtn) {
 if (scorerClearQueueBtn) {
   scorerClearQueueBtn.addEventListener("click", clearSignupQueueForScorer);
 }
+if (scorerManualScorePlayerSelect) {
+  scorerManualScorePlayerSelect.addEventListener("change", () => updateManualScoreControlState("scorer"));
+}
+if (scorerManualScoreNoteInput) {
+  scorerManualScoreNoteInput.addEventListener("input", () => updateManualScoreControlState("scorer"));
+}
 if (scorerDeathFingerBtn) {
-  scorerDeathFingerBtn.addEventListener("click", () => applyManualScoreAdjustment("death_finger"));
+  scorerDeathFingerBtn.addEventListener("click", () => applyManualScoreAdjustment("death_finger", {
+    noteInput: scorerManualScoreNoteInput,
+  }));
 }
 if (scorerHealingHandBtn) {
-  scorerHealingHandBtn.addEventListener("click", () => applyManualScoreAdjustment("healing_hand"));
+  scorerHealingHandBtn.addEventListener("click", () => applyManualScoreAdjustment("healing_hand", {
+    noteInput: scorerManualScoreNoteInput,
+  }));
+}
+if (adminManualScorePlayerSelect) {
+  adminManualScorePlayerSelect.addEventListener("change", () => updateManualScoreControlState("admin"));
+}
+if (adminManualScoreNoteInput) {
+  adminManualScoreNoteInput.addEventListener("input", () => updateManualScoreControlState("admin"));
 }
 if (adminDeathFingerBtn) {
   adminDeathFingerBtn.addEventListener("click", () => applyManualScoreAdjustment("death_finger", {
     playerSelect: adminManualScorePlayerSelect,
+    noteInput: adminManualScoreNoteInput,
     messageTarget: "admin",
   }));
 }
 if (adminHealingHandBtn) {
   adminHealingHandBtn.addEventListener("click", () => applyManualScoreAdjustment("healing_hand", {
     playerSelect: adminManualScorePlayerSelect,
+    noteInput: adminManualScoreNoteInput,
     messageTarget: "admin",
   }));
 }

@@ -85,11 +85,14 @@
               <option value="">请选择当前赛季选手</option>
             </select>
           </div>
+          <div class="row">
+            <input id="scorerManualScoreNoteInput" type="text" placeholder="备注，可选" maxlength="80" />
+          </div>
           <div class="row admin-panel-actions">
             <button id="scorerDeathFingerBtn" class="button-danger" type="button">死亡一指 -1</button>
             <button id="scorerHealingHandBtn" class="button-secondary" type="button">治疗之手 +1</button>
           </div>
-          <p class="muted">每次只允许对一名当前赛季选手加减 1 分，所有记分员与管理员都可在积分明细中撤销。</p>
+          <p id="scorerManualScoreHint" class="muted">先选择当前赛季选手，再执行加减分；备注非必填。</p>
         </section>
       </div>
       <p id="scorerPanelMessage" class="message"></p>
@@ -125,10 +128,14 @@
               <option value="">请选择当前赛季选手</option>
             </select>
           </div>
+          <div class="row">
+            <input id="adminManualScoreNoteInput" type="text" placeholder="备注，可选" maxlength="80" />
+          </div>
           <div class="row admin-panel-actions">
             <button id="adminDeathFingerBtn" class="button-danger" type="button">死亡一指 -1</button>
             <button id="adminHealingHandBtn" class="button-secondary" type="button">治疗之手 +1</button>
           </div>
+          <p id="adminManualScoreHint" class="muted">先选择当前赛季选手，再执行加减分；备注非必填。</p>
         </section>
         <section class="admin-panel-card">
           <div class="section-head">

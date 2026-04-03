@@ -3676,6 +3676,17 @@ ol {
   color: #88a0ba;
 }
 
+.score-detail-item-note {
+  margin: 0;
+  padding: 8px 10px;
+  border-radius: 10px;
+  background: rgba(24, 43, 66, 0.72);
+  border: 1px solid rgba(126, 165, 207, 0.12);
+  color: #d7e6f8;
+  font-size: 12px;
+  line-height: 1.45;
+}
+
 .score-detail-delta {
   flex: 0 0 auto;
   display: inline-flex;
