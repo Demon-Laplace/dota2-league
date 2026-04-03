@@ -2730,8 +2730,12 @@ function getBonusGainMap(matches) {
       const extraGain = player.team === match.winner_team
         ? Math.max(scoreChange - 1, 0)
         : 0;
-      if (extraGain <= 0) return;
-      bonusMap.set(playerId, Number((bonusMap.get(playerId) || 0) + extraGain));
+      const extraPenalty = player.team !== match.winner_team
+        ? Math.max((-1) - scoreChange, 0)
+        : 0;
+      const netBonus = extraGain - extraPenalty;
+      if (!netBonus) return;
+      bonusMap.set(playerId, Number((bonusMap.get(playerId) || 0) + netBonus));
     });
   });
 
@@ -2747,6 +2751,38 @@ function getGoldenTouchPlayerIds(matches) {
   if (highest <= 0) return new Set();
   return new Set(
     [...bonusMap.entries()]
+      .filter(([, value]) => value === highest)
+      .map(([playerId]) => playerId)
+  );
+}
+
+function getExtraPenaltyMap(matches) {
+  const penaltyMap = new Map();
+
+  (matches || []).forEach((match) => {
+    if (!hasRecordedWinner(match.winner_team)) return;
+    parseRecentMatchPlayers(match.players).forEach((player) => {
+      const playerId = player.player_id || player.id;
+      if (!playerId || player.team === match.winner_team) return;
+      const scoreChange = Number(player.score_change ?? 0);
+      const extraPenalty = Math.max((-1) - scoreChange, 0);
+      if (extraPenalty <= 0) return;
+      penaltyMap.set(playerId, Number((penaltyMap.get(playerId) || 0) + extraPenalty));
+    });
+  });
+
+  return penaltyMap;
+}
+
+function getSuperDoublePlayerIds(matches) {
+  const penaltyMap = getExtraPenaltyMap(matches);
+  let highest = 0;
+  penaltyMap.forEach((value) => {
+    if (value > highest) highest = value;
+  });
+  if (highest <= 0) return new Set();
+  return new Set(
+    [...penaltyMap.entries()]
       .filter(([, value]) => value === highest)
       .map(([playerId]) => playerId)
   );
@@ -2867,6 +2903,19 @@ function getLeaderboardNameRankClass(rank) {
   if (rank <= 3) return "player-name-display-rank23";
   if (rank <= 5) return "player-name-display-rank45";
   return "";
+}
+
+function getLeaderboardTagLayout(tagCount) {
+  if (tagCount <= 1) {
+    return { columns: 1, minWidth: 128 };
+  }
+  if (tagCount <= 2) {
+    return { columns: 2, minWidth: 168 };
+  }
+  if (tagCount <= 4) {
+    return { columns: 2, minWidth: 188 };
+  }
+  return { columns: 3, minWidth: 246 };
 }
 
 function getLeaderboardRankByPlayerId(playerId, players = leaderboardPlayers) {
@@ -5097,6 +5146,11 @@ function renderTodayPlayers() {
 function renderLeaderboard(data) {
   leaderboardBody.innerHTML = "";
   leaderboardPlayers = data || [];
+  const longestNameLength = Math.max(
+    8,
+    ...((data || []).map((player) => (stripPlayerNameMeta(player.display_name || "未知选手") || "未知选手").length))
+  );
+  leaderboardCard?.style.setProperty("--leaderboard-name-ch", String(Math.min(longestNameLength + 2, 18)));
 
   if (!data || data.length === 0) {
     seasonPlayerRewardTotal = 0;
@@ -5123,6 +5177,7 @@ function renderLeaderboard(data) {
   const loseStreakMap = getActiveLoseStreakMap(recentMatchesData, 3);
   const bronzeFeederIds = getBronzeFeederPlayerIds(data, recentMatchesData);
   const goldenTouchIds = getGoldenTouchPlayerIds(recentMatchesData);
+  const superDoubleIds = getSuperDoublePlayerIds(recentMatchesData);
   const teammateAffinity = getTeammateAffinityLeaders(data, recentMatchesData, 8, 12);
   const nemesisMap = getNemesisMap(data, recentMatchesData, 8, 25);
   const mvpIds = getMvpPlayerIds();
@@ -5166,7 +5221,11 @@ function renderLeaderboard(data) {
     }
 
     if (goldenTouchIds.has(playerId)) {
-      tags.push({ icon: "✶", label: "点金手", tone: "sun", description: "靠双倍、锦鲤等加成拿到的额外积分最多" });
+      tags.push({ icon: "✶", label: "点金手", tone: "sun", description: "扣除双倍额外扣分后 净加成积分最多的人" });
+    }
+
+    if (superDoubleIds.has(playerId)) {
+      tags.push({ icon: "⟡", label: "超级加倍", tone: "arcane", description: "因双倍等效果吃到的额外扣分最多的人" });
     }
 
     if (teammateAffinity.unluckyId && teammateAffinity.unluckyId === playerId) {
@@ -5192,8 +5251,13 @@ function renderLeaderboard(data) {
       tags.push({ icon: "★", label: "MVP", tone: "royal" });
     }
 
+    const tagLayout = getLeaderboardTagLayout(tags.length);
+
     const tagsHtml = `
-      <div class="leaderboard-player-tags${tags.length ? "" : " leaderboard-player-tags-empty"}">
+      <div
+        class="leaderboard-player-tags${tags.length ? "" : " leaderboard-player-tags-empty"}"
+        style="--tag-columns: ${tagLayout.columns}; --tag-min-width: ${tagLayout.minWidth}px;"
+      >
         ${tags.map((tag) => `
         <span class="leaderboard-tag leaderboard-tag-${tag.tone}" title="${escapeHtml(tag.description || tag.label)}" aria-label="${escapeHtml(tag.description || tag.label)}">
           <span class="leaderboard-tag-icon">${escapeHtml(tag.icon)}</span>

@@ -3069,10 +3069,10 @@ ol {
 
 .leaderboard-player-cell {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 186px;
+  grid-template-columns: fit-content(calc(var(--leaderboard-name-ch, 10) * 1em + 10px)) minmax(0, 1fr);
   align-items: center;
   gap: 12px;
-  min-height: 52px;
+  min-height: 58px;
   transition:
     grid-template-columns 0.28s cubic-bezier(0.22, 1, 0.36, 1),
     min-height 0.28s cubic-bezier(0.22, 1, 0.36, 1),
@@ -3086,6 +3086,7 @@ ol {
   font-size: 17px;
   line-height: 1.2;
   letter-spacing: 0.04em;
+  white-space: nowrap;
 }
 
 .player-name-display.player-name-display-rank1,
@@ -3191,14 +3192,14 @@ ol {
 
 .leaderboard-player-tags {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  grid-auto-rows: minmax(22px, auto);
+  grid-template-columns: repeat(var(--tag-columns, 3), minmax(0, 1fr));
+  grid-auto-rows: minmax(28px, auto);
   align-content: center;
   justify-items: stretch;
-  gap: 4px;
-  width: 186px;
-  min-width: 186px;
-  min-height: 48px;
+  gap: 6px;
+  width: 100%;
+  min-width: var(--tag-min-width, 220px);
+  min-height: 66px;
   transition:
     width 0.28s cubic-bezier(0.22, 1, 0.36, 1),
     min-height 0.28s cubic-bezier(0.22, 1, 0.36, 1),
@@ -3217,11 +3218,11 @@ ol {
   gap: 4px;
   width: 100%;
   min-width: 0;
-  min-height: 22px;
-  padding: 2px 5px;
-  border-radius: 8px;
-  font-size: 9px;
-  line-height: 1.15;
+  min-height: 28px;
+  padding: 4px 8px;
+  border-radius: 9px;
+  font-size: 10px;
+  line-height: 1.2;
   font-weight: 600;
   letter-spacing: 0.02em;
   border: 1px solid rgba(124, 165, 209, 0.2);
@@ -3250,26 +3251,25 @@ ol {
 }
 
 .leaderboard-card-compact .leaderboard-player-cell {
-  grid-template-columns: minmax(0, 1fr) 162px;
+  grid-template-columns: fit-content(calc(var(--leaderboard-name-ch, 10) * 0.95em + 8px)) minmax(0, 1fr);
   gap: 10px;
-  min-height: 44px;
+  min-height: 48px;
 }
 
 .leaderboard-card-compact .leaderboard-player-name {
-  font-size: 14px;
+  font-size: 15px;
 }
 
 .leaderboard-card-compact .leaderboard-player-tags {
-  width: 162px;
-  min-width: 162px;
-  min-height: 42px;
-  gap: 3px;
+  min-width: calc(var(--tag-min-width, 220px) - 18px);
+  min-height: 56px;
+  gap: 4px;
 }
 
 .leaderboard-card-compact .leaderboard-tag {
-  min-height: 18px;
-  padding: 1px 4px;
-  font-size: 8px;
+  min-height: 24px;
+  padding: 2px 6px;
+  font-size: 9px;
 }
 
 .leaderboard-card-compact .leaderboard-score {
@@ -3447,6 +3447,21 @@ ol {
 .leaderboard-tag-inferno .leaderboard-tag-icon {
   background: linear-gradient(135deg, rgba(255, 197, 123, 0.24), rgba(241, 95, 18, 0.24));
   color: #ffe2ce;
+}
+
+.leaderboard-tag-arcane {
+  color: #e9e4ff;
+  border-color: rgba(129, 140, 248, 0.34);
+  background:
+    linear-gradient(135deg, rgba(63, 61, 147, 0.44), rgba(41, 34, 108, 0.34));
+  box-shadow:
+    inset 0 1px 0 rgba(238, 236, 255, 0.06),
+    0 0 14px rgba(99, 102, 241, 0.1);
+}
+
+.leaderboard-tag-arcane .leaderboard-tag-icon {
+  background: linear-gradient(135deg, rgba(167, 180, 255, 0.22), rgba(99, 102, 241, 0.22));
+  color: #ece8ff;
 }
 
 .leaderboard-score {
