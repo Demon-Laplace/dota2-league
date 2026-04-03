@@ -5427,7 +5427,7 @@ function renderLeaderboard(data) {
     }
 
     if (hardcoreLoseIds.has(playerId)) {
-      tags.push({ icon: "☄", label: "又菜又爱玩", tone: "slate" });
+      tags.push({ icon: "☄", label: "又菜又爱玩", tone: "slate", description: "你懂得" });
     }
 
     if (winStreakMap.has(playerId)) {
@@ -5461,15 +5461,15 @@ function renderLeaderboard(data) {
     }
 
     if (superDoubleIds.has(playerId)) {
-      tags.push({ icon: "⟡", label: "超级加倍", tone: "arcane", description: "双倍净扣分最多" });
+      tags.push({ icon: "⟡", label: "超级加倍", tone: "arcane", description: "双倍下分" });
     }
 
     if (teammateAffinity.unluckyId && teammateAffinity.unluckyId === playerId) {
-      tags.push({ icon: "⚡", label: "避雷针", tone: "storm", description: "同队时更容易输" });
+      tags.push({ icon: "⚡", label: "有毒", tone: "storm", description: "同队时更容易输" });
     }
 
     if (teammateAffinity.luckyId && teammateAffinity.luckyId === playerId) {
-      tags.push({ icon: "✿", label: "幸运星", tone: "pink", description: "同队时更容易赢" });
+      tags.push({ icon: "✿", label: "福将", tone: "pink", description: "同队时更容易赢" });
     }
 
     if (lateArrivalIds.has(playerId)) {
@@ -5482,14 +5482,14 @@ function renderLeaderboard(data) {
         icon: "☼",
         label: "光明使者",
         tone: "dawn",
-        description: `天辉胜率 ${formatWinRateValue(sideSpecialist.radiantRate)}，明显高于夜魇 ${formatWinRateValue(sideSpecialist.direRate)}`,
+        description: `天辉胜率 ${formatWinRateValue(sideSpecialist.radiantRate)}`,
       });
     } else if (sideSpecialist?.side === "B") {
       tags.push({
         icon: "☽",
         label: "夜魇暗潮",
         tone: "abyss",
-        description: `夜魇胜率 ${formatWinRateValue(sideSpecialist.direRate)}，明显高于天辉 ${formatWinRateValue(sideSpecialist.radiantRate)}`,
+        description: `夜魇胜率 ${formatWinRateValue(sideSpecialist.direRate)}`,
       });
     }
 
@@ -5500,7 +5500,7 @@ function renderLeaderboard(data) {
         icon: "✹",
         label: `${opponentName}一生之敌`,
         tone: "inferno",
-        description: `面对 ${opponentName} 时更难赢`,
+        description: `${opponentName}怎么都赢不了我`,
       });
     }
 
