@@ -3060,17 +3060,37 @@ function getMatchDayParticipantEntries(matches) {
 }
 
 function buildMatchDayPlayerSummaryHtml(participants, attendanceNotes) {
+  const participantIdSet = new Set((participants || []).map((entry) => entry.player_id).filter(Boolean));
   const summaryEntries = [
-    ...(participants || []).map((entry) => ({ ...entry, className: "match-day-player-name-participant" })),
+    ...(participants || []).map((entry) => ({
+      ...entry,
+      display_name: stripPlayerNameMeta(entry.display_name || "未知选手") || "未知选手",
+      className: "match-day-player-name-participant",
+      sortOrder: 0,
+    })),
     ...(attendanceNotes || [])
       .filter((entry) => entry.status === "standby")
-      .map((entry) => ({ ...entry, className: "match-day-player-name-standby" })),
+      .map((entry) => ({
+        ...entry,
+        display_name: stripPlayerNameMeta(entry.display_name || "未知选手") || "未知选手",
+        className: "match-day-player-name-standby",
+        sortOrder: 1,
+      })),
     ...(attendanceNotes || [])
       .filter((entry) => entry.status === "absent")
-      .map((entry) => ({ ...entry, className: "match-day-player-name-absent" })),
+      .map((entry) => ({
+        ...entry,
+        display_name: stripPlayerNameMeta(entry.display_name || "未知选手") || "未知选手",
+        className: participantIdSet.has(entry.player_id) ? "match-day-player-name-late" : "match-day-player-name-absent",
+        sortOrder: participantIdSet.has(entry.player_id) ? 1 : 2,
+      })),
   ];
 
   const html = summaryEntries
+    .sort((a, b) => {
+      if ((a.sortOrder || 0) !== (b.sortOrder || 0)) return (a.sortOrder || 0) - (b.sortOrder || 0);
+      return String(a.display_name || "").localeCompare(String(b.display_name || ""), "zh-CN");
+    })
     .map((entry) => `<span class="match-day-player-name ${entry.className}">${escapeHtml(entry.display_name || "未知选手")}</span>`)
     .join("");
   return html ? `<div class="match-day-player-list">${html}</div>` : "";
@@ -3119,15 +3139,50 @@ function clearMatchDayAttendanceSelection(groupKey) {
   matchDayAttendanceSelectedIdsByGroup.delete(groupKey);
 }
 
+function getMatchDayAttendanceEntryMeta(entry, participantIdSet) {
+  const normalizedName = stripPlayerNameMeta(entry.display_name || "未知选手") || "未知选手";
+  if (entry.status === "absent") {
+    if (participantIdSet.has(entry.player_id)) {
+      return {
+        ...entry,
+        display_name: normalizedName,
+        statusLabel: "迟到",
+        cardClassName: "match-day-attendance-note-late",
+      };
+    }
+    return {
+      ...entry,
+      display_name: normalizedName,
+      statusLabel: "未出席",
+      cardClassName: "match-day-attendance-note-absent",
+    };
+  }
+
+  return {
+    ...entry,
+    display_name: normalizedName,
+    statusLabel: getMatchDayAttendanceLabel(entry.status),
+    cardClassName: `match-day-attendance-note-${entry.status}`,
+  };
+}
+
 function buildMatchDayAttendancePanelHtml(group, canScore) {
   if (!canScore) return "";
 
   const participantEntries = group.participants || [];
+  const participantIdSet = new Set(participantEntries.map((entry) => entry.player_id).filter(Boolean));
   const attendanceNotes = group.attendance_notes || [];
   const selectablePlayers = seasonPlayers.filter((player) => (
     player.is_in_season
     && !attendanceNotes.some((entry) => entry.player_id === player.id)
-  ));
+  )).sort((a, b) => {
+    const aParticipant = participantIdSet.has(a.id);
+    const bParticipant = participantIdSet.has(b.id);
+    if (aParticipant !== bParticipant) return aParticipant ? -1 : 1;
+    const aName = stripPlayerNameMeta(a.display_name || "未知选手") || "未知选手";
+    const bName = stripPlayerNameMeta(b.display_name || "未知选手") || "未知选手";
+    return aName.localeCompare(bName, "zh-CN");
+  });
   const selectedIds = getMatchDayAttendanceSelectedIds(
     group.group_key,
     selectablePlayers.map((player) => player.id)
@@ -3145,33 +3200,37 @@ function buildMatchDayAttendancePanelHtml(group, canScore) {
               data-group-key="${group.group_key}"
               data-player-id="${player.id}"
               aria-pressed="${selectedIds.has(player.id) ? "true" : "false"}"
-            >${escapeHtml(player.display_name || "未知选手")}${isParticipant ? ' · 已出席' : ""}</button>
+            >${escapeHtml(stripPlayerNameMeta(player.display_name || "未知选手") || "未知选手")}${isParticipant ? " · 已出席" : " · 未出席"}</button>
           `;
         }).join("")}
       </div>
     `
-    : '<p class="muted match-day-attendance-empty">暂无可登记选手</p>';
+    : "";
   const listHtml = attendanceNotes.length
-    ? attendanceNotes.map((entry) => `
-      <div class="match-day-attendance-note match-day-attendance-note-${entry.status}">
+    ? [...attendanceNotes].sort((a, b) => {
+      const aParticipant = participantIdSet.has(a.player_id);
+      const bParticipant = participantIdSet.has(b.player_id);
+      if (aParticipant !== bParticipant) return aParticipant ? -1 : 1;
+      const aName = stripPlayerNameMeta(a.display_name || "未知选手") || "未知选手";
+      const bName = stripPlayerNameMeta(b.display_name || "未知选手") || "未知选手";
+      return aName.localeCompare(bName, "zh-CN");
+    }).map((entry) => {
+      const meta = getMatchDayAttendanceEntryMeta(entry, participantIdSet);
+      return `
+      <div class="match-day-attendance-note ${meta.cardClassName}">
         <div class="match-day-attendance-note-main">
-          <span class="match-day-attendance-status">${escapeHtml(getMatchDayAttendanceLabel(entry.status))}</span>
-          <strong>${escapeHtml(entry.display_name || "未知选手")}</strong>
-          ${entry.note ? `<span class="muted">${escapeHtml(entry.note)}</span>` : ""}
+          <span class="match-day-attendance-status">${escapeHtml(meta.statusLabel)}</span>
+          <strong>${escapeHtml(meta.display_name || "未知选手")}</strong>
+          ${meta.note ? `<span class="muted">${escapeHtml(meta.note)}</span>` : ""}
         </div>
-        ${canScore ? `<button class="button-secondary match-day-attendance-remove-btn" type="button" data-note-id="${entry.id}" data-player-name="${escapeHtml(entry.display_name || "该选手")}" data-status-label="${escapeHtml(getMatchDayAttendanceLabel(entry.status))}">移除</button>` : ""}
+        ${canScore ? `<button class="button-secondary match-day-attendance-remove-btn" type="button" data-note-id="${meta.id}" data-player-name="${escapeHtml(meta.display_name || "该选手")}" data-status-label="${escapeHtml(meta.statusLabel)}">移除</button>` : ""}
       </div>
-    `).join("")
-    : '<p class="muted match-day-attendance-empty">暂无补记</p>';
+    `;
+    }).join("")
+    : "";
 
   return `
     <div class="match-day-attendance-panel" data-match-day-key="${group.group_key}">
-      <div class="match-day-attendance-panel-head">
-        <div>
-          <h3>补记名单</h3>
-          <p class="muted">登记迟到选手。</p>
-        </div>
-      </div>
       ${canScore ? `
         <div class="match-day-attendance-form">
           ${chipsHtml}
@@ -3180,7 +3239,7 @@ function buildMatchDayAttendancePanelHtml(group, canScore) {
           </div>
         </div>
       ` : ""}
-      <div class="match-day-attendance-list">${listHtml}</div>
+      ${listHtml ? `<div class="match-day-attendance-list">${listHtml}</div>` : ""}
     </div>
   `;
 }
@@ -3518,7 +3577,7 @@ function rerenderPlayerDrivenLocally() {
 }
 
 function getPlayerDisplayNameById(playerId) {
-  return seasonPlayers.find((player) => player.id === playerId)?.display_name || "未知选手";
+  return stripPlayerNameMeta(seasonPlayers.find((player) => player.id === playerId)?.display_name || "未知选手") || "未知选手";
 }
 
 function createOptimisticQueueEntry(playerId, displayName, overrides = {}) {
