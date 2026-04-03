@@ -86,6 +86,7 @@ const leaderboardCard = document.getElementById("leaderboardCard");
 const leaderboardCompactBtn = document.getElementById("leaderboardCompactBtn");
 const leaderboardBody = document.getElementById("leaderboardBody");
 const openMatchFormBtn = document.getElementById("openMatchFormBtn");
+const finishTodayMatchDayBtn = document.getElementById("finishTodayMatchDayBtn");
 const openBackfillFormBtn = document.getElementById("openBackfillFormBtn");
 const recordEntrySection = document.getElementById("recordEntrySection");
 const closeMatchFormBtn = document.getElementById("closeMatchFormBtn");
@@ -1415,6 +1416,10 @@ function applyRolePermissions() {
   }
   confirmQueueBtn.hidden = !canScore;
   openMatchFormBtn.hidden = !canScore;
+  if (finishTodayMatchDayBtn) {
+    finishTodayMatchDayBtn.hidden = !canScore;
+    finishTodayMatchDayBtn.disabled = !canScore || !activeSeason?.id;
+  }
   openBackfillFormBtn.hidden = !canScore;
   recordMatchBtn.hidden = !canScore;
   recordBackfillBtn.hidden = !canScore;
@@ -1803,7 +1808,7 @@ function buildMatchDayAttendancePanelHtml(group, canScore) {
           <strong>${escapeHtml(entry.display_name || "未知选手")}</strong>
           ${entry.note ? `<span class="muted">${escapeHtml(entry.note)}</span>` : ""}
         </div>
-        ${canScore ? `<button class="button-secondary match-day-attendance-remove-btn" type="button" data-note-id="${entry.id}" data-player-name="${escapeHtml(entry.display_name || "该选手")}">移除</button>` : ""}
+        ${canScore ? `<button class="button-secondary match-day-attendance-remove-btn" type="button" data-note-id="${entry.id}" data-player-name="${escapeHtml(entry.display_name || "该选手")}" data-status-label="${escapeHtml(getMatchDayAttendanceLabel(entry.status))}">移除</button>` : ""}
       </div>
     `).join("")
     : '<p class="muted match-day-attendance-empty">暂无补记</p>';
@@ -3225,6 +3230,9 @@ function renderSeasonPlayersPanel() {
 
 function renderMatchDayStatus() {
   const storedStartTime = readStoredMatchDayStartTime();
+  if (finishTodayMatchDayBtn) {
+    finishTodayMatchDayBtn.disabled = !isCurrentRoleScorer() || !activeSeason?.id;
+  }
 
   if (activeMatchDay) {
     matchDayStatus.textContent = `${activeMatchDay.match_date} 进行中`;
@@ -5497,6 +5505,59 @@ async function cancelMatchDay() {
   });
 }
 
+async function finishTodayMatchDay() {
+  if (!ensureScorerAccess("仅记分员或管理员可结束今日比赛。")) return;
+  if (!activeSeason?.id) {
+    setMessage("当前缺少可用赛季，暂时无法结束今日比赛。", true);
+    return;
+  }
+
+  const confirmed = window.confirm("确认结束今日比赛吗？这会立刻结算“未参赛最高 -1 / 最低 +1”，并清空今日报名队列与当日名单。若之后今天又新增或补录比赛，系统仍会自动重新回算。");
+  if (!confirmed) {
+    return;
+  }
+
+  if (finishTodayMatchDayBtn) {
+    finishTodayMatchDayBtn.disabled = true;
+  }
+
+  setMessage("正在结束今日比赛并结算...");
+  setMatchMessage("正在结束今日比赛并结算...");
+  setBackfillMessage("");
+
+  const { data, error } = await db.rpc("finalize_active_match_day", {
+    p_season_id: activeSeason.id,
+  });
+
+  if (finishTodayMatchDayBtn) {
+    finishTodayMatchDayBtn.disabled = false;
+  }
+
+  if (error) {
+    setMessage(`结束今日比赛失败：${error.message}。请先在 Supabase 执行最新 SQL。`, true);
+    setMatchMessage(`结束今日比赛失败：${error.message}。请先在 Supabase 执行最新 SQL。`, true);
+    return;
+  }
+
+  if (!data) {
+    setMessage("今日暂无可结束的比赛记录。");
+    setMatchMessage("今日暂无可结束的比赛记录。");
+    return;
+  }
+
+  clearStoredMatchDayStartTime();
+  matchStartTimeInput.value = "";
+  setMessage("今日比赛已结束，未参赛加减分已完成结算。");
+  setMatchMessage("今日比赛已结束，未参赛加减分已完成结算。");
+  appendAdminActionLog("手动结束了今日比赛并结算未参赛加减分。");
+  requestImmediateRefresh({
+    playerDriven: true,
+    queue: true,
+    leaderboard: true,
+    recentMatches: true,
+  });
+}
+
 async function markQueuePlayerReady(playerId, playerName, buttonEl) {
   if (!activeMatchDay) {
     setMessage("请先发起当日比赛。", true);
@@ -5638,10 +5699,11 @@ async function addMatchDayAttendanceNote(matchDayId, seasonId, matchDate, status
   });
 }
 
-async function removeMatchDayAttendanceNote(noteId, playerName, buttonEl) {
+async function removeMatchDayAttendanceNote(noteId, playerName, statusLabel, buttonEl) {
   if (!ensureScorerAccess("仅记分员或管理员可移除每日补记名单。")) return;
   if (!noteId) return;
-  const confirmed = window.confirm(`确认移除 ${playerName || "该选手"} 的补记状态吗？`);
+  const resolvedStatusLabel = statusLabel || "补记";
+  const confirmed = window.confirm(`确认移除 ${playerName || "该选手"} 的${resolvedStatusLabel}记录吗？`);
   if (!confirmed) return;
 
   if (buttonEl) {
@@ -5649,7 +5711,7 @@ async function removeMatchDayAttendanceNote(noteId, playerName, buttonEl) {
   }
 
   const removedState = removeMatchDayAttendanceNoteLocally(noteId);
-  setMessage(`正在移除 ${playerName || "该选手"} 的补记状态...`);
+  setMessage(`正在移除 ${playerName || "该选手"} 的${resolvedStatusLabel}记录...`);
 
   const { error } = await db.from("match_day_attendance_notes").delete().eq("id", noteId);
 
@@ -6438,6 +6500,10 @@ openMatchFormBtn.addEventListener("click", () => {
   renderMatchForm();
 });
 
+if (finishTodayMatchDayBtn) {
+  finishTodayMatchDayBtn.addEventListener("click", finishTodayMatchDay);
+}
+
 openBackfillFormBtn.addEventListener("click", async () => {
   if (!backfillSeasonSelect.value && activeSeason?.id) {
     backfillSeasonSelect.value = activeSeason.id;
@@ -6730,6 +6796,7 @@ recentMatchesList.addEventListener("click", async (event) => {
     await removeMatchDayAttendanceNote(
       attendanceRemoveButton.dataset.noteId,
       attendanceRemoveButton.dataset.playerName,
+      attendanceRemoveButton.dataset.statusLabel,
       attendanceRemoveButton
     );
     return;
