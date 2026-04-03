@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Dota2 宁德联赛</title>
-  <link rel="stylesheet" href="style.css?v=20260403-20" />
+  <link rel="stylesheet" href="style.css?v=20260403-21" />
 </head>
   <body>
   <div id="loadingScreen" class="loading-screen" aria-live="polite">
@@ -430,7 +430,23 @@
     </div>
   </div>
 
+  <div id="scoreDetailModal" class="hero-picker-modal" hidden>
+    <div id="scoreDetailBackdrop" class="hero-picker-backdrop"></div>
+    <div class="hero-picker-dialog score-detail-dialog" role="dialog" aria-modal="true" aria-labelledby="scoreDetailTitle">
+      <div class="section-head">
+        <div>
+          <h2 id="scoreDetailTitle">积分变动明细</h2>
+          <p id="scoreDetailSubtitle" class="muted">起始 10 分</p>
+        </div>
+        <button id="closeScoreDetailBtn" class="button-secondary" type="button">关闭</button>
+      </div>
+      <div id="scoreDetailSummary" class="score-detail-summary"></div>
+      <div id="scoreDetailList" class="score-detail-list"></div>
+      <p id="scoreDetailMessage" class="message"></p>
+    </div>
+  </div>
+
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="app.js?v=20260403-31"></script>
+  <script src="app.js?v=20260403-32"></script>
 </body>
 </html>

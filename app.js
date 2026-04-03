@@ -143,6 +143,14 @@ const accessScorerSelect = document.getElementById("accessScorerSelect");
 const accessScorerChips = document.getElementById("accessScorerChips");
 const confirmAccessBtn = document.getElementById("confirmAccessBtn");
 const accessMessage = document.getElementById("accessMessage");
+const scoreDetailModal = document.getElementById("scoreDetailModal");
+const scoreDetailBackdrop = document.getElementById("scoreDetailBackdrop");
+const closeScoreDetailBtn = document.getElementById("closeScoreDetailBtn");
+const scoreDetailTitle = document.getElementById("scoreDetailTitle");
+const scoreDetailSubtitle = document.getElementById("scoreDetailSubtitle");
+const scoreDetailSummary = document.getElementById("scoreDetailSummary");
+const scoreDetailList = document.getElementById("scoreDetailList");
+const scoreDetailMessage = document.getElementById("scoreDetailMessage");
 
 let seasonPlayers = [];
 let todayPlayers = [];
@@ -209,6 +217,8 @@ let realtimeChannel = null;
 let refreshTimer = null;
 let refreshFlushPromise = null;
 let placeholderEnsureAttemptKey = "";
+let scoreDetailSeasonCache = new Map();
+let scoreDetailState = null;
 const loadingStartedAt = Date.now();
 const REFRESH_DEBOUNCE_MS = 150;
 const REFRESH_SELF_SUPPRESS_MS = 1200;
@@ -878,6 +888,12 @@ function setRewardMessage(text, isError = false) {
   rewardMessageEl.className = isError ? "message error" : "message";
 }
 
+function setScoreDetailMessage(text, isError = false) {
+  if (!scoreDetailMessage) return;
+  scoreDetailMessage.textContent = text;
+  scoreDetailMessage.className = isError ? "message error" : "message";
+}
+
 function formatScore(value) {
   const numericValue = Number(value ?? 0);
   if (Number.isNaN(numericValue)) return "0";
@@ -895,6 +911,23 @@ function getWinRateNumber(value, wins = 0, gamesPlayed = 0) {
 function formatWinRateValue(value, wins = 0, gamesPlayed = 0) {
   const resolvedValue = getWinRateNumber(value, wins, gamesPlayed);
   return `${resolvedValue.toFixed(1).replace(/\.0$/, "")}%`;
+}
+
+function formatSignedScore(value) {
+  const numericValue = Number(value ?? 0);
+  if (!Number.isFinite(numericValue)) return "0";
+  return `${numericValue > 0 ? "+" : ""}${formatScore(numericValue)}`;
+}
+
+function formatShortLocalTime(value) {
+  if (!value) return "";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+  return date.toLocaleTimeString("zh-CN", {
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  });
 }
 
 function buildLeaderboardShareText(players = leaderboardPlayers) {
@@ -1086,6 +1119,424 @@ function setLeaderboardCompactMode(isCompact) {
     leaderboardCompactBtn.setAttribute("aria-pressed", String(isLeaderboardCompact));
     leaderboardCompactBtn.setAttribute("aria-label", isLeaderboardCompact ? "展开积分榜" : "收起积分榜");
     leaderboardCompactBtn.title = isLeaderboardCompact ? "展开积分榜" : "收起积分榜";
+  }
+}
+
+function closeScoreDetailModal() {
+  scoreDetailState = null;
+  if (scoreDetailModal) {
+    scoreDetailModal.hidden = true;
+  }
+  if (scoreDetailSummary) {
+    scoreDetailSummary.innerHTML = "";
+  }
+  if (scoreDetailList) {
+    scoreDetailList.innerHTML = "";
+  }
+  setScoreDetailMessage("");
+}
+
+function renderScoreDetailLoading(player) {
+  if (scoreDetailTitle) {
+    scoreDetailTitle.textContent = `${stripPlayerNameMeta(player?.display_name || "未知选手")} · 积分明细`;
+  }
+  if (scoreDetailSubtitle) {
+    const seasonLabel = activeSeason?.name ? `${activeSeason.name} · 起始 10 分` : "起始 10 分";
+    scoreDetailSubtitle.textContent = seasonLabel;
+  }
+  if (scoreDetailSummary) {
+    scoreDetailSummary.innerHTML = `
+      <div class="score-detail-summary-card">
+        <span class="score-detail-summary-label">当前积分</span>
+        <strong class="score-detail-summary-value">${formatScore(player?.score ?? 10)}</strong>
+      </div>
+      <div class="score-detail-summary-card">
+        <span class="score-detail-summary-label">净变化</span>
+        <strong class="score-detail-summary-value">${formatSignedScore(Number(player?.score ?? 10) - 10)}</strong>
+      </div>
+      <div class="score-detail-summary-card">
+        <span class="score-detail-summary-label">记分项</span>
+        <strong class="score-detail-summary-value">整理中</strong>
+      </div>
+    `;
+  }
+  if (scoreDetailList) {
+    scoreDetailList.innerHTML = '<div class="score-detail-empty muted">正在整理积分变动...</div>';
+  }
+  setScoreDetailMessage("");
+}
+
+function compareScoreDetailMatches(a, b) {
+  const aDate = a.match_date || formatArchiveDate(a.created_at) || "";
+  const bDate = b.match_date || formatArchiveDate(b.created_at) || "";
+  if (aDate !== bDate) {
+    return aDate.localeCompare(bDate);
+  }
+
+  const aTime = new Date(a.created_at || 0).getTime();
+  const bTime = new Date(b.created_at || 0).getTime();
+  if (aTime !== bTime) {
+    return aTime - bTime;
+  }
+
+  return String(a.match_id || "").localeCompare(String(b.match_id || ""));
+}
+
+function shouldApplyMatchDayAbsenceAdjustmentClient(matchDate, closedAt) {
+  if (!matchDate) return false;
+  if (closedAt) return true;
+
+  const now = new Date();
+  const beijing = new Date(
+    now.toLocaleString("en-US", { timeZone: "Asia/Shanghai" })
+  );
+  const businessDate = getBeijingBusinessDateString();
+  const localMinutes = beijing.getHours() * 60 + beijing.getMinutes();
+
+  if (matchDate < businessDate) return true;
+  if (matchDate > businessDate) return false;
+  return localMinutes >= (23 * 60 + 30) || localMinutes < 120;
+}
+
+function ensureScoreStateEntry(stateMap, playerId, displayName = "未知选手") {
+  if (!playerId) return null;
+  if (!stateMap.has(playerId)) {
+    stateMap.set(playerId, {
+      score: 10,
+      gamesPlayed: 0,
+      display_name: stripPlayerNameMeta(displayName || "未知选手") || "未知选手",
+    });
+  }
+  const entry = stateMap.get(playerId);
+  if (displayName && (!entry.display_name || entry.display_name === "未知选手")) {
+    entry.display_name = stripPlayerNameMeta(displayName) || "未知选手";
+  }
+  return entry;
+}
+
+async function getScoreDetailSeasonData(seasonId) {
+  if (!seasonId) {
+    throw new Error("当前没有可用赛季。");
+  }
+
+  if (scoreDetailSeasonCache.has(seasonId)) {
+    return scoreDetailSeasonCache.get(seasonId);
+  }
+
+  const matchesQuery = db
+    .from("match_day_recent_matches")
+    .select("match_id, match_day_id, season_id, match_date, day_is_active, winner_team, note, created_at, players, double_downs")
+    .eq("season_id", seasonId)
+    .order("created_at", { ascending: true })
+    .limit(1200);
+  const matchDaysQuery = db
+    .from("match_days")
+    .select("id, season_id, match_date, closed_at, is_active")
+    .eq("season_id", seasonId)
+    .order("match_date", { ascending: true })
+    .limit(180);
+  const participantsQuery = db
+    .from("season_players")
+    .select("player_id")
+    .eq("season_id", seasonId);
+
+  const [matchesResult, matchDaysResult, participantsResult] = await Promise.all([
+    matchesQuery,
+    matchDaysQuery,
+    participantsQuery,
+  ]);
+
+  if (matchesResult.error) {
+    if (matchesResult.error.message?.includes("double_downs")) {
+      throw new Error("积分明细依赖最新比赛视图，请先执行最新 SQL。");
+    }
+    throw matchesResult.error;
+  }
+
+  const seasonData = {
+    matches: [...(matchesResult.data || [])].sort(compareScoreDetailMatches),
+    matchDays: matchDaysResult.error ? [] : (matchDaysResult.data || []),
+    participantIds: new Set(
+      participantsResult.error
+        ? []
+        : (participantsResult.data || []).map((row) => row.player_id).filter(Boolean)
+    ),
+  };
+
+  scoreDetailSeasonCache.set(seasonId, seasonData);
+  return seasonData;
+}
+
+function buildScoreDetailEntries(player, seasonData) {
+  const targetPlayerId = player.player_id || player.id || "";
+  const targetPlayerName = stripPlayerNameMeta(player.display_name || "未知选手") || "未知选手";
+  const stateMap = new Map();
+  const participantIds = seasonData?.participantIds || new Set();
+  const matchDaysByDate = new Map(
+    (seasonData?.matchDays || [])
+      .filter((day) => day.match_date)
+      .map((day) => [day.match_date, day])
+  );
+  const matchesByDay = new Map();
+
+  ensureScoreStateEntry(stateMap, targetPlayerId, targetPlayerName);
+  participantIds.forEach((playerId) => ensureScoreStateEntry(stateMap, playerId));
+
+  (seasonData?.matches || []).forEach((match) => {
+    const matchDate = match.match_date || formatArchiveDate(match.created_at) || "";
+    if (!matchDate) return;
+    if (!matchesByDay.has(matchDate)) {
+      matchesByDay.set(matchDate, []);
+    }
+    matchesByDay.get(matchDate).push(match);
+  });
+
+  const entries = [];
+
+  matchesByDay.forEach((dayMatches, matchDate) => {
+    const participantsToday = new Set();
+
+    dayMatches.forEach((match, matchIndex) => {
+      const players = parseRecentMatchPlayers(match.players);
+      const doubleDowns = parseRecentMatchPlayers(match.double_downs);
+      const winnerRecorded = hasRecordedWinner(match.winner_team);
+      const koiPlayerId = getSeasonKoiPlayerId(match.season_id);
+      const koiAppliedTeam = winnerRecorded && koiPlayerId
+        ? players.find((item) => item.player_id === koiPlayerId && item.team === match.winner_team)?.team || null
+        : null;
+      const targetPlayer = players.find((item) => item.player_id === targetPlayerId);
+      const roundLabel = `第${matchIndex + 1}场`;
+
+      players.forEach((matchPlayer) => {
+        participantsToday.add(matchPlayer.player_id);
+        const state = ensureScoreStateEntry(stateMap, matchPlayer.player_id, matchPlayer.display_name);
+        if (!state) return;
+
+        const delta = Number(matchPlayer.score_change ?? 0);
+        if (winnerRecorded) {
+          state.score += delta;
+          state.gamesPlayed += 1;
+        }
+      });
+
+      if (!targetPlayer) return;
+
+      const delta = Number(targetPlayer.score_change ?? 0);
+      if (!Number.isFinite(delta) || delta === 0) return;
+
+      const isTeamDouble = doubleDowns.some(
+        (item) => item.mode === "team" && item.target_team === targetPlayer.team
+      );
+      const isSingleDouble = doubleDowns.some(
+        (item) => item.mode === "single" && item.target_player_id === targetPlayer.player_id
+      );
+      const isKoiBoost = Boolean(
+        koiAppliedTeam && winnerRecorded && targetPlayer.team === koiAppliedTeam
+      );
+      const badges = [];
+
+      badges.push({
+        label: delta > 0 ? "胜场" : "败场",
+        tone: delta > 0 ? "win" : "lose",
+      });
+      if (isTeamDouble) {
+        badges.push({ label: "团队双倍", tone: "team" });
+      }
+      if (isSingleDouble) {
+        badges.push({ label: "个人双倍", tone: "single" });
+      }
+      if (isKoiBoost) {
+        badges.push({ label: "锦鲤", tone: "koi" });
+      }
+
+      const metaParts = [
+        matchDate,
+        roundLabel,
+        formatShortLocalTime(match.created_at),
+      ].filter(Boolean);
+      const subtitleParts = [
+        getWinnerLabel(match.winner_team),
+        getTeamLabel(targetPlayer.team),
+      ];
+
+      entries.push({
+        id: `match-${match.match_id}-${targetPlayer.player_id}`,
+        delta,
+        title: `${roundLabel} · ${getWinnerLabel(match.winner_team)}`,
+        subtitle: subtitleParts.join(" · "),
+        meta: metaParts.join(" · "),
+        badges,
+      });
+    });
+
+    if (
+      dayMatches.length > 0
+      && participantIds.size > 0
+      && shouldApplyMatchDayAbsenceAdjustmentClient(matchDate, matchDaysByDate.get(matchDate)?.closed_at)
+    ) {
+      const absentPlayers = [...participantIds]
+        .filter((playerId) => !participantsToday.has(playerId))
+        .map((playerId) => ({
+          player_id: playerId,
+          ...ensureScoreStateEntry(stateMap, playerId),
+        }))
+        .filter(Boolean);
+
+      if (absentPlayers.length) {
+        const highestScore = Math.max(...absentPlayers.map((item) => Number(item.score ?? 10)));
+        const lowestScore = Math.min(...absentPlayers.map((item) => Number(item.score ?? 10)));
+        const highestGamesPlayed = Math.max(
+          ...absentPlayers
+            .filter((item) => Number(item.score ?? 10) === highestScore)
+            .map((item) => Number(item.gamesPlayed ?? 0))
+        );
+        const lowestGamesPlayed = Math.max(
+          ...absentPlayers
+            .filter((item) => Number(item.score ?? 10) === lowestScore)
+            .map((item) => Number(item.gamesPlayed ?? 0))
+        );
+
+        absentPlayers.forEach((absentPlayer) => {
+          let delta = 0;
+          const score = Number(absentPlayer.score ?? 10);
+          const gamesPlayed = Number(absentPlayer.gamesPlayed ?? 0);
+
+          if (score === lowestScore && gamesPlayed === lowestGamesPlayed) {
+            delta += 1;
+          }
+          if (score === highestScore && gamesPlayed === highestGamesPlayed) {
+            delta -= 1;
+          }
+
+          if (!delta) return;
+
+          const state = ensureScoreStateEntry(
+            stateMap,
+            absentPlayer.player_id,
+            absentPlayer.display_name
+          );
+          if (state) {
+            state.score += delta;
+          }
+
+          if (absentPlayer.player_id === targetPlayerId) {
+            entries.push({
+              id: `rest-${matchDate}-${absentPlayer.player_id}`,
+              delta,
+              title: "休战结算",
+              subtitle: delta > 0 ? "当日未参赛 · 末位补分" : "当日未参赛 · 榜首扣分",
+              meta: `${matchDate} · 当日未参赛`,
+              badges: [
+                { label: "休战", tone: "rest" },
+                { label: delta > 0 ? "末位 +1" : "榜首 -1", tone: delta > 0 ? "restplus" : "restminus" },
+              ],
+            });
+          }
+        });
+      }
+    }
+  });
+
+  const currentScore = Number(player.score ?? (10 + entries.reduce((sum, entry) => sum + entry.delta, 0)));
+  const positiveDelta = entries.reduce((sum, entry) => sum + (entry.delta > 0 ? entry.delta : 0), 0);
+  const negativeDelta = entries.reduce((sum, entry) => sum + (entry.delta < 0 ? entry.delta : 0), 0);
+
+  return {
+    playerName: targetPlayerName,
+    currentScore,
+    totalDelta: currentScore - 10,
+    positiveDelta,
+    negativeDelta,
+    entries,
+  };
+}
+
+function renderScoreDetailContent(player, detail) {
+  if (!scoreDetailTitle || !scoreDetailSubtitle || !scoreDetailSummary || !scoreDetailList) return;
+
+  scoreDetailTitle.textContent = `${detail.playerName} · 积分明细`;
+  scoreDetailSubtitle.textContent = activeSeason?.name
+    ? `${activeSeason.name} · 起始 10 分`
+    : "起始 10 分";
+
+  scoreDetailSummary.innerHTML = `
+    <div class="score-detail-summary-card">
+      <span class="score-detail-summary-label">当前积分</span>
+      <strong class="score-detail-summary-value">${formatScore(detail.currentScore)}</strong>
+    </div>
+    <div class="score-detail-summary-card">
+      <span class="score-detail-summary-label">净变化</span>
+      <strong class="score-detail-summary-value ${detail.totalDelta >= 0 ? "score-detail-delta-positive" : "score-detail-delta-negative"}">${formatSignedScore(detail.totalDelta)}</strong>
+    </div>
+    <div class="score-detail-summary-card">
+      <span class="score-detail-summary-label">上分合计</span>
+      <strong class="score-detail-summary-value score-detail-delta-positive">${formatSignedScore(detail.positiveDelta)}</strong>
+    </div>
+    <div class="score-detail-summary-card">
+      <span class="score-detail-summary-label">掉分合计</span>
+      <strong class="score-detail-summary-value score-detail-delta-negative">${formatSignedScore(detail.negativeDelta)}</strong>
+    </div>
+  `;
+
+  if (!detail.entries.length) {
+    scoreDetailList.innerHTML = '<div class="score-detail-empty muted">本赛季还没有产生积分变动。</div>';
+    setScoreDetailMessage("");
+    return;
+  }
+
+  scoreDetailList.innerHTML = [...detail.entries].reverse().map((entry) => `
+    <article class="score-detail-item">
+      <div class="score-detail-item-head">
+        <div class="score-detail-item-copy">
+          <strong class="score-detail-item-title">${escapeHtml(entry.title)}</strong>
+          <p class="score-detail-item-subtitle muted">${escapeHtml(entry.subtitle)}</p>
+        </div>
+        <span class="score-detail-delta ${entry.delta >= 0 ? "score-detail-delta-positive" : "score-detail-delta-negative"}">${formatSignedScore(entry.delta)}</span>
+      </div>
+      <p class="score-detail-item-meta muted">${escapeHtml(entry.meta)}</p>
+      <div class="score-detail-badges">
+        ${entry.badges.map((badge) => `<span class="score-detail-badge score-detail-badge-${badge.tone}">${escapeHtml(badge.label)}</span>`).join("")}
+      </div>
+    </article>
+  `).join("");
+
+  setScoreDetailMessage(`共整理出 ${detail.entries.length} 条有效积分变动。`);
+}
+
+async function openScoreDetailModal(playerId) {
+  const player = leaderboardPlayers.find(
+    (item) => (item.player_id || item.id) === playerId
+  );
+  if (!player) {
+    setMessage("未找到这位选手的积分信息。", true);
+    return;
+  }
+  if (!activeSeason?.id) {
+    setMessage("当前没有可查看的赛季积分明细。", true);
+    return;
+  }
+
+  scoreDetailState = {
+    playerId,
+    seasonId: activeSeason.id,
+  };
+  scoreDetailModal.hidden = false;
+  renderScoreDetailLoading(player);
+  setScoreDetailMessage("正在整理积分变动...");
+
+  try {
+    const seasonData = await getScoreDetailSeasonData(activeSeason.id);
+    if (!scoreDetailState || scoreDetailState.playerId !== playerId || scoreDetailState.seasonId !== activeSeason?.id) {
+      return;
+    }
+    const detail = buildScoreDetailEntries(player, seasonData);
+    renderScoreDetailContent(player, detail);
+  } catch (error) {
+    if (!scoreDetailState || scoreDetailState.playerId !== playerId) return;
+    if (scoreDetailList) {
+      scoreDetailList.innerHTML = '<div class="score-detail-empty muted">积分明细暂时不可用。</div>';
+    }
+    setScoreDetailMessage(`积分明细加载失败：${error.message || "未知错误"}`, true);
   }
 }
 
@@ -3814,7 +4265,16 @@ function renderLeaderboard(data) {
           ${tagsHtml}
         </div>
       </td>
-      <td><span class="leaderboard-score">${formatScore(player.score)}</span></td>
+      <td>
+        <button
+          type="button"
+          class="leaderboard-score leaderboard-score-trigger"
+          data-role="score-detail"
+          data-player-id="${escapeHtml(playerId)}"
+          aria-label="查看 ${escapeHtml(stripPlayerNameMeta(player.display_name || "该选手"))} 的积分明细"
+          title="查看积分变动明细"
+        >${formatScore(player.score)}</button>
+      </td>
       <td><span class="leaderboard-stat${gamesPlayed > 5 ? " leaderboard-stat-active" : ""}">${gamesPlayed}</span></td>
       <td>
         <div class="leaderboard-rate" style="--rate-percent: ${winRateNumber}%; --rate-glow: ${Math.max(14, winRateNumber)}%;">
@@ -4815,6 +5275,7 @@ async function loadActiveMatchDay() {
 }
 
 async function loadSeasonPlayers() {
+  scoreDetailSeasonCache.clear();
   const playersResult = await db
     .from("players")
     .select("id, display_name, reward_floor_bonus, reward_double_bonus, reward_extra_points")
@@ -4985,6 +5446,7 @@ async function loadLeaderboard() {
 }
 
 async function loadRecentMatches() {
+  scoreDetailSeasonCache.clear();
   await ensurePreviousMatchDayPlaceholderOnce();
 
   let dayQuery = db
@@ -7089,9 +7551,31 @@ if (leaderboardCopyBtn) {
   leaderboardCopyBtn.addEventListener("click", copyLeaderboardSummary);
 }
 
+if (leaderboardBody) {
+  leaderboardBody.addEventListener("click", async (event) => {
+    const trigger = event.target.closest('[data-role="score-detail"]');
+    if (!trigger) return;
+    const playerId = trigger.dataset.playerId || "";
+    if (!playerId) return;
+    await openScoreDetailModal(playerId);
+  });
+}
+
+if (closeScoreDetailBtn) {
+  closeScoreDetailBtn.addEventListener("click", closeScoreDetailModal);
+}
+
+if (scoreDetailBackdrop) {
+  scoreDetailBackdrop.addEventListener("click", closeScoreDetailModal);
+}
+
 document.addEventListener("keydown", (event) => {
   if (event.key === "Escape" && !heroPickerModal.hidden) {
     closeHeroPicker();
+    return;
+  }
+  if (event.key === "Escape" && scoreDetailModal && !scoreDetailModal.hidden) {
+    closeScoreDetailModal();
   }
 });
 
