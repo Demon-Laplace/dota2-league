@@ -3228,6 +3228,7 @@ ol {
   background: rgba(16, 34, 57, 0.68);
   color: #dce9f8;
   text-align: center;
+  text-shadow: 0 1px 1px rgba(0, 0, 0, 0.42);
   transition:
     min-height 0.24s ease,
     padding 0.24s ease,
@@ -3291,25 +3292,33 @@ ol {
 }
 
 .leaderboard-tag-gold {
-  color: #fff3cc;
-  border-color: rgba(240, 195, 106, 0.28);
-  background: rgba(104, 73, 27, 0.3);
+  color: #f8e8c2;
+  border-color: rgba(198, 160, 89, 0.3);
+  background:
+    linear-gradient(135deg, rgba(102, 79, 34, 0.42), rgba(72, 55, 21, 0.32));
+  box-shadow:
+    inset 0 1px 0 rgba(248, 234, 201, 0.04),
+    0 0 10px rgba(176, 143, 78, 0.06);
 }
 
 .leaderboard-tag-gold .leaderboard-tag-icon {
-  background: rgba(240, 195, 106, 0.18);
-  color: #ffe2a1;
+  background: linear-gradient(135deg, rgba(214, 184, 116, 0.18), rgba(139, 110, 44, 0.18));
+  color: #f7ddb0;
 }
 
 .leaderboard-tag-teal {
-  color: #ddfbf6;
-  border-color: rgba(99, 213, 208, 0.26);
-  background: rgba(27, 82, 88, 0.26);
+  color: #e4fff8;
+  border-color: rgba(114, 228, 212, 0.28);
+  background:
+    linear-gradient(135deg, rgba(28, 90, 98, 0.32), rgba(18, 62, 69, 0.26));
+  box-shadow:
+    inset 0 1px 0 rgba(225, 255, 247, 0.04),
+    0 0 10px rgba(99, 213, 208, 0.06);
 }
 
 .leaderboard-tag-teal .leaderboard-tag-icon {
-  background: rgba(99, 213, 208, 0.16);
-  color: #bff6e8;
+  background: linear-gradient(135deg, rgba(133, 236, 223, 0.18), rgba(72, 174, 170, 0.16));
+  color: #cffff0;
 }
 
 .leaderboard-tag-slate {
@@ -3348,6 +3357,96 @@ ol {
 .leaderboard-tag-royal .leaderboard-tag-icon {
   background: rgba(167, 139, 250, 0.16);
   color: #ddd6fe;
+}
+
+.leaderboard-tag-crimson {
+  color: #ffe7eb;
+  border-color: rgba(184, 62, 85, 0.34);
+  background:
+    linear-gradient(135deg, rgba(93, 22, 35, 0.5), rgba(60, 16, 24, 0.38));
+  box-shadow:
+    inset 0 1px 0 rgba(255, 233, 233, 0.05),
+    0 0 12px rgba(155, 40, 59, 0.08);
+}
+
+.leaderboard-tag-crimson .leaderboard-tag-icon {
+  background: linear-gradient(135deg, rgba(201, 92, 116, 0.22), rgba(130, 25, 46, 0.22));
+  color: #ffe3e8;
+}
+
+.leaderboard-tag-brass {
+  color: #f3dfc2;
+  border-color: rgba(155, 110, 60, 0.34);
+  background:
+    linear-gradient(135deg, rgba(96, 66, 31, 0.44), rgba(67, 45, 17, 0.34));
+  box-shadow:
+    inset 0 1px 0 rgba(241, 224, 194, 0.04),
+    0 0 10px rgba(130, 90, 44, 0.07);
+}
+
+.leaderboard-tag-brass .leaderboard-tag-icon {
+  background: linear-gradient(135deg, rgba(180, 133, 77, 0.2), rgba(118, 80, 34, 0.2));
+  color: #f4ddba;
+}
+
+.leaderboard-tag-sun {
+  color: #fff4bf;
+  border-color: rgba(255, 214, 64, 0.42);
+  background:
+    linear-gradient(135deg, rgba(182, 141, 18, 0.5), rgba(134, 103, 12, 0.38));
+  box-shadow:
+    inset 0 1px 0 rgba(255, 246, 200, 0.08),
+    0 0 16px rgba(255, 210, 50, 0.14);
+}
+
+.leaderboard-tag-sun .leaderboard-tag-icon {
+  background: linear-gradient(135deg, rgba(255, 239, 160, 0.24), rgba(247, 194, 18, 0.22));
+  color: #fff3be;
+}
+
+.leaderboard-tag-storm {
+  color: #fff1ad;
+  border-color: rgba(250, 204, 21, 0.38);
+  background:
+    linear-gradient(135deg, rgba(171, 122, 12, 0.46), rgba(120, 80, 10, 0.34));
+  box-shadow:
+    inset 0 1px 0 rgba(255, 245, 210, 0.06),
+    0 0 14px rgba(250, 204, 21, 0.11);
+}
+
+.leaderboard-tag-storm .leaderboard-tag-icon {
+  background: linear-gradient(135deg, rgba(253, 224, 71, 0.24), rgba(234, 179, 8, 0.22));
+  color: #fff1ba;
+}
+
+.leaderboard-tag-pink {
+  color: #ffe6f1;
+  border-color: rgba(244, 114, 182, 0.34);
+  background:
+    linear-gradient(135deg, rgba(132, 45, 94, 0.42), rgba(96, 31, 67, 0.32));
+  box-shadow:
+    inset 0 1px 0 rgba(255, 234, 244, 0.05),
+    0 0 12px rgba(244, 114, 182, 0.08);
+}
+
+.leaderboard-tag-pink .leaderboard-tag-icon {
+  background: linear-gradient(135deg, rgba(251, 182, 206, 0.22), rgba(236, 72, 153, 0.2));
+  color: #ffe7f0;
+}
+
+.leaderboard-tag-inferno {
+  color: #ffe7da;
+  border-color: rgba(255, 115, 48, 0.38);
+  background:
+    linear-gradient(135deg, rgba(170, 57, 19, 0.5), rgba(120, 35, 12, 0.36));
+  box-shadow:
+    inset 0 1px 0 rgba(255, 230, 223, 0.07),
+    0 0 16px rgba(255, 98, 28, 0.13);
+}
+
+.leaderboard-tag-inferno .leaderboard-tag-icon {
+  background: linear-gradient(135deg, rgba(255, 197, 123, 0.24), rgba(241, 95, 18, 0.24));
+  color: #ffe2ce;
 }
 
 .leaderboard-score {

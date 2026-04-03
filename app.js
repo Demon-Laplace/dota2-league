@@ -1243,8 +1243,6 @@ function setScorerPanelOpen(isOpen) {
     scorerModeBtn.textContent = isScorerPanelOpen ? "收起记录" : "记录员模式";
   }
   if (isScorerPanelOpen) {
-    renderScorerManualScoreOptions();
-    updateManualScoreControlState("scorer");
     setAdminPanelOpen(false);
   }
 }
@@ -1257,8 +1255,6 @@ function setAdminPanelOpen(isOpen) {
     adminModeBtn.textContent = isAdminPanelOpen ? "收起管理" : "管理员模式";
   }
   if (isAdminPanelOpen) {
-    renderAdminManualScoreOptions();
-    updateManualScoreControlState("admin");
     setScorerPanelOpen(false);
   }
 }
@@ -2595,7 +2591,7 @@ function getMvpPlayerIds() {
   return new Set();
 }
 
-function getActiveWinStreakPlayerIds(matches, minStreak = 3) {
+function getActiveWinStreakMap(matches, minStreak = 3) {
   const streakMap = new Map();
   const finishedPlayers = new Set();
 
@@ -2618,11 +2614,251 @@ function getActiveWinStreakPlayerIds(matches, minStreak = 3) {
     });
   });
 
-  return new Set(
+  return new Map(
     [...streakMap.entries()]
       .filter(([playerId, streak]) => !finishedPlayers.has(playerId) && streak >= minStreak)
+      .map(([playerId, streak]) => [playerId, streak])
+  );
+}
+
+function getActiveLoseStreakMap(matches, minStreak = 3) {
+  const streakMap = new Map();
+  const finishedPlayers = new Set();
+
+  (matches || []).forEach((match) => {
+    if (!hasRecordedWinner(match.winner_team)) return;
+
+    parseRecentMatchPlayers(match.players).forEach((player) => {
+      const playerId = player.player_id || player.id;
+      if (!playerId || finishedPlayers.has(playerId)) return;
+
+      const isLoser = player.team !== match.winner_team;
+      const currentStreak = streakMap.get(playerId) || 0;
+
+      if (isLoser) {
+        streakMap.set(playerId, currentStreak + 1);
+        return;
+      }
+
+      finishedPlayers.add(playerId);
+    });
+  });
+
+  return new Map(
+    [...streakMap.entries()]
+      .filter(([playerId, streak]) => !finishedPlayers.has(playerId) && streak >= minStreak)
+      .map(([playerId, streak]) => [playerId, streak])
+  );
+}
+
+function getPlayerWinRateMap(data) {
+  const map = new Map();
+  (data || []).forEach((player) => {
+    const playerId = player.player_id || player.id;
+    if (!playerId) return;
+    map.set(playerId, getWinRateNumber(player.win_rate, player.wins, player.games_played));
+  });
+  return map;
+}
+
+function isPlayerAffectedByDoubleDown(player, doubleDowns) {
+  const playerId = player?.player_id || player?.id;
+  const team = player?.team;
+  if (!playerId || !team) return false;
+  return (doubleDowns || []).some((item) => (
+    (item.mode === "team" && item.target_team === team)
+    || (item.mode === "single" && item.target_player_id === playerId)
+  ));
+}
+
+function getRegularLossCountMap(matches) {
+  const lossMap = new Map();
+
+  (matches || []).forEach((match) => {
+    if (!hasRecordedWinner(match.winner_team)) return;
+    const players = parseRecentMatchPlayers(match.players);
+    const doubleDowns = parseRecentMatchPlayers(match.double_downs);
+
+    players.forEach((player) => {
+      const playerId = player.player_id || player.id;
+      if (!playerId || player.team === match.winner_team) return;
+      if (Number(player.score_change ?? 0) !== -1) return;
+      if (isPlayerAffectedByDoubleDown(player, doubleDowns)) return;
+      lossMap.set(playerId, (lossMap.get(playerId) || 0) + 1);
+    });
+  });
+
+  return lossMap;
+}
+
+function getBronzeFeederPlayerIds(data, matches) {
+  const lossMap = getRegularLossCountMap(matches);
+  const entries = (data || [])
+    .map((player) => ({
+      playerId: player.player_id || player.id,
+      losses: lossMap.get(player.player_id || player.id) || 0,
+    }))
+    .filter((entry) => entry.playerId);
+
+  if (entries.length < 2) return new Set();
+
+  const values = entries.map((entry) => entry.losses);
+  const mean = values.reduce((sum, value) => sum + value, 0) / values.length;
+  const variance = values.reduce((sum, value) => sum + ((value - mean) ** 2), 0) / values.length;
+  const std = Math.sqrt(variance);
+  const sorted = [...entries].sort((a, b) => b.losses - a.losses);
+  const top = sorted[0];
+  const second = sorted[1];
+
+  if (!top || top.losses <= 0) return new Set();
+  if (second && top.losses <= second.losses) return new Set();
+  if (top.losses < mean + std) return new Set();
+
+  return new Set([top.playerId]);
+}
+
+function getBonusGainMap(matches) {
+  const bonusMap = new Map();
+
+  (matches || []).forEach((match) => {
+    if (!hasRecordedWinner(match.winner_team)) return;
+    parseRecentMatchPlayers(match.players).forEach((player) => {
+      const playerId = player.player_id || player.id;
+      if (!playerId) return;
+      const scoreChange = Number(player.score_change ?? 0);
+      const extraGain = player.team === match.winner_team
+        ? Math.max(scoreChange - 1, 0)
+        : 0;
+      if (extraGain <= 0) return;
+      bonusMap.set(playerId, Number((bonusMap.get(playerId) || 0) + extraGain));
+    });
+  });
+
+  return bonusMap;
+}
+
+function getGoldenTouchPlayerIds(matches) {
+  const bonusMap = getBonusGainMap(matches);
+  let highest = 0;
+  bonusMap.forEach((value) => {
+    if (value > highest) highest = value;
+  });
+  if (highest <= 0) return new Set();
+  return new Set(
+    [...bonusMap.entries()]
+      .filter(([, value]) => value === highest)
       .map(([playerId]) => playerId)
   );
+}
+
+function getTeammateAffinityLeaders(data, matches, minSharedGames = 8, threshold = 12) {
+  const overallWinRateMap = getPlayerWinRateMap(data);
+  const pairMap = new Map();
+
+  (matches || []).forEach((match) => {
+    if (!hasRecordedWinner(match.winner_team)) return;
+    const players = parseRecentMatchPlayers(match.players);
+
+    ["A", "B"].forEach((teamKey) => {
+      const teamPlayers = players.filter((player) => player.team === teamKey);
+      teamPlayers.forEach((subject) => {
+        const subjectId = subject.player_id || subject.id;
+        if (!subjectId) return;
+        teamPlayers.forEach((mate) => {
+          const mateId = mate.player_id || mate.id;
+          if (!mateId || mateId === subjectId) return;
+          const key = `${subjectId}__${mateId}`;
+          const current = pairMap.get(key) || { games: 0, wins: 0 };
+          current.games += 1;
+          if (teamKey === match.winner_team) current.wins += 1;
+          pairMap.set(key, current);
+        });
+      });
+    });
+  });
+
+  const influence = new Map();
+  pairMap.forEach((stat, key) => {
+    if (stat.games < minSharedGames) return;
+    const [subjectId, mateId] = key.split("__");
+    const mateOverallRate = overallWinRateMap.get(mateId);
+    if (!Number.isFinite(mateOverallRate)) return;
+    const pairRate = (stat.wins / stat.games) * 100;
+    const delta = pairRate - mateOverallRate;
+    const current = influence.get(subjectId) || { weightedDelta: 0, totalGames: 0 };
+    current.weightedDelta += delta * stat.games;
+    current.totalGames += stat.games;
+    influence.set(subjectId, current);
+  });
+
+  let luckiest = null;
+  let unluckiest = null;
+  influence.forEach((value, playerId) => {
+    if (!value.totalGames) return;
+    const averageDelta = value.weightedDelta / value.totalGames;
+    if (!luckiest || averageDelta > luckiest.averageDelta) {
+      luckiest = { playerId, averageDelta };
+    }
+    if (!unluckiest || averageDelta < unluckiest.averageDelta) {
+      unluckiest = { playerId, averageDelta };
+    }
+  });
+
+  return {
+    luckyId: luckiest && luckiest.averageDelta >= threshold ? luckiest.playerId : "",
+    unluckyId: unluckiest && unluckiest.averageDelta <= -threshold ? unluckiest.playerId : "",
+  };
+}
+
+function getNemesisMap(data, matches, minHeadToHeadGames = 8, minDelta = 25) {
+  const overallWinRateMap = getPlayerWinRateMap(data);
+  const duelMap = new Map();
+
+  (matches || []).forEach((match) => {
+    if (!hasRecordedWinner(match.winner_team)) return;
+    const players = parseRecentMatchPlayers(match.players);
+    const teamA = players.filter((player) => player.team === "A");
+    const teamB = players.filter((player) => player.team === "B");
+
+    teamA.forEach((playerA) => {
+      const playerAId = playerA.player_id || playerA.id;
+      if (!playerAId) return;
+      teamB.forEach((playerB) => {
+        const playerBId = playerB.player_id || playerB.id;
+        if (!playerBId) return;
+
+        const aKey = `${playerAId}__${playerBId}`;
+        const aStat = duelMap.get(aKey) || { games: 0, wins: 0 };
+        aStat.games += 1;
+        if (match.winner_team === "A") aStat.wins += 1;
+        duelMap.set(aKey, aStat);
+
+        const bKey = `${playerBId}__${playerAId}`;
+        const bStat = duelMap.get(bKey) || { games: 0, wins: 0 };
+        bStat.games += 1;
+        if (match.winner_team === "B") bStat.wins += 1;
+        duelMap.set(bKey, bStat);
+      });
+    });
+  });
+
+  const nemesisMap = new Map();
+  duelMap.forEach((stat, key) => {
+    if (stat.games < minHeadToHeadGames) return;
+    const [playerId, opponentId] = key.split("__");
+    const overallRate = overallWinRateMap.get(playerId);
+    if (!Number.isFinite(overallRate)) return;
+    const duelRate = (stat.wins / stat.games) * 100;
+    const delta = duelRate - overallRate;
+    if (delta > -minDelta) return;
+
+    const current = nemesisMap.get(playerId);
+    if (!current || delta < current.delta) {
+      nemesisMap.set(playerId, { opponentId, delta, games: stat.games });
+    }
+  });
+
+  return nemesisMap;
 }
 
 function getLeaderboardNameRankClass(rank) {
@@ -4882,8 +5118,14 @@ function renderLeaderboard(data) {
 
   const highestRewardIds = getHighestRewardPlayerIds(data);
   const hardcoreLoseIds = getHardcoreLoseTaggedPlayerIds(data);
-  const winStreakIds = getActiveWinStreakPlayerIds(recentMatchesData, 3);
+  const winStreakMap = getActiveWinStreakMap(recentMatchesData, 3);
+  const loseStreakMap = getActiveLoseStreakMap(recentMatchesData, 3);
+  const bronzeFeederIds = getBronzeFeederPlayerIds(data, recentMatchesData);
+  const goldenTouchIds = getGoldenTouchPlayerIds(recentMatchesData);
+  const teammateAffinity = getTeammateAffinityLeaders(data, recentMatchesData, 8, 12);
+  const nemesisMap = getNemesisMap(data, recentMatchesData, 8, 25);
   const mvpIds = getMvpPlayerIds();
+  const playerNameMap = new Map(data.map((player) => [player.player_id || player.id, stripPlayerNameMeta(player.display_name || "未知选手") || "未知选手"]));
 
   data.forEach((player, idx) => {
     const tr = document.createElement("tr");
@@ -4910,8 +5152,39 @@ function renderLeaderboard(data) {
       tags.push({ icon: "☄", label: "又菜又爱玩", tone: "slate" });
     }
 
-    if (winStreakIds.has(playerId)) {
-      tags.push({ icon: "▲", label: "连胜", tone: "ember" });
+    if (winStreakMap.has(playerId)) {
+      tags.push({ icon: "▲", label: "连胜", tone: "ember", description: `${winStreakMap.get(playerId)} 连胜` });
+    }
+
+    if (loseStreakMap.has(playerId)) {
+      tags.push({ icon: "▼", label: "连败", tone: "crimson", description: `${loseStreakMap.get(playerId)} 连败` });
+    }
+
+    if (bronzeFeederIds.has(playerId)) {
+      tags.push({ icon: "◈", label: "送分童子", tone: "brass", description: "本赛季常规败场明显多于其他人。" });
+    }
+
+    if (goldenTouchIds.has(playerId)) {
+      tags.push({ icon: "✶", label: "点金手", tone: "sun", description: "靠双倍、锦鲤等加成拿到的额外积分最多。" });
+    }
+
+    if (teammateAffinity.unluckyId && teammateAffinity.unluckyId === playerId) {
+      tags.push({ icon: "⚡", label: "避雷针", tone: "storm", description: "和他同队时，队友整体更容易输掉比赛。" });
+    }
+
+    if (teammateAffinity.luckyId && teammateAffinity.luckyId === playerId) {
+      tags.push({ icon: "✿", label: "幸运星", tone: "pink", description: "和他同队时，队友整体更容易赢下比赛。" });
+    }
+
+    const nemesis = nemesisMap.get(playerId);
+    if (nemesis?.opponentId) {
+      const opponentName = playerNameMap.get(nemesis.opponentId) || "那位对手";
+      tags.push({
+        icon: "✹",
+        label: `${opponentName}的一生之敌`,
+        tone: "inferno",
+        description: `面对 ${opponentName} 时，这位选手会明显更难赢。`,
+      });
     }
 
     if (mvpIds.has(playerId)) {
@@ -4921,7 +5194,7 @@ function renderLeaderboard(data) {
     const tagsHtml = `
       <div class="leaderboard-player-tags${tags.length ? "" : " leaderboard-player-tags-empty"}">
         ${tags.map((tag) => `
-        <span class="leaderboard-tag leaderboard-tag-${tag.tone}" title="${escapeHtml(tag.label)}" aria-label="${escapeHtml(tag.label)}">
+        <span class="leaderboard-tag leaderboard-tag-${tag.tone}" title="${escapeHtml(tag.description || tag.label)}" aria-label="${escapeHtml(tag.description || tag.label)}">
           <span class="leaderboard-tag-icon">${escapeHtml(tag.icon)}</span>
           <span class="leaderboard-tag-label">${escapeHtml(tag.label)}</span>
         </span>
