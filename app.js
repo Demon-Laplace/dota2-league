@@ -1375,37 +1375,37 @@ function buildScoreDetailEntries(player, seasonData) {
       && participantIds.size > 0
       && shouldApplyMatchDayAbsenceAdjustmentClient(matchDate, matchDaysByDate.get(matchDate)?.closed_at)
     ) {
-      const absentPlayers = [...participantIds]
-        .filter((playerId) => !participantsToday.has(playerId))
+      const seasonPlayers = [...participantIds]
         .map((playerId) => ({
           player_id: playerId,
           ...ensureScoreStateEntry(stateMap, playerId),
         }))
         .filter(Boolean);
 
-      if (absentPlayers.length) {
-        const highestScore = Math.max(...absentPlayers.map((item) => Number(item.score ?? 10)));
-        const lowestScore = Math.min(...absentPlayers.map((item) => Number(item.score ?? 10)));
+      if (seasonPlayers.length) {
+        const highestScore = Math.max(...seasonPlayers.map((item) => Number(item.score ?? 10)));
+        const lowestScore = Math.min(...seasonPlayers.map((item) => Number(item.score ?? 10)));
         const highestGamesPlayed = Math.max(
-          ...absentPlayers
+          ...seasonPlayers
             .filter((item) => Number(item.score ?? 10) === highestScore)
             .map((item) => Number(item.gamesPlayed ?? 0))
         );
         const lowestGamesPlayed = Math.max(
-          ...absentPlayers
+          ...seasonPlayers
             .filter((item) => Number(item.score ?? 10) === lowestScore)
             .map((item) => Number(item.gamesPlayed ?? 0))
         );
 
-        absentPlayers.forEach((absentPlayer) => {
+        seasonPlayers.forEach((absentPlayer) => {
           let delta = 0;
           const score = Number(absentPlayer.score ?? 10);
           const gamesPlayed = Number(absentPlayer.gamesPlayed ?? 0);
+          const isAbsent = !participantsToday.has(absentPlayer.player_id);
 
-          if (score === lowestScore && gamesPlayed === lowestGamesPlayed) {
+          if (isAbsent && score === lowestScore && gamesPlayed === lowestGamesPlayed) {
             delta += 1;
           }
-          if (score === highestScore && gamesPlayed === highestGamesPlayed) {
+          if (isAbsent && score === highestScore && gamesPlayed === highestGamesPlayed) {
             delta -= 1;
           }
 
@@ -1425,11 +1425,11 @@ function buildScoreDetailEntries(player, seasonData) {
               id: `rest-${matchDate}-${absentPlayer.player_id}`,
               delta,
               title: "比赛日未参赛结算",
-              subtitle: delta > 0 ? "比赛日未参赛 · 末位补分" : "比赛日未参赛 · 榜首扣分",
+              subtitle: delta > 0 ? "总榜榜尾未参赛 · 补分" : "总榜榜首未参赛 · 扣分",
               meta: `${matchDate} · 比赛日未参赛`,
               badges: [
                 { label: "比赛日未参赛", tone: "rest" },
-                { label: delta > 0 ? "末位 +1" : "榜首 -1", tone: delta > 0 ? "restplus" : "restminus" },
+                { label: delta > 0 ? "榜尾缺席 +1" : "榜首缺席 -1", tone: delta > 0 ? "restplus" : "restminus" },
               ],
             });
           }
@@ -2460,21 +2460,51 @@ function getPreviousBeijingBusinessDateString() {
   return `${prevYear}-${prevMonth}-${prevDay}`;
 }
 
-function getTodayRecordedMatchCount(seasonId = activeSeason?.id) {
-  const today = getBeijingBusinessDateString();
+function getRecordedMatchCountForDate(matchDate, seasonId = activeSeason?.id) {
+  if (!matchDate) return 0;
   return (recentMatchesData || []).filter((match) => {
     const matchSeasonId = match.season_id || null;
-    const matchDate = match.match_date || formatArchiveDate(match.created_at) || "";
-    return (!seasonId || matchSeasonId === seasonId) && matchDate === today;
+    const resolvedMatchDate = match.match_date || formatArchiveDate(match.created_at) || "";
+    return (!seasonId || matchSeasonId === seasonId) && resolvedMatchDate === matchDate;
   }).length;
+}
+
+function getTodayRecordedMatchCount(seasonId = activeSeason?.id) {
+  return getRecordedMatchCountForDate(getBeijingBusinessDateString(), seasonId);
+}
+
+function getFinishMatchDayActionContext(seasonId = activeSeason?.id) {
+  const businessDate = getBeijingBusinessDateString();
+  const activeDate = activeMatchDay?.season_id === seasonId
+    ? (activeMatchDay.match_date || businessDate)
+    : null;
+  const targetDate = activeDate || businessDate;
+  const targetMatchCount = getRecordedMatchCountForDate(targetDate, seasonId);
+  const hasPastActiveDay = Boolean(activeDate && activeDate !== businessDate);
+  const isRestMode = !hasPastActiveDay && targetDate === businessDate && targetMatchCount === 0;
+
+  return {
+    businessDate,
+    activeDate,
+    targetDate,
+    targetMatchCount,
+    hasPastActiveDay,
+    isRestMode,
+  };
 }
 
 function updateFinishTodayMatchDayButtonLabel() {
   if (!finishTodayMatchDayBtn) return;
-  const hasTodayMatches = getTodayRecordedMatchCount(activeSeason?.id) > 0;
-  const label = hasTodayMatches ? "结束比赛日" : "今日休战";
+  const actionContext = getFinishMatchDayActionContext(activeSeason?.id);
+  const label = actionContext.isRestMode ? "今日休战" : "结束比赛日";
   finishTodayMatchDayBtn.textContent = label;
-  finishTodayMatchDayBtn.title = hasTodayMatches ? "结束今日比赛日并结算未参赛加减分" : "今日无比赛，直接设置休战";
+  finishTodayMatchDayBtn.title = actionContext.isRestMode
+    ? "今日无比赛，直接设置休战"
+    : (
+      actionContext.targetDate === actionContext.businessDate
+        ? "结束今日比赛日并结算比赛日未参赛加减分"
+        : `结束 ${actionContext.targetDate} 比赛日并结算比赛日未参赛加减分`
+    );
   finishTodayMatchDayBtn.setAttribute("aria-label", finishTodayMatchDayBtn.title);
 }
 
@@ -6125,11 +6155,12 @@ async function finishTodayMatchDay() {
     return;
   }
 
+  const actionContext = getFinishMatchDayActionContext(activeSeason.id);
   const todayMatchCount = getTodayRecordedMatchCount(activeSeason.id);
   const confirmed = window.confirm(
-    todayMatchCount > 0
-      ? "确认结束今日比赛日吗？这会立刻按“比赛日未参赛”规则结算“未参赛最高 -1 / 最低 +1”，并清空今日报名队列与当日名单。若之后今天又新增或补录比赛，系统仍会自动重新回算。"
-      : "确认设置今日休战吗？今天还没有已记录比赛，本次不会触发未参赛加减分，只会结束今日状态并清空今日报名队列与当日名单。"
+    actionContext.isRestMode
+      ? "确认设置今日休战吗？今天还没有已记录比赛，本次不会触发未参赛加减分，只会结束今日状态并清空今日报名队列与当日名单。"
+      : `确认结束 ${actionContext.targetDate === actionContext.businessDate ? "今日" : actionContext.targetDate} 比赛日吗？这会立刻按“比赛日未参赛”规则结算“总榜榜首缺席 -1 / 总榜榜尾缺席 +1”，并清空对应比赛日后的报名队列与当日名单。若之后该比赛日又新增或补录比赛，系统仍会自动重新回算。`
   );
   if (!confirmed) {
     return;
@@ -6139,14 +6170,14 @@ async function finishTodayMatchDay() {
     finishTodayMatchDayBtn.disabled = true;
   }
 
-  setMessage(todayMatchCount > 0 ? "正在结束今日比赛日并结算..." : "正在设置今日休战...");
-  setMatchMessage(todayMatchCount > 0 ? "正在结束今日比赛日并结算..." : "正在设置今日休战...");
+  setMessage(actionContext.isRestMode ? "正在设置今日休战..." : "正在结束比赛日并结算...");
+  setMatchMessage(actionContext.isRestMode ? "正在设置今日休战..." : "正在结束比赛日并结算...");
   setBackfillMessage("");
 
   let data = null;
   let error = null;
 
-  if (todayMatchCount > 0) {
+  if (!actionContext.isRestMode && actionContext.targetDate === actionContext.businessDate && todayMatchCount > 0) {
     ({ data, error } = await db.rpc("finalize_active_match_day", {
       p_season_id: activeSeason.id,
     }));
@@ -6168,27 +6199,29 @@ async function finishTodayMatchDay() {
   }
 
   if (error) {
-    setMessage(`设置今日休战失败：${error.message}。请先在 Supabase 执行最新 SQL。`, true);
-    setMatchMessage(`设置今日休战失败：${error.message}。请先在 Supabase 执行最新 SQL。`, true);
+    const failurePrefix = actionContext.isRestMode ? "设置今日休战失败" : "结束比赛日失败";
+    setMessage(`${failurePrefix}：${error.message}。请先在 Supabase 执行最新 SQL。`, true);
+    setMatchMessage(`${failurePrefix}：${error.message}。请先在 Supabase 执行最新 SQL。`, true);
     return;
   }
 
   if (!data) {
-    setMessage(todayMatchCount > 0 ? "今日暂无可休战的比赛记录。" : "今日没有已记录比赛，未触发积分结算。");
-    setMatchMessage(todayMatchCount > 0 ? "今日暂无可休战的比赛记录。" : "今日没有已记录比赛，未触发积分结算。");
+    setMessage(actionContext.isRestMode ? "今日没有已记录比赛，未触发积分结算。" : "当前没有可结束的比赛日记录。");
+    setMatchMessage(actionContext.isRestMode ? "今日没有已记录比赛，未触发积分结算。" : "当前没有可结束的比赛日记录。");
     return;
   }
 
   clearStoredMatchDayStartTime();
   matchStartTimeInput.value = "";
-  if (todayMatchCount > 0) {
-    setMessage("今日比赛日已结束，比赛日未参赛加减分已完成结算。");
-    setMatchMessage("今日比赛日已结束，比赛日未参赛加减分已完成结算。");
-    appendAdminActionLog("手动结束了今日比赛日并结算比赛日未参赛加减分。");
-  } else {
+  if (actionContext.isRestMode) {
     setMessage("今日已休战。今日没有比赛，未触发积分结算。");
     setMatchMessage("今日已休战。今日没有比赛，未触发积分结算。");
     appendAdminActionLog("手动设置了今日休战（今日无比赛，未触发积分结算）。");
+  } else {
+    const targetLabel = actionContext.targetDate === actionContext.businessDate ? "今日比赛日" : `${actionContext.targetDate} 比赛日`;
+    setMessage(`${targetLabel}已结束，比赛日未参赛加减分已完成结算。`);
+    setMatchMessage(`${targetLabel}已结束，比赛日未参赛加减分已完成结算。`);
+    appendAdminActionLog(`手动结束了 ${actionContext.targetDate} 比赛日并结算比赛日未参赛加减分。`);
   }
   requestImmediateRefresh({
     playerDriven: true,
