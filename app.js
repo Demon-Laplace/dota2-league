@@ -2988,6 +2988,13 @@ function getRewardGlowTier(amount) {
   return "blazing";
 }
 
+function getStreakTagIntensityClass(streak) {
+  const value = Number(streak || 0);
+  if (value >= 7) return "leaderboard-tag-streak-3";
+  if (value >= 5) return "leaderboard-tag-streak-2";
+  return "leaderboard-tag-streak-1";
+}
+
 function getLeaderboardNameRankClass(rank) {
   if (rank === 1) return "player-name-display-rank1";
   if (rank <= 3) return "player-name-display-rank23";
@@ -5409,11 +5416,25 @@ function renderLeaderboard(data) {
     }
 
     if (winStreakMap.has(playerId)) {
-      tags.push({ icon: "▲", label: "连胜", tone: "ember", description: `${winStreakMap.get(playerId)} 连胜` });
+      const streak = winStreakMap.get(playerId);
+      tags.push({
+        icon: "▲",
+        label: "连胜",
+        tone: "ember",
+        className: getStreakTagIntensityClass(streak),
+        description: `${streak} 连胜`,
+      });
     }
 
     if (loseStreakMap.has(playerId)) {
-      tags.push({ icon: "▼", label: "连败", tone: "crimson", description: `${loseStreakMap.get(playerId)} 连败` });
+      const streak = loseStreakMap.get(playerId);
+      tags.push({
+        icon: "▼",
+        label: "连败",
+        tone: "crimson",
+        className: getStreakTagIntensityClass(streak),
+        description: `${streak} 连败`,
+      });
     }
 
     if (bronzeFeederIds.has(playerId)) {
@@ -5476,7 +5497,7 @@ function renderLeaderboard(data) {
     const tagsHtml = `
       <div class="leaderboard-player-tags${tags.length ? "" : " leaderboard-player-tags-empty"}">
         ${tags.slice(0, 12).map((tag) => `
-        <span class="leaderboard-tag leaderboard-tag-${tag.tone}" title="${escapeHtml(tag.description || tag.label)}" aria-label="${escapeHtml(tag.description || tag.label)}">
+        <span class="leaderboard-tag leaderboard-tag-${tag.tone}${tag.className ? ` ${tag.className}` : ""}" title="${escapeHtml(tag.description || tag.label)}" aria-label="${escapeHtml(tag.description || tag.label)}">
           <span class="leaderboard-tag-icon">${escapeHtml(tag.icon)}</span>
           <span class="leaderboard-tag-label">${escapeHtml(tag.label)}</span>
         </span>
