@@ -2028,10 +2028,22 @@ button:disabled {
 
 .leaderboard-compact-btn {
   flex: 0 0 auto;
-  min-width: 0;
-  padding: 7px 12px;
-  font-size: 12px;
-  line-height: 1.4;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  min-width: 36px;
+  padding: 0;
+  font-size: 16px;
+  line-height: 1;
+}
+
+.leaderboard-compact-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transform: translateY(-1px);
 }
 
 .leaderboard-compact-btn[aria-pressed="true"] {
@@ -2044,9 +2056,9 @@ button:disabled {
   position: relative;
   z-index: 1;
   margin-top: 12px;
-  max-height: 560px;
-  overflow: auto;
-  overscroll-behavior: contain;
+  overflow-x: auto;
+  overflow-y: visible;
+  overscroll-behavior-x: contain;
   scrollbar-width: thin;
   scrollbar-color: rgba(126, 173, 224, 0.5) rgba(8, 22, 40, 0.34);
 }
@@ -2068,6 +2080,16 @@ button:disabled {
 
 .leaderboard-card-compact .leaderboard-scroll-shell {
   max-height: 248px;
+  overflow: auto;
+  overscroll-behavior: contain;
+}
+
+.leaderboard-card-compact .leaderboard-view-hint {
+  color: #b7cade;
+}
+
+.leaderboard-card-compact .leaderboard-compact-icon {
+  transform: translateY(-1px) rotate(90deg);
 }
 
 table {
@@ -2108,6 +2130,160 @@ td {
     linear-gradient(90deg, transparent, rgba(240, 195, 106, 0.22) 18%, rgba(126, 224, 216, 0.3) 50%, rgba(86, 166, 255, 0.22) 82%, transparent)
     bottom / 100% 1px no-repeat;
   backdrop-filter: blur(14px);
+}
+
+.leaderboard-card:not(.leaderboard-card-compact) .leaderboard-table thead th {
+  position: static;
+}
+
+ol {
+  padding-left: 22px;
+}
+
+#queueList {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 10px;
+  margin: 14px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+#queueList li {
+  margin: 0;
+}
+
+#queueList li.queue-cutoff {
+  margin: 0;
+  padding: 0;
+  border-bottom: 0;
+}
+
+.queue-item {
+  position: relative;
+  display: grid;
+  gap: 10px;
+  min-height: 148px;
+  padding: 14px;
+  border-radius: 16px;
+  border: 1px solid rgba(117, 155, 197, 0.18);
+  background: linear-gradient(180deg, rgba(14, 31, 54, 0.82), rgba(10, 24, 41, 0.74));
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.03),
+    0 12px 26px rgba(2, 10, 24, 0.18);
+}
+
+.queue-item::before {
+  content: "";
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 4px;
+  border-radius: 16px 0 0 16px;
+  background: rgba(86, 166, 255, 0.48);
+}
+
+.queue-item-active::before {
+  background: rgba(86, 166, 255, 0.54);
+}
+
+.queue-item-ready::before {
+  background: rgba(99, 213, 208, 0.72);
+}
+
+.queue-item-cancelled::before {
+  background: rgba(255, 138, 138, 0.68);
+}
+
+.queue-item-standby::before {
+  background: rgba(240, 195, 106, 0.72);
+}
+
+.queue-item.queue-cutoff {
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.03),
+    0 0 0 1px rgba(240, 195, 106, 0.16),
+    0 12px 26px rgba(2, 10, 24, 0.18);
+}
+
+.queue-card-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.queue-card-head strong {
+  font-size: 16px;
+  line-height: 1.35;
+}
+
+.queue-card-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.queue-card-time {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.queue-card-actions {
+  margin-top: auto;
+}
+
+.queue-card-actions button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  padding: 8px 12px;
+  border-radius: 12px;
+}
+
+.queue-status-standby {
+  color: #fff1c8;
+  background: rgba(104, 73, 27, 0.36);
+  border-color: rgba(240, 195, 106, 0.34);
+}
+
+.queue-slot {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 12px;
+  line-height: 1.5;
+  color: #fff1c8;
+  background: rgba(104, 73, 27, 0.36);
+  border: 1px solid rgba(240, 195, 106, 0.34);
+}
+
+.queue-status {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 12px;
+  line-height: 1.5;
+  border: 1px solid rgba(117, 155, 197, 0.22);
+}
+
+.queue-status-active {
+  color: #d4e8ff;
+  background: var(--blue-soft);
+  border-color: rgba(86, 166, 255, 0.3);
+}
+
+.queue-status-cancelled {
+  color: #ffd0d0;
+  background: var(--danger-soft);
+  border-color: rgba(255, 138, 138, 0.3);
+}
+
+.queue-status-ready {
+  color: #d8fbf3;
+  background: var(--teal-soft);
+  border-color: rgba(99, 213, 208, 0.3);
 }
 
 .leaderboard-table tbody td {
@@ -2496,84 +2672,6 @@ td {
   box-shadow: 0 0 0 1px rgba(110, 231, 183, 0.12), 0 10px 24px rgba(15, 118, 110, 0.24);
 }
 
-ol {
-  padding-left: 22px;
-}
-
-#queueList {
-  margin: 0;
-}
-
-#queueList li {
-  margin-bottom: 10px;
-}
-
-#queueList li.queue-cutoff {
-  margin-bottom: 18px;
-  padding-bottom: 18px;
-  border-bottom: 2px solid rgba(240, 195, 106, 0.32);
-}
-
-.queue-item {
-  display: flex;
-  justify-content: space-between;
-  gap: 12px;
-  align-items: center;
-  flex-wrap: wrap;
-}
-
-.queue-main {
-  display: flex;
-  gap: 10px;
-  align-items: center;
-  flex-wrap: wrap;
-}
-
-.queue-slot {
-  display: inline-block;
-  padding: 2px 8px;
-  border-radius: 999px;
-  font-size: 12px;
-  line-height: 1.5;
-  color: #fff1c8;
-  background: rgba(104, 73, 27, 0.36);
-  border: 1px solid rgba(240, 195, 106, 0.34);
-}
-
-.queue-actions {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  flex-wrap: wrap;
-}
-
-.queue-status {
-  display: inline-block;
-  padding: 2px 8px;
-  border-radius: 999px;
-  font-size: 12px;
-  line-height: 1.5;
-  border: 1px solid rgba(117, 155, 197, 0.22);
-}
-
-.queue-status-active {
-  color: #d4e8ff;
-  background: var(--blue-soft);
-  border-color: rgba(86, 166, 255, 0.3);
-}
-
-.queue-status-cancelled {
-  color: #ffd0d0;
-  background: var(--danger-soft);
-  border-color: rgba(255, 138, 138, 0.3);
-}
-
-.queue-status-ready {
-  color: #d8fbf3;
-  background: var(--teal-soft);
-  border-color: rgba(99, 213, 208, 0.3);
-}
-
 .hero-picker-modal {
   position: fixed;
   inset: 0;
@@ -2771,11 +2869,15 @@ ol {
   }
 
   .leaderboard-scroll-shell {
-    max-height: 460px;
+    overflow-x: auto;
   }
 
   .leaderboard-card-compact .leaderboard-scroll-shell {
     max-height: 220px;
+  }
+
+  #queueList {
+    grid-template-columns: 1fr;
   }
 
   input,

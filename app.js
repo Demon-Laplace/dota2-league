@@ -15,6 +15,7 @@ const REMEMBERED_SCORER_PLAYER_KEY = "nd_dota_remembered_scorer_player_v1";
 const SKIP_NEXT_SCORER_RECONNECT_KEY = "nd_dota_skip_next_scorer_reconnect_v1";
 const DEVICE_ID_STORAGE_KEY = "nd_dota_device_id_v1";
 const ADMIN_ACTION_LOGS_STORAGE_PREFIX = "nd_dota_admin_action_logs_";
+const LEADERBOARD_COMPACT_STORAGE_KEY = "nd_dota_leaderboard_compact_v1";
 
 const db = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
@@ -789,6 +790,22 @@ function clearStoredMatchDayStartTime() {
   window.localStorage.removeItem(getMatchDayStartTimeKey());
 }
 
+function readStoredLeaderboardCompactState() {
+  try {
+    return window.localStorage.getItem(LEADERBOARD_COMPACT_STORAGE_KEY) === "1";
+  } catch {
+    return false;
+  }
+}
+
+function writeStoredLeaderboardCompactState(isCompact) {
+  try {
+    window.localStorage.setItem(LEADERBOARD_COMPACT_STORAGE_KEY, isCompact ? "1" : "0");
+  } catch {
+    // Ignore localStorage failures and keep in-memory state.
+  }
+}
+
 function setMessage(text, isError = false) {
   messageEl.textContent = text;
   messageEl.className = isError ? "message error" : "message";
@@ -905,15 +922,16 @@ function setAdminPanelOpen(isOpen) {
 function setLeaderboardCompactMode(isCompact) {
   isLeaderboardCompact = Boolean(isCompact);
   leaderboardCard?.classList.toggle("leaderboard-card-compact", isLeaderboardCompact);
+  writeStoredLeaderboardCompactState(isLeaderboardCompact);
   if (leaderboardCompactBtn) {
-    leaderboardCompactBtn.textContent = isLeaderboardCompact ? "展开榜" : "短榜";
     leaderboardCompactBtn.setAttribute("aria-pressed", String(isLeaderboardCompact));
-    leaderboardCompactBtn.title = isLeaderboardCompact ? "切回展开榜" : "切换为短榜";
+    leaderboardCompactBtn.setAttribute("aria-label", isLeaderboardCompact ? "展开积分榜" : "收起积分榜");
+    leaderboardCompactBtn.title = isLeaderboardCompact ? "展开积分榜" : "收起积分榜";
   }
   if (leaderboardViewHint) {
     leaderboardViewHint.textContent = isLeaderboardCompact
       ? "短榜已启用，可用滚轮上下查看完整榜单。"
-      : "展开榜显示更多条目，切换短榜后可用滚轮上下查看。";
+      : "展开榜显示完整积分榜，收起后可用滚轮上下查看。";
   }
 }
 
@@ -2756,38 +2774,50 @@ function renderQueue(data) {
         : "";
     const readyEntry = getQueueReadyEntryByPlayerId(row.player_id);
     const hasArrived = Boolean(readyEntry);
-    const actionHtml = isCancelled
-      ? `<button class="button-secondary queue-resignup-btn" data-entry-id="${row.id}" data-player-name="${escapeHtml(playerName)}">重新报名</button>`
-      : hasArrived
-        ? (canScore
-            ? `<button class="button-danger queue-unready-btn" data-roster-entry-id="${readyEntry.id}" data-player-name="${escapeHtml(playerName)}">取消就位</button>`
-            : "")
-        : `<button class="button-secondary queue-ready-btn" data-entry-id="${row.id}" data-player-id="${row.player_id}" data-player-name="${escapeHtml(playerName)}">就位</button>`;
     let laneLabel = "";
+    let isStandby = false;
 
     if (!isCancelled) {
       activeCount += 1;
-      laneLabel = activeCount <= 10
-        ? `正式队列 #${activeCount}`
-        : `替补区 #${activeCount - 10}`;
+      isStandby = activeCount > 10;
+      laneLabel = isStandby ? `替补 #${activeCount - 10}` : `正式 #${activeCount}`;
     }
 
+    const actionHtml = isCancelled
+      ? `<button class="button-secondary queue-resignup-btn" data-entry-id="${row.id}" data-player-name="${escapeHtml(playerName)}">恢复报名</button>`
+      : hasArrived
+        ? (canScore
+            ? `<button class="button-danger queue-unready-btn" data-roster-entry-id="${readyEntry.id}" data-player-name="${escapeHtml(playerName)}">取消到场</button>`
+            : "")
+        : `<button class="button-secondary queue-ready-btn" data-entry-id="${row.id}" data-player-id="${row.player_id}" data-player-name="${escapeHtml(playerName)}">标记到场</button>`;
+    const tagsHtml = [
+      laneLabel ? `<span class="queue-slot">${escapeHtml(laneLabel)}</span>` : "",
+      `<span class="${statusClass}">${statusLabel}</span>`,
+      !isCancelled && hasArrived ? '<span class="queue-status queue-status-ready">已开机入场</span>' : "",
+    ].filter(Boolean).join("");
+
     li.className = "queue-item";
+    li.classList.add(
+      isCancelled
+        ? "queue-item-cancelled"
+        : (hasArrived ? "queue-item-ready" : "queue-item-active")
+    );
+    if (isStandby) {
+      li.classList.add("queue-item-standby");
+    }
     if (!isCancelled && activeCount === 10) {
       li.classList.add("queue-cutoff");
     }
 
     li.innerHTML = `
-      <div class="queue-main">
-        ${laneLabel ? `<span class="queue-slot">${laneLabel}</span>` : ""}
+      <div class="queue-card-head">
         <strong>${escapeHtml(playerName)}</strong>
-        <span class="${statusClass}">${statusLabel}</span>
-        ${!isCancelled && hasArrived ? '<span class="queue-status queue-status-ready">已开机入场</span>' : ""}
       </div>
-      <div class="queue-actions">
-        <span class="muted">${escapeHtml(metaText)}</span>
-        ${actionHtml}
+      <div class="queue-card-tags">
+        ${tagsHtml}
       </div>
+      <p class="muted queue-card-time">${escapeHtml(metaText || "记录时间未知")}</p>
+      ${actionHtml ? `<div class="queue-card-actions">${actionHtml}</div>` : ""}
     `;
     queueList.appendChild(li);
   });
@@ -5718,7 +5748,7 @@ async function init() {
     setBackfillFormOpen(false);
     setSeasonPanelOpen(false);
     setRewardPanelOpen(false);
-    setLeaderboardCompactMode(false);
+    setLeaderboardCompactMode(readStoredLeaderboardCompactState());
     renderHeroOptions();
     matchStartTimeInput.value = formatTime24(readStoredMatchDayStartTime()?.startTime || "");
     backfillDateInput.value = getBeijingBusinessDateString();

@@ -151,10 +151,12 @@
         </section>
 
         <section class="card">
-          <h2>当前报名队列</h2>
-          <div class="row">
-            <button id="confirmQueueBtn" class="button-secondary" disabled>全部到齐</button>
-            <button id="clearQueueBtn" class="button-danger" hidden>测试清空报名队列</button>
+          <div class="section-head">
+            <h2>当前报名队列</h2>
+            <div class="row">
+              <button id="confirmQueueBtn" class="button-secondary" disabled>全部到齐</button>
+              <button id="clearQueueBtn" class="button-danger" hidden>测试清空报名队列</button>
+            </div>
           </div>
           <ol id="queueList"></ol>
           <p id="queueEmpty" class="muted">当前无人报名</p>
@@ -182,9 +184,18 @@
           <div class="section-head leaderboard-head">
             <div class="leaderboard-title-block">
               <h2>积分榜</h2>
-              <p id="leaderboardViewHint" class="muted leaderboard-view-hint">展开榜显示更多条目，切换短榜后可用滚轮上下查看。</p>
+              <p id="leaderboardViewHint" class="muted leaderboard-view-hint">展开榜显示完整积分榜，收起后可用滚轮上下查看。</p>
             </div>
-            <button id="leaderboardCompactBtn" class="season-chip leaderboard-compact-btn" type="button" aria-pressed="false">短榜</button>
+            <button
+              id="leaderboardCompactBtn"
+              class="season-chip leaderboard-compact-btn"
+              type="button"
+              aria-pressed="false"
+              aria-label="收起积分榜"
+              title="收起积分榜"
+            >
+              <span class="leaderboard-compact-icon" aria-hidden="true">↕</span>
+            </button>
           </div>
           <div class="leaderboard-scroll-shell">
             <table class="leaderboard-table">
