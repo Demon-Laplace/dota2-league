@@ -1423,11 +1423,11 @@ function buildScoreDetailEntries(player, seasonData) {
             entries.push({
               id: `rest-${matchDate}-${absentPlayer.player_id}`,
               delta,
-              title: "休战结算",
-              subtitle: delta > 0 ? "当日未参赛 · 末位补分" : "当日未参赛 · 榜首扣分",
-              meta: `${matchDate} · 当日未参赛`,
+              title: "比赛日未参赛结算",
+              subtitle: delta > 0 ? "比赛日未参赛 · 末位补分" : "比赛日未参赛 · 榜首扣分",
+              meta: `${matchDate} · 比赛日未参赛`,
               badges: [
-                { label: "休战", tone: "rest" },
+                { label: "比赛日未参赛", tone: "rest" },
                 { label: delta > 0 ? "末位 +1" : "榜首 -1", tone: delta > 0 ? "restplus" : "restminus" },
               ],
             });
@@ -6065,7 +6065,7 @@ async function finishTodayMatchDay() {
   const todayMatchCount = getTodayRecordedMatchCount(activeSeason.id);
   const confirmed = window.confirm(
     todayMatchCount > 0
-      ? "确认设置今日休战吗？这会立刻结算“未参赛最高 -1 / 最低 +1”，并清空今日报名队列与当日名单。若之后今天又新增或补录比赛，系统仍会自动重新回算。"
+      ? "确认结束今日比赛日吗？这会立刻按“比赛日未参赛”规则结算“未参赛最高 -1 / 最低 +1”，并清空今日报名队列与当日名单。若之后今天又新增或补录比赛，系统仍会自动重新回算。"
       : "确认设置今日休战吗？今天还没有已记录比赛，本次不会触发未参赛加减分，只会结束今日状态并清空今日报名队列与当日名单。"
   );
   if (!confirmed) {
@@ -6076,8 +6076,8 @@ async function finishTodayMatchDay() {
     finishTodayMatchDayBtn.disabled = true;
   }
 
-  setMessage(todayMatchCount > 0 ? "正在设置今日休战并结算..." : "正在设置今日休战...");
-  setMatchMessage(todayMatchCount > 0 ? "正在设置今日休战并结算..." : "正在设置今日休战...");
+  setMessage(todayMatchCount > 0 ? "正在结束今日比赛日并结算..." : "正在设置今日休战...");
+  setMatchMessage(todayMatchCount > 0 ? "正在结束今日比赛日并结算..." : "正在设置今日休战...");
   setBackfillMessage("");
 
   let data = null;
@@ -6119,9 +6119,9 @@ async function finishTodayMatchDay() {
   clearStoredMatchDayStartTime();
   matchStartTimeInput.value = "";
   if (todayMatchCount > 0) {
-    setMessage("今日已休战，未参赛加减分已完成结算。");
-    setMatchMessage("今日已休战，未参赛加减分已完成结算。");
-    appendAdminActionLog("手动设置了今日休战并结算未参赛加减分。");
+    setMessage("今日比赛日已结束，比赛日未参赛加减分已完成结算。");
+    setMatchMessage("今日比赛日已结束，比赛日未参赛加减分已完成结算。");
+    appendAdminActionLog("手动结束了今日比赛日并结算比赛日未参赛加减分。");
   } else {
     setMessage("今日已休战。今日没有比赛，未触发积分结算。");
     setMatchMessage("今日已休战。今日没有比赛，未触发积分结算。");
