@@ -2065,7 +2065,14 @@ function getOrCreateRecentMatchDayGroup(matchDayId, matchDate, seasonId, options
 
 function syncRecentMatchDayGroupParticipants(group) {
   if (!group) return;
-  group.matches.sort((a, b) => new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime());
+  group.matches.sort((a, b) => {
+    const aTime = new Date(a.created_at || 0).getTime();
+    const bTime = new Date(b.created_at || 0).getTime();
+    if (aTime !== bTime) {
+      return aTime - bTime;
+    }
+    return String(a.match_id || "").localeCompare(String(b.match_id || ""), "zh-CN");
+  });
   group.attendance_notes.sort((a, b) => new Date(a.created_at || 0).getTime() - new Date(b.created_at || 0).getTime());
   group.participants = getMatchDayParticipantEntries(group.matches);
 }
@@ -2175,7 +2182,7 @@ function upsertRecentMatchLocally(match) {
   if (groupMatchIndex >= 0) {
     group.matches[groupMatchIndex] = match;
   } else {
-    group.matches.unshift(match);
+    group.matches.push(match);
   }
   syncRecentMatchDayGroupParticipants(group);
   sortRecentMatchDayGroupsLocally();
@@ -4147,7 +4154,10 @@ function buildRecentMatchDayGroups(matches, matchDays = [], attendanceNotes = []
       group.matches.sort((a, b) => {
         const aTime = new Date(a.created_at || 0).getTime();
         const bTime = new Date(b.created_at || 0).getTime();
-        return bTime - aTime;
+        if (aTime !== bTime) {
+          return aTime - bTime;
+        }
+        return String(a.match_id || "").localeCompare(String(b.match_id || ""), "zh-CN");
       });
       group.attendance_notes.sort((a, b) => {
         const aTime = new Date(a.created_at || 0).getTime();
