@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Dota2 宁德联赛</title>
-  <link rel="stylesheet" href="style.css?v=20260403-18" />
+  <link rel="stylesheet" href="style.css?v=20260403-19" />
 </head>
   <body>
   <div id="loadingScreen" class="loading-screen" aria-live="polite">
@@ -254,11 +254,13 @@
         </section>
 
         <section id="recordEntrySection" class="card">
-          <div class="section-head">
-            <h2 id="recordEntryTitle">记录比赛</h2>
+          <div class="section-head record-entry-head">
+            <div class="record-entry-title-block">
+              <h2 id="recordEntryTitle">记录比赛</h2>
+              <button id="finishTodayMatchDayBtn" class="button-secondary record-entry-finish-btn">今日比赛结束</button>
+            </div>
             <div class="row">
               <button id="openMatchFormBtn">添加当日比赛</button>
-              <button id="finishTodayMatchDayBtn" class="button-secondary">今日比赛结束</button>
               <button id="openBackfillFormBtn" class="button-secondary">比赛补录</button>
             </div>
           </div>
