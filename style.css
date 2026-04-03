@@ -1780,52 +1780,18 @@ button:disabled {
   font-size: 11px;
   line-height: 1.4;
   white-space: nowrap;
-  cursor: pointer;
   box-shadow: none;
-}
-
-.match-day-player-count:hover {
-  filter: brightness(1.05);
-  transform: none;
 }
 
 .match-day-player-list {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 0;
   flex: 1 1 280px;
   min-width: 0;
   max-width: 100%;
   overflow: hidden;
   white-space: nowrap;
-}
-
-.match-day-player-group {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  min-width: 0;
-}
-
-.match-day-player-group-label {
-  display: inline-flex;
-  align-items: center;
-  padding: 1px 6px;
-  border-radius: 999px;
-  flex: none;
-  font-size: 10px;
-  line-height: 1.35;
-  letter-spacing: 0.04em;
-  color: rgba(187, 209, 235, 0.84);
-  background: rgba(34, 58, 88, 0.42);
-  box-shadow: inset 0 0 0 1px rgba(112, 151, 198, 0.16);
-}
-
-.match-day-player-group-list {
-  display: inline-flex;
-  align-items: center;
-  min-width: 0;
-  overflow: hidden;
 }
 
 .match-day-player-name {
@@ -1836,10 +1802,11 @@ button:disabled {
   font-size: 12px;
   line-height: 1.2;
   letter-spacing: 0.01em;
+  white-space: nowrap;
 }
 
-.match-day-player-group-list .match-day-player-name:not(:last-child)::after {
-  content: "、";
+.match-day-player-name:not(:last-child)::after {
+  content: " · ";
   color: rgba(173, 197, 226, 0.42);
 }
 
@@ -1859,31 +1826,30 @@ button:disabled {
 }
 
 .match-day-attendance-panel {
-  display: none;
-  gap: 10px;
-  padding: 12px;
-  border: 1px solid rgba(124, 165, 209, 0.16);
-  border-radius: 12px;
-  background: rgba(11, 27, 45, 0.58);
-}
-
-.match-day-attendance-panel-open {
   display: grid;
+  gap: 10px;
+  padding: 10px 12px;
+  border: 1px solid rgba(124, 165, 209, 0.14);
+  border-radius: 12px;
+  background: linear-gradient(180deg, rgba(12, 28, 45, 0.72), rgba(9, 22, 37, 0.6));
+  box-shadow: inset 0 1px 0 rgba(219, 231, 245, 0.03);
 }
 
 .match-day-attendance-panel-head h3 {
   margin: 0;
-  font-size: 14px;
+  font-size: 13px;
+  letter-spacing: 0.04em;
 }
 
 .match-day-attendance-panel-head p {
-  margin: 4px 0 0;
+  margin: 2px 0 0;
+  font-size: 12px;
 }
 
 .match-day-attendance-form {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
-  gap: 10px;
+  gap: 8px;
   align-items: center;
 }
 
@@ -1896,7 +1862,7 @@ button:disabled {
 
 .match-day-attendance-list {
   display: grid;
-  gap: 8px;
+  gap: 6px;
 }
 
 .match-day-attendance-note {
@@ -1905,7 +1871,7 @@ button:disabled {
   justify-content: space-between;
   gap: 10px;
   flex-wrap: wrap;
-  padding: 10px 12px;
+  padding: 8px 10px;
   border-radius: 10px;
   border: 1px solid rgba(124, 165, 209, 0.12);
   background: rgba(13, 31, 53, 0.58);

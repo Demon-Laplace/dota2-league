@@ -157,7 +157,6 @@ let recentMatchesData = [];
 let recentMatchDayGroupsData = [];
 let roleMembersSupportAutoReconnect = true;
 let openRecentMatchGroups = new Set();
-let openRecentMatchAttendancePanels = new Set();
 let isMatchFormOpen = false;
 let isBackfillFormOpen = false;
 let isSeasonPanelOpen = false;
@@ -1728,35 +1727,25 @@ function getMatchDayParticipantEntries(matches) {
 }
 
 function buildMatchDayPlayerSummaryHtml(participants, attendanceNotes) {
-  const buildGroupHtml = (entries, itemClassName, label) => {
-    if (!entries.length) return "";
-    return `
-      <span class="match-day-player-group">
-        <span class="match-day-player-group-label">${escapeHtml(label)}</span>
-        <span class="match-day-player-group-list">
-          ${entries.map((entry) => `<span class="match-day-player-name ${itemClassName}">${escapeHtml(entry.display_name || "未知选手")}</span>`).join("")}
-        </span>
-      </span>
-    `;
-  };
+  const summaryEntries = [
+    ...(participants || []).map((entry) => ({ ...entry, className: "match-day-player-name-participant" })),
+    ...(attendanceNotes || [])
+      .filter((entry) => entry.status === "standby")
+      .map((entry) => ({ ...entry, className: "match-day-player-name-standby" })),
+    ...(attendanceNotes || [])
+      .filter((entry) => entry.status === "absent")
+      .map((entry) => ({ ...entry, className: "match-day-player-name-absent" })),
+  ];
 
-  const participantHtml = buildGroupHtml(participants || [], "match-day-player-name-participant", "参赛");
-  const standbyHtml = buildGroupHtml(
-    (attendanceNotes || []).filter((entry) => entry.status === "standby"),
-    "match-day-player-name-standby",
-    "替补"
-  );
-  const absentHtml = buildGroupHtml(
-    (attendanceNotes || []).filter((entry) => entry.status === "absent"),
-    "match-day-player-name-absent",
-    "未到场"
-  );
-
-  const html = [participantHtml, standbyHtml, absentHtml].filter(Boolean).join("");
+  const html = summaryEntries
+    .map((entry) => `<span class="match-day-player-name ${entry.className}">${escapeHtml(entry.display_name || "未知选手")}</span>`)
+    .join("");
   return html ? `<div class="match-day-player-list">${html}</div>` : "";
 }
 
 function buildMatchDayAttendancePanelHtml(group, canScore) {
+  if (!canScore) return "";
+
   const participantEntries = group.participants || [];
   const attendanceNotes = group.attendance_notes || [];
   const availablePlayers = seasonPlayers.filter((player) => (
@@ -1778,16 +1767,14 @@ function buildMatchDayAttendancePanelHtml(group, canScore) {
         ${canScore ? `<button class="button-secondary match-day-attendance-remove-btn" type="button" data-note-id="${entry.id}" data-player-name="${escapeHtml(entry.display_name || "该选手")}">移除</button>` : ""}
       </div>
     `).join("")
-    : '<p class="muted match-day-attendance-empty">暂无补记名单</p>';
-
-  const isExpanded = openRecentMatchAttendancePanels.has(group.group_key);
+    : '<p class="muted match-day-attendance-empty">暂无补记</p>';
 
   return `
-    <div class="match-day-attendance-panel${isExpanded ? " match-day-attendance-panel-open" : ""}" data-match-day-key="${group.group_key}">
+    <div class="match-day-attendance-panel" data-match-day-key="${group.group_key}">
       <div class="match-day-attendance-panel-head">
         <div>
-          <h3>每日补记名单</h3>
-          <p class="muted">这里补充报名但替补、报名未到场等未参赛选手，后续可用于处罚或补充统计。</p>
+          <h3>补记名单</h3>
+          <p class="muted">补记替补或未到场。</p>
         </div>
       </div>
       ${canScore ? `
@@ -1796,8 +1783,8 @@ function buildMatchDayAttendancePanelHtml(group, canScore) {
             ${optionsHtml}
           </select>
           <div class="match-day-attendance-form-actions">
-            <button class="button-secondary match-day-attendance-add-btn" type="button" data-status="standby" data-match-day-id="${group.match_day_id || ""}" data-match-date="${group.match_date || ""}" data-season-id="${group.season_id || ""}" ${group.match_day_id ? "" : "disabled"}>记为替补</button>
-            <button class="button-danger match-day-attendance-add-btn" type="button" data-status="absent" data-match-day-id="${group.match_day_id || ""}" data-match-date="${group.match_date || ""}" data-season-id="${group.season_id || ""}" ${group.match_day_id ? "" : "disabled"}>记为未到场</button>
+            <button class="button-secondary match-day-attendance-add-btn" type="button" data-status="standby" data-match-day-id="${group.match_day_id || ""}" data-match-date="${group.match_date || ""}" data-season-id="${group.season_id || ""}" ${group.match_day_id ? "" : "disabled"}>补记替补</button>
+            <button class="button-danger match-day-attendance-add-btn" type="button" data-status="absent" data-match-day-id="${group.match_day_id || ""}" data-match-date="${group.match_date || ""}" data-season-id="${group.season_id || ""}" ${group.match_day_id ? "" : "disabled"}>补记未到场</button>
           </div>
         </div>
       ` : ""}
@@ -3856,7 +3843,6 @@ function renderRecentMatches(groups) {
     const playerSummaryHtml = buildMatchDayPlayerSummaryHtml(participantEntries, group.attendance_notes || []);
     details.dataset.matchDate = group.match_date;
     details.dataset.groupKey = group.group_key;
-    details.dataset.attendanceExpanded = openRecentMatchAttendancePanels.has(group.group_key) ? "true" : "false";
     details.className = `match-day-group${isActiveDay ? " match-day-group-active-day" : " match-day-group-archive-day"}`;
     details.open = isActiveDay || openRecentMatchGroups.has(group.group_key);
     details.dataset.expanded = details.open ? "true" : "false";
@@ -3874,7 +3860,7 @@ function renderRecentMatches(groups) {
         <div class="match-day-summary">
           <strong>${escapeHtml(group.match_date || "历史比赛")}</strong>
           <span class="queue-slot">${matches.length} 场</span>
-          <button class="match-day-player-count" type="button" data-role="toggle-attendance-panel" data-match-day-key="${group.group_key}" aria-expanded="${openRecentMatchAttendancePanels.has(group.group_key) ? "true" : "false"}" title="展开当日补记名单">${matchDayPlayerCount} 人</button>
+          <span class="match-day-player-count">${matchDayPlayerCount} 人</span>
           ${playerSummaryHtml}
         </div>
         <span class="match-day-toggle">
@@ -6182,23 +6168,6 @@ signupPlayerGrid.addEventListener("click", async (event) => {
 });
 
 recentMatchesList.addEventListener("click", async (event) => {
-  const attendanceToggleButton = event.target.closest('[data-role="toggle-attendance-panel"]');
-  if (attendanceToggleButton) {
-    event.preventDefault();
-    event.stopPropagation();
-    const groupKey = attendanceToggleButton.dataset.matchDayKey;
-    if (groupKey) {
-      if (openRecentMatchAttendancePanels.has(groupKey)) {
-        openRecentMatchAttendancePanels.delete(groupKey);
-      } else {
-        openRecentMatchAttendancePanels.add(groupKey);
-        openRecentMatchGroups.add(groupKey);
-      }
-      renderRecentMatches(recentMatchDayGroupsData);
-    }
-    return;
-  }
-
   const attendanceAddButton = event.target.closest(".match-day-attendance-add-btn");
   if (attendanceAddButton) {
     const panel = attendanceAddButton.closest(".match-day-attendance-panel");
