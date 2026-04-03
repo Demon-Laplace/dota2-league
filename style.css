@@ -3192,13 +3192,13 @@ ol {
 
 .leaderboard-player-tags {
   display: grid;
-  grid-template-columns: repeat(var(--tag-columns, 3), minmax(0, 1fr));
+  grid-template-columns: repeat(5, minmax(0, 1fr));
   grid-auto-rows: minmax(24px, auto);
   align-content: center;
   justify-items: stretch;
   gap: 5px;
   width: 100%;
-  min-width: var(--tag-min-width, 220px);
+  min-width: 0;
   min-height: 54px;
   transition:
     width 0.28s cubic-bezier(0.22, 1, 0.36, 1),
@@ -3261,7 +3261,7 @@ ol {
 }
 
 .leaderboard-card-compact .leaderboard-player-tags {
-  min-width: calc(var(--tag-min-width, 220px) - 18px);
+  min-width: 0;
   min-height: 48px;
   gap: 3px;
 }

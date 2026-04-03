@@ -2911,19 +2911,6 @@ function getLeaderboardNameRankClass(rank) {
   return "";
 }
 
-function getLeaderboardTagLayout(tagCount) {
-  if (tagCount <= 1) {
-    return { columns: 1, minWidth: 128 };
-  }
-  if (tagCount <= 2) {
-    return { columns: 2, minWidth: 168 };
-  }
-  if (tagCount <= 4) {
-    return { columns: 2, minWidth: 188 };
-  }
-  return { columns: 3, minWidth: 246 };
-}
-
 function getLeaderboardRankByPlayerId(playerId, players = leaderboardPlayers) {
   if (!playerId || !players?.length) return 0;
   const index = players.findIndex((player) => (player.player_id || player.id) === playerId);
@@ -5257,13 +5244,8 @@ function renderLeaderboard(data) {
       tags.push({ icon: "★", label: "MVP", tone: "royal" });
     }
 
-    const tagLayout = getLeaderboardTagLayout(tags.length);
-
     const tagsHtml = `
-      <div
-        class="leaderboard-player-tags${tags.length ? "" : " leaderboard-player-tags-empty"}"
-        style="--tag-columns: ${tagLayout.columns}; --tag-min-width: ${tagLayout.minWidth}px;"
-      >
+      <div class="leaderboard-player-tags${tags.length ? "" : " leaderboard-player-tags-empty"}">
         ${tags.map((tag) => `
         <span class="leaderboard-tag leaderboard-tag-${tag.tone}" title="${escapeHtml(tag.description || tag.label)}" aria-label="${escapeHtml(tag.description || tag.label)}">
           <span class="leaderboard-tag-icon">${escapeHtml(tag.icon)}</span>
