@@ -196,6 +196,7 @@ let recentMatchesData = [];
 let recentMatchDayGroupsData = [];
 let roleMembersSupportAutoReconnect = true;
 let openRecentMatchGroups = new Set();
+let openRecentMatchSeasons = new Set();
 let isMatchFormOpen = false;
 let isBackfillFormOpen = false;
 let isSeasonPanelOpen = false;
@@ -5734,6 +5735,73 @@ function getMatchDayPlayerNames(matches) {
   return names;
 }
 
+function getSeasonMetaById(seasonId) {
+  if (!seasonId) return null;
+  if (activeSeason?.id === seasonId) return activeSeason;
+  return (allSeasons || []).find((season) => season.id === seasonId) || null;
+}
+
+function getSeasonDisplayName(seasonId) {
+  const season = getSeasonMetaById(seasonId);
+  return season?.name || "未命名赛季";
+}
+
+function getDateMonthKey(dateString) {
+  return String(dateString || "").slice(0, 7);
+}
+
+function shouldOpenSeasonGroupByDefault(seasonMeta, groups) {
+  if (!seasonMeta) return true;
+  if (openRecentMatchSeasons.has(seasonMeta.id)) return true;
+
+  const todayMonth = getDateMonthKey(getBeijingBusinessDateString());
+  const startMonth = getDateMonthKey(seasonMeta.start_date);
+  const isEnded = Boolean(seasonMeta.end_date) || seasonMeta.is_active === false;
+  const hasActiveDay = (groups || []).some((group) => group.day_is_active);
+
+  if (hasActiveDay || seasonMeta.is_active) return true;
+  if (isEnded) return false;
+  return Boolean(startMonth && startMonth === todayMonth);
+}
+
+function buildRecentMatchSeasonGroups(groups) {
+  const seasonMap = new Map();
+
+  (groups || []).forEach((group) => {
+    const seasonId = group.season_id || "season-unknown";
+    if (!seasonMap.has(seasonId)) {
+      const seasonMeta = getSeasonMetaById(group.season_id);
+      seasonMap.set(seasonId, {
+        season_id: group.season_id || null,
+        season_name: seasonMeta?.name || "未命名赛季",
+        season_meta: seasonMeta,
+        groups: [],
+      });
+    }
+    seasonMap.get(seasonId).groups.push(group);
+  });
+
+  return [...seasonMap.values()]
+    .map((entry) => {
+      entry.groups.sort((a, b) => {
+        if (a.match_date !== b.match_date) {
+          return String(b.match_date).localeCompare(String(a.match_date), "zh-CN");
+        }
+        const aStarted = new Date(a.started_at || 0).getTime();
+        const bStarted = new Date(b.started_at || 0).getTime();
+        return bStarted - aStarted;
+      });
+      return entry;
+    })
+    .sort((a, b) => {
+      const aSeason = a.season_meta;
+      const bSeason = b.season_meta;
+      const aStart = String(aSeason?.start_date || a.groups[0]?.match_date || "");
+      const bStart = String(bSeason?.start_date || b.groups[0]?.match_date || "");
+      return bStart.localeCompare(aStart, "zh-CN");
+    });
+}
+
 function buildRecentMatchDayGroups(matches, matchDays = [], attendanceNotes = []) {
   const groupMap = new Map();
 
@@ -5860,8 +5928,46 @@ function renderRecentMatches(groups) {
   recentMatchesEmpty.style.display = "none";
   renderTodayPlayers();
 
-  recentMatchDayGroupsData.forEach((group) => {
-    const details = document.createElement("details");
+  const seasonGroups = buildRecentMatchSeasonGroups(recentMatchDayGroupsData);
+
+  seasonGroups.forEach((seasonEntry) => {
+    const seasonDetails = document.createElement("details");
+    const seasonMeta = seasonEntry.season_meta;
+    const dayGroups = seasonEntry.groups || [];
+    const totalMatches = dayGroups.reduce((sum, group) => sum + (group.matches?.length || 0), 0);
+    const isSeasonOpen = shouldOpenSeasonGroupByDefault(seasonMeta, dayGroups);
+    seasonDetails.className = "recent-match-season-group";
+    seasonDetails.dataset.seasonId = seasonEntry.season_id || "";
+    seasonDetails.open = isSeasonOpen;
+    seasonDetails.dataset.expanded = isSeasonOpen ? "true" : "false";
+    seasonDetails.addEventListener("toggle", () => {
+      if (seasonEntry.season_id) {
+        if (seasonDetails.open) {
+          openRecentMatchSeasons.add(seasonEntry.season_id);
+        } else {
+          openRecentMatchSeasons.delete(seasonEntry.season_id);
+        }
+      }
+      seasonDetails.dataset.expanded = seasonDetails.open ? "true" : "false";
+    });
+
+    seasonDetails.innerHTML = `
+      <summary class="recent-match-season-summary">
+        <div class="recent-match-season-title-block">
+          <strong>${escapeHtml(seasonEntry.season_name || getSeasonDisplayName(seasonEntry.season_id))}</strong>
+          <span class="muted">${dayGroups.length} 个比赛日 · ${totalMatches} 场比赛</span>
+        </div>
+        <span class="match-day-toggle">
+          <span class="match-day-toggle-icon" aria-hidden="true"></span>
+        </span>
+      </summary>
+      <div class="recent-match-season-content"></div>
+    `;
+
+    const seasonContent = seasonDetails.querySelector(".recent-match-season-content");
+
+    dayGroups.forEach((group) => {
+      const details = document.createElement("details");
     const matches = group.matches || [];
     const isActiveDay = Boolean(group.day_is_active);
     const participantEntries = group.participants || [];
@@ -6021,7 +6127,10 @@ function renderRecentMatches(groups) {
       content.appendChild(card);
     });
 
-    recentMatchesList.appendChild(details);
+      seasonContent.appendChild(details);
+    });
+
+    recentMatchesList.appendChild(seasonDetails);
   });
 }
 
@@ -6401,7 +6510,7 @@ function exitAccessRole() {
 async function loadSeasons() {
   const { data, error } = await db
     .from("seasons")
-    .select("id, name, start_date, is_active, koi_player_id")
+    .select("id, name, start_date, end_date, is_active, koi_player_id")
     .gte("start_date", "2026-04-01")
     .order("start_date", { ascending: false });
 
