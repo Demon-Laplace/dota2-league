@@ -3297,6 +3297,7 @@ function renderLeaderboard(data) {
     const rank = idx + 1;
     const isBottomTwo = data.length >= 2 && rank >= data.length - 1;
     const playerId = player.player_id || player.id || "";
+    const gamesPlayed = Number(player.games_played ?? 0);
     const tags = [];
     const nameClassName = getPlayerNameStyleClass(playerId, {
       players: data,
@@ -3362,7 +3363,7 @@ function renderLeaderboard(data) {
         </div>
       </td>
       <td><span class="leaderboard-score">${formatScore(player.score)}</span></td>
-      <td><span class="leaderboard-stat">${player.games_played ?? 0}</span></td>
+      <td><span class="leaderboard-stat${gamesPlayed > 5 ? " leaderboard-stat-active" : ""}">${gamesPlayed}</span></td>
       <td>
         <div class="leaderboard-rate" style="--rate-percent: ${winRateNumber}%; --rate-glow: ${Math.max(14, winRateNumber)}%;">
           <span class="leaderboard-rate-bar" aria-hidden="true"></span>

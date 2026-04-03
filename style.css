@@ -2322,11 +2322,16 @@ button:disabled {
   position: relative;
   z-index: 1;
   margin-top: 12px;
+  max-height: 2200px;
   overflow-x: auto;
   overflow-y: visible;
   overscroll-behavior-x: contain;
   scrollbar-width: thin;
   scrollbar-color: rgba(126, 173, 224, 0.5) rgba(8, 22, 40, 0.34);
+  transition:
+    max-height 0.34s cubic-bezier(0.22, 1, 0.36, 1),
+    box-shadow 0.28s ease,
+    scrollbar-color 0.22s ease;
 }
 
 .leaderboard-scroll-shell::-webkit-scrollbar {
@@ -2345,9 +2350,10 @@ button:disabled {
 }
 
 .leaderboard-card-compact .leaderboard-scroll-shell {
-  max-height: 372px;
+  max-height: 452px;
   overflow: auto;
   overscroll-behavior: contain;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.03);
 }
 
 table {
@@ -2376,18 +2382,36 @@ td {
   position: sticky;
   top: 0;
   z-index: 2;
-  padding: 0 10px 8px;
-  color: var(--text-dim);
-  font-size: 12px;
+  padding: 11px 12px 10px;
+  color: rgba(226, 238, 250, 0.92);
+  font-size: 11px;
   font-weight: 600;
-  letter-spacing: 0.08em;
+  letter-spacing: 0.06em;
   text-transform: uppercase;
-  border-bottom: 0;
+  border-top: 1px solid rgba(127, 164, 206, 0.18);
+  border-bottom: 1px solid rgba(127, 164, 206, 0.14);
   background:
-    linear-gradient(180deg, rgba(8, 22, 40, 0.96), rgba(8, 22, 40, 0.86)),
-    linear-gradient(90deg, transparent, rgba(240, 195, 106, 0.22) 18%, rgba(126, 224, 216, 0.3) 50%, rgba(86, 166, 255, 0.22) 82%, transparent)
-    bottom / 100% 1px no-repeat;
-  backdrop-filter: blur(14px);
+    linear-gradient(180deg, rgba(18, 39, 63, 0.94), rgba(12, 28, 47, 0.92)),
+    radial-gradient(circle at 0% 50%, rgba(240, 195, 106, 0.12), transparent 40%),
+    radial-gradient(circle at 100% 50%, rgba(99, 213, 208, 0.12), transparent 42%);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.04),
+    inset 0 -1px 0 rgba(90, 133, 176, 0.08);
+  backdrop-filter: blur(18px);
+}
+
+.leaderboard-table thead th:first-child {
+  border-left: 1px solid rgba(127, 164, 206, 0.18);
+  border-radius: 14px 0 0 14px;
+}
+
+.leaderboard-table thead th:last-child {
+  border-right: 1px solid rgba(127, 164, 206, 0.18);
+  border-radius: 0 14px 14px 0;
+}
+
+.leaderboard-table thead th:not(:first-child) {
+  box-shadow: inset 1px 0 0 rgba(127, 164, 206, 0.08);
 }
 
 .leaderboard-card:not(.leaderboard-card-compact) .leaderboard-table thead th {
@@ -2563,6 +2587,10 @@ ol {
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.02),
     inset 0 -1px 0 rgba(126, 224, 216, 0.06);
+  transition:
+    padding 0.28s cubic-bezier(0.22, 1, 0.36, 1),
+    background-color 0.24s ease,
+    box-shadow 0.24s ease;
 }
 
 .leaderboard-table tbody tr td:first-child {
@@ -2603,10 +2631,14 @@ ol {
 
 .leaderboard-player-cell {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 132px;
+  grid-template-columns: minmax(0, 1fr) 186px;
   align-items: center;
   gap: 12px;
   min-height: 52px;
+  transition:
+    grid-template-columns 0.28s cubic-bezier(0.22, 1, 0.36, 1),
+    min-height 0.28s cubic-bezier(0.22, 1, 0.36, 1),
+    gap 0.24s ease;
 }
 
 .leaderboard-player-name {
@@ -2722,13 +2754,17 @@ ol {
 .leaderboard-player-tags {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  grid-auto-rows: minmax(18px, auto);
+  grid-auto-rows: minmax(22px, auto);
   align-content: center;
   justify-items: stretch;
   gap: 4px;
-  width: 132px;
-  min-width: 132px;
-  min-height: 40px;
+  width: 186px;
+  min-width: 186px;
+  min-height: 48px;
+  transition:
+    width 0.28s cubic-bezier(0.22, 1, 0.36, 1),
+    min-height 0.28s cubic-bezier(0.22, 1, 0.36, 1),
+    gap 0.24s ease;
 }
 
 .leaderboard-player-tags-empty {
@@ -2740,64 +2776,60 @@ ol {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 0;
+  gap: 4px;
   width: 100%;
   min-width: 0;
-  min-height: 18px;
-  padding: 1px 4px;
+  min-height: 22px;
+  padding: 2px 5px;
   border-radius: 8px;
   font-size: 9px;
-  line-height: 1.2;
+  line-height: 1.15;
   font-weight: 600;
   letter-spacing: 0.02em;
   border: 1px solid rgba(124, 165, 209, 0.2);
   background: rgba(16, 34, 57, 0.68);
   color: #dce9f8;
+  text-align: center;
+  transition:
+    min-height 0.24s ease,
+    padding 0.24s ease,
+    background-color 0.24s ease,
+    border-color 0.24s ease;
 }
 
 .leaderboard-tag-icon {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 100%;
-  height: 100%;
-  border-radius: 6px;
-  font-size: 10px;
-  line-height: 1;
-  background: rgba(255, 255, 255, 0.06);
-}
-
-.leaderboard-tag-label {
   display: none;
 }
 
+.leaderboard-tag-label {
+  display: block;
+  overflow-wrap: anywhere;
+}
+
 .leaderboard-card-compact .leaderboard-table tbody td {
-  padding: 10px 10px;
+  padding: 8px 10px;
 }
 
 .leaderboard-card-compact .leaderboard-player-cell {
-  grid-template-columns: minmax(0, 1fr) 108px;
+  grid-template-columns: minmax(0, 1fr) 162px;
   gap: 10px;
-  min-height: 46px;
+  min-height: 44px;
 }
 
 .leaderboard-card-compact .leaderboard-player-name {
-  font-size: 15px;
+  font-size: 14px;
 }
 
 .leaderboard-card-compact .leaderboard-player-tags {
-  width: 108px;
-  min-width: 108px;
-  min-height: 34px;
+  width: 162px;
+  min-width: 162px;
+  min-height: 42px;
   gap: 3px;
 }
 
 .leaderboard-card-compact .leaderboard-tag {
-  min-height: 15px;
-  padding: 1px 3px;
-}
-
-.leaderboard-card-compact .leaderboard-tag-icon {
+  min-height: 18px;
+  padding: 1px 4px;
   font-size: 8px;
 }
 
@@ -2909,6 +2941,15 @@ ol {
   border: 1px solid rgba(124, 165, 209, 0.18);
 }
 
+.leaderboard-stat-active {
+  color: #e5f2ff;
+  background: linear-gradient(135deg, rgba(74, 110, 153, 0.34), rgba(45, 72, 110, 0.3));
+  border-color: rgba(149, 192, 244, 0.22);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.05),
+    0 0 16px rgba(126, 173, 224, 0.06);
+}
+
 .leaderboard-reward {
   color: #fff1c8;
   background: rgba(104, 73, 27, 0.36);
@@ -2922,9 +2963,13 @@ ol {
   justify-content: flex-start;
   padding: 3px;
   color: #d8fbf3;
-  background: rgba(12, 36, 49, 0.56);
+  background: rgba(10, 31, 43, 0.62);
   border: 1px solid rgba(99, 213, 208, 0.24);
   overflow: hidden;
+  transition:
+    min-height 0.24s ease,
+    background-color 0.24s ease,
+    border-color 0.24s ease;
 }
 
 .leaderboard-rate-bar {
@@ -2932,8 +2977,8 @@ ol {
   inset: 3px;
   border-radius: 999px;
   background:
-    linear-gradient(90deg, rgba(22, 88, 104, 0.16), rgba(22, 88, 104, 0.06)),
-    rgba(8, 25, 36, 0.72);
+    linear-gradient(90deg, rgba(18, 62, 76, 0.18), rgba(18, 62, 76, 0.08)),
+    rgba(7, 20, 30, 0.78);
   overflow: hidden;
 }
 
@@ -2944,11 +2989,11 @@ ol {
   width: var(--rate-percent, 0%);
   border-radius: inherit;
   background:
-    linear-gradient(90deg, rgba(91, 214, 208, 0.88), rgba(139, 245, 232, 0.94)),
+    linear-gradient(90deg, rgba(58, 162, 160, 0.82), rgba(87, 187, 178, 0.78)),
     linear-gradient(180deg, rgba(255, 255, 255, 0.16), transparent);
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.18),
-    0 0 16px rgba(99, 213, 208, 0.16);
+    0 0 14px rgba(99, 213, 208, 0.1);
 }
 
 .leaderboard-rate-bar::after {
