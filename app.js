@@ -1011,6 +1011,96 @@ async function copyLeaderboardSummary() {
   }
 }
 
+function buildMatchDayBattleReportText(group) {
+  const matches = group?.matches || [];
+  const attendanceNotes = group?.attendance_notes || [];
+  const dateLabel = group?.match_date || "历史比赛";
+  const seasonName = activeSeason?.id && group?.season_id === activeSeason.id
+    ? activeSeason.name
+    : (allSeasons.find((season) => season.id === group?.season_id)?.name || "");
+  const header = seasonName
+    ? `【${seasonName} ${dateLabel}战斗简报】`
+    : `【${dateLabel}战斗简报】`;
+
+  const lines = [header];
+
+  if (!matches.length) {
+    lines.push("当日暂无已记录比赛。");
+  } else {
+    matches.forEach((match, index) => {
+      const players = parseRecentMatchPlayers(match.players);
+      const teamAPlayers = players
+        .filter((player) => player.team === "A")
+        .map((player) => stripPlayerNameMeta(player.display_name || "未知选手"));
+      const teamBPlayers = players
+        .filter((player) => player.team === "B")
+        .map((player) => stripPlayerNameMeta(player.display_name || "未知选手"));
+      const matchLabel = `第${index + 1}场`;
+      const timeLabel = formatShortLocalTime(match.created_at);
+      const titleLine = [matchLabel, timeLabel, getWinnerLabel(match.winner_team)]
+        .filter(Boolean)
+        .join("｜");
+      lines.push(titleLine);
+      lines.push(`天辉：${teamAPlayers.join("·") || "待补充"}`);
+      lines.push(`夜魇：${teamBPlayers.join("·") || "待补充"}`);
+
+      const noteLines = getMatchNoteLines(match);
+      if (noteLines.length) {
+        lines.push(`备注：${noteLines.join("；")}`);
+      }
+    });
+  }
+
+  const standbyNames = attendanceNotes
+    .filter((entry) => entry.status === "standby")
+    .map((entry) => stripPlayerNameMeta(entry.display_name || "未知选手"));
+  const absentNames = attendanceNotes
+    .filter((entry) => entry.status === "absent")
+    .map((entry) => stripPlayerNameMeta(entry.display_name || "未知选手"));
+
+  if (standbyNames.length) {
+    lines.push(`替补：${standbyNames.join("·")}`);
+  }
+  if (absentNames.length) {
+    lines.push(`未到场：${absentNames.join("·")}`);
+  }
+
+  return lines.join("\n");
+}
+
+async function copyMatchDayBattleReport(groupKey, buttonEl) {
+  const group = (recentMatchDayGroupsData || []).find((item) => item.group_key === groupKey);
+  if (!group) {
+    setMessage("未找到对应比赛日，暂时无法复制战斗简报。", true);
+    return;
+  }
+
+  const text = buildMatchDayBattleReportText(group);
+  if (!text) {
+    setMessage("当前暂无可复制的战斗简报内容。", true);
+    return;
+  }
+
+  if (buttonEl) {
+    buttonEl.disabled = true;
+  }
+
+  try {
+    const copied = await copyTextToClipboard(text);
+    if (!copied) {
+      setMessage("战斗简报复制失败，请稍后重试。", true);
+      return;
+    }
+    setMessage(`${group.match_date || "该比赛日"}战斗简报已复制。`);
+  } catch (error) {
+    setMessage(`战斗简报复制失败：${error.message || "未知错误"}`, true);
+  } finally {
+    if (buttonEl) {
+      buttonEl.disabled = false;
+    }
+  }
+}
+
 function getHeroDisplayName(heroName) {
   if (!heroName) return "";
   return HERO_NAME_ZH[heroName] || heroName;
@@ -4945,8 +5035,20 @@ function renderRecentMatches(groups) {
           <span class="match-day-player-count">${matchDayPlayerCount} 人</span>
           ${playerSummaryHtml}
         </div>
+        <span class="match-day-summary-actions">
+          <button
+            type="button"
+            class="match-day-copy-btn"
+            data-role="copy-match-day-report"
+            data-group-key="${escapeHtml(group.group_key)}"
+            aria-label="复制当日战斗简报"
+            title="复制当日战斗简报"
+          >
+            <span class="leaderboard-copy-icon" aria-hidden="true">⎘</span>
+          </button>
         <span class="match-day-toggle">
           <span class="match-day-toggle-icon" aria-hidden="true"></span>
+        </span>
         </span>
       </summary>
       <div class="match-day-content">
@@ -7629,6 +7731,14 @@ signupPlayerGrid.addEventListener("click", async (event) => {
 });
 
 recentMatchesList.addEventListener("click", async (event) => {
+  const copyMatchDayButton = event.target.closest('[data-role="copy-match-day-report"]');
+  if (copyMatchDayButton) {
+    event.preventDefault();
+    event.stopPropagation();
+    await copyMatchDayBattleReport(copyMatchDayButton.dataset.groupKey, copyMatchDayButton);
+    return;
+  }
+
   const attendanceAddButton = event.target.closest(".match-day-attendance-add-btn");
   if (attendanceAddButton) {
     const panel = attendanceAddButton.closest(".match-day-attendance-panel");
