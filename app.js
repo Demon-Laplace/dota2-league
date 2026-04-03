@@ -3184,6 +3184,7 @@ function getMatchDayAttendanceEntryMeta(entry, participantIdSet) {
 
 function buildMatchDayAttendancePanelHtml(group, canScore) {
   if (!canScore) return "";
+  if ((group.matches?.length || 0) === 0) return "";
 
   const participantEntries = group.participants || [];
   const participantIdSet = new Set(participantEntries.map((entry) => entry.player_id).filter(Boolean));
@@ -5405,6 +5406,7 @@ function renderLeaderboard(data) {
     const isBottomTwo = data.length >= 2 && rank >= data.length - 1;
     const playerId = player.player_id || player.id || "";
     const gamesPlayed = Number(player.games_played ?? 0);
+    const rewardExtraPoints = Number(player.reward_extra_points ?? 0);
     const tags = [];
     const nameClassName = getPlayerNameStyleClass(playerId, {
       players: data,
@@ -5414,6 +5416,10 @@ function renderLeaderboard(data) {
 
     if (highestRewardIds.has(playerId)) {
       tags.push({ icon: "¤", label: "金主", tone: "gold", description: "本赛季最大赞助人" });
+    }
+
+    if (rewardExtraPoints > 0) {
+      tags.push({ icon: "✶", label: "感恩的信赖", tone: "gratitude", description: "感谢捐赠" });
     }
 
     if (activeSeason?.koi_player_id && playerId === activeSeason.koi_player_id) {
