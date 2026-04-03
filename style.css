@@ -2063,6 +2063,15 @@ button:disabled {
   flex-wrap: wrap;
 }
 
+.match-order-btn {
+  min-width: 34px;
+  min-height: 34px;
+  padding: 0;
+  border-radius: 10px;
+  font-size: 16px;
+  line-height: 1;
+}
+
 .recent-match-title strong {
   display: inline-flex;
   align-items: center;

@@ -2178,6 +2178,50 @@ function upsertRecentMatchLocally(match) {
   renderRecentMatches(recentMatchDayGroupsData);
 }
 
+function findRecentMatchGroupByMatchId(matchId) {
+  for (const group of recentMatchDayGroupsData || []) {
+    const matchIndex = group.matches.findIndex((item) => item.match_id === matchId);
+    if (matchIndex >= 0) {
+      return { group, matchIndex };
+    }
+  }
+  return null;
+}
+
+function moveRecentMatchLocally(matchId, direction) {
+  const located = findRecentMatchGroupByMatchId(matchId);
+  if (!located) return null;
+
+  const { group, matchIndex } = located;
+  const targetIndex = direction === "up" ? matchIndex - 1 : matchIndex + 1;
+  if (targetIndex < 0 || targetIndex >= group.matches.length) {
+    return null;
+  }
+
+  const previousOrder = group.matches.map((item) => item.match_id);
+  [group.matches[matchIndex], group.matches[targetIndex]] = [group.matches[targetIndex], group.matches[matchIndex]];
+  syncRecentMatchDayGroupParticipants(group);
+  renderRecentMatches(recentMatchDayGroupsData);
+  return { groupKey: group.group_key, previousOrder };
+}
+
+function restoreRecentMatchOrderLocally(groupKey, previousOrder) {
+  if (!groupKey || !Array.isArray(previousOrder) || !previousOrder.length) return;
+  const group = (recentMatchDayGroupsData || []).find((item) => item.group_key === groupKey);
+  if (!group) return;
+
+  const matchMap = new Map(group.matches.map((item) => [item.match_id, item]));
+  const restoredMatches = previousOrder
+    .map((matchId) => matchMap.get(matchId))
+    .filter(Boolean);
+
+  if (restoredMatches.length === group.matches.length) {
+    group.matches = restoredMatches;
+    syncRecentMatchDayGroupParticipants(group);
+    renderRecentMatches(recentMatchDayGroupsData);
+  }
+}
+
 function sortQueueEntries(data) {
   return [...data].sort((a, b) => {
     const aCancelled = a.status === "cancelled" || a.is_active === false;
@@ -3941,7 +3985,7 @@ function getMatchEffectLogsByTeam(match, players, doubleDowns) {
   };
 
   doubleDowns.forEach((item) => {
-    const userName = playerMap.get(item.user_player_id)?.display_name || "未知选手";
+    const userName = stripPlayerNameMeta(playerMap.get(item.user_player_id)?.display_name || "未知选手");
     const targetPlayers = item.mode === "team"
       ? players.filter((player) => player.team === item.target_team)
       : players.filter((player) => player.player_id === item.target_player_id);
@@ -3978,8 +4022,8 @@ function getMatchEffectLogsByTeam(match, players, doubleDowns) {
     if (targetTeam && logsByTeam[targetTeam]) {
       logsByTeam[targetTeam].push({
         text: item.user_player_id === item.target_player_id
-          ? `${userName}个人双倍(自己)，${effectText}`
-          : `${userName}个人双倍(${targetName})，${effectText}`,
+          ? `${userName}个人双倍，自己${effectText}`
+          : `${userName}个人双倍，${stripPlayerNameMeta(targetName)}${effectText}`,
         tone,
       });
     }
@@ -3990,7 +4034,7 @@ function getMatchEffectLogsByTeam(match, players, doubleDowns) {
     const koiPlayer = players.find((player) => player.player_id === koiPlayerId && player.team === match.winner_team);
     if (koiPlayer) {
       logsByTeam[match.winner_team].push({
-        text: `${koiPlayer.display_name || "锦鲤"}锦鲤效果，团队积分 +25%`,
+        text: `${stripPlayerNameMeta(koiPlayer.display_name || "锦鲤")}锦鲤效果，团队积分 +25%`,
         tone: "gold",
       });
     }
@@ -4259,6 +4303,8 @@ function renderRecentMatches(groups) {
         </li>
       `).join("");
       const card = document.createElement("article");
+      const canMoveUp = canScore && matchIndex > 0;
+      const canMoveDown = canScore && matchIndex < matches.length - 1;
 
       card.className = "recent-match-card";
       card.innerHTML = `
@@ -4270,6 +4316,8 @@ function renderRecentMatches(groups) {
           </div>
           ${canScore ? `
             <div class="recent-match-actions">
+              <button class="button-secondary match-order-btn" data-role="move-match" data-direction="up" data-match-id="${match.match_id}" ${canMoveUp ? "" : "disabled"} title="上移一场">↑</button>
+              <button class="button-secondary match-order-btn" data-role="move-match" data-direction="down" data-match-id="${match.match_id}" ${canMoveDown ? "" : "disabled"} title="下移一场">↓</button>
               <button class="button-secondary edit-match-btn" data-match-id="${match.match_id}">修改记录</button>
               <button class="button-danger delete-match-btn" data-match-id="${match.match_id}">删除记录</button>
             </div>
@@ -6155,6 +6203,41 @@ async function deleteMatch(matchId, buttonEl) {
   });
 }
 
+async function moveMatchWithinDay(matchId, direction, buttonEl) {
+  if (!ensureScorerAccess("仅记分员或管理员可调整场次顺序。")) return;
+  if (!matchId || !["up", "down"].includes(direction)) return;
+
+  const rollbackState = moveRecentMatchLocally(matchId, direction);
+  if (!rollbackState) return;
+
+  if (buttonEl) {
+    buttonEl.disabled = true;
+  }
+
+  setMessage(`正在调整场次顺序...`);
+
+  const { error } = await db.rpc("move_match_within_day", {
+    p_match_id: matchId,
+    p_direction: direction,
+  });
+
+  if (buttonEl) {
+    buttonEl.disabled = false;
+  }
+
+  if (error) {
+    restoreRecentMatchOrderLocally(rollbackState.groupKey, rollbackState.previousOrder);
+    setMessage(`调整场次顺序失败：${error.message}。请先在 Supabase 执行最新 SQL。`, true);
+    return;
+  }
+
+  setMessage("场次顺序已调整，积分已按新顺序重算。");
+  requestImmediateRefresh({
+    leaderboard: true,
+    recentMatches: true,
+  });
+}
+
 function subscribeRealtime() {
   if (realtimeChannel) {
     db.removeChannel(realtimeChannel);
@@ -6651,6 +6734,16 @@ recentMatchesList.addEventListener("click", async (event) => {
       currentHero: playerButton.dataset.heroName || "",
       isSavedMatch: true,
     });
+    return;
+  }
+
+  const moveButton = event.target.closest('[data-role="move-match"]');
+  if (moveButton) {
+    await moveMatchWithinDay(
+      moveButton.dataset.matchId,
+      moveButton.dataset.direction,
+      moveButton
+    );
     return;
   }
 
