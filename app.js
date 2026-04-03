@@ -2456,6 +2456,15 @@ function getPreviousBeijingBusinessDateString() {
   return `${prevYear}-${prevMonth}-${prevDay}`;
 }
 
+function getTodayRecordedMatchCount(seasonId = activeSeason?.id) {
+  const today = getBeijingBusinessDateString();
+  return (recentMatchesData || []).filter((match) => {
+    const matchSeasonId = match.season_id || null;
+    const matchDate = match.match_date || formatArchiveDate(match.created_at) || "";
+    return (!seasonId || matchSeasonId === seasonId) && matchDate === today;
+  }).length;
+}
+
 function getBackfillDateMaxValue() {
   const latestPastDate = getPreviousBeijingBusinessDateString();
   if (editingMatchId && backfillDateInput.value && backfillDateInput.value > latestPastDate) {
@@ -6053,7 +6062,12 @@ async function finishTodayMatchDay() {
     return;
   }
 
-  const confirmed = window.confirm("确认设置今日休战吗？这会立刻结算“未参赛最高 -1 / 最低 +1”，并清空今日报名队列与当日名单。若之后今天又新增或补录比赛，系统仍会自动重新回算。");
+  const todayMatchCount = getTodayRecordedMatchCount(activeSeason.id);
+  const confirmed = window.confirm(
+    todayMatchCount > 0
+      ? "确认设置今日休战吗？这会立刻结算“未参赛最高 -1 / 最低 +1”，并清空今日报名队列与当日名单。若之后今天又新增或补录比赛，系统仍会自动重新回算。"
+      : "确认设置今日休战吗？今天还没有已记录比赛，本次不会触发未参赛加减分，只会结束今日状态并清空今日报名队列与当日名单。"
+  );
   if (!confirmed) {
     return;
   }
@@ -6062,13 +6076,29 @@ async function finishTodayMatchDay() {
     finishTodayMatchDayBtn.disabled = true;
   }
 
-  setMessage("正在设置今日休战并结算...");
-  setMatchMessage("正在设置今日休战并结算...");
+  setMessage(todayMatchCount > 0 ? "正在设置今日休战并结算..." : "正在设置今日休战...");
+  setMatchMessage(todayMatchCount > 0 ? "正在设置今日休战并结算..." : "正在设置今日休战...");
   setBackfillMessage("");
 
-  const { data, error } = await db.rpc("finalize_active_match_day", {
-    p_season_id: activeSeason.id,
-  });
+  let data = null;
+  let error = null;
+
+  if (todayMatchCount > 0) {
+    ({ data, error } = await db.rpc("finalize_active_match_day", {
+      p_season_id: activeSeason.id,
+    }));
+  } else {
+    const cancelResult = await db.rpc("cancel_active_match_day", {
+      p_season_id: activeSeason.id,
+    });
+    error = cancelResult.error || null;
+
+    if (!error) {
+      const recalcResult = await db.rpc("recalculate_all_scores");
+      error = recalcResult.error || null;
+      data = !error;
+    }
+  }
 
   if (finishTodayMatchDayBtn) {
     finishTodayMatchDayBtn.disabled = false;
@@ -6081,16 +6111,22 @@ async function finishTodayMatchDay() {
   }
 
   if (!data) {
-    setMessage("今日暂无可休战的比赛记录。");
-    setMatchMessage("今日暂无可休战的比赛记录。");
+    setMessage(todayMatchCount > 0 ? "今日暂无可休战的比赛记录。" : "今日没有已记录比赛，未触发积分结算。");
+    setMatchMessage(todayMatchCount > 0 ? "今日暂无可休战的比赛记录。" : "今日没有已记录比赛，未触发积分结算。");
     return;
   }
 
   clearStoredMatchDayStartTime();
   matchStartTimeInput.value = "";
-  setMessage("今日已休战，未参赛加减分已完成结算。");
-  setMatchMessage("今日已休战，未参赛加减分已完成结算。");
-  appendAdminActionLog("手动设置了今日休战并结算未参赛加减分。");
+  if (todayMatchCount > 0) {
+    setMessage("今日已休战，未参赛加减分已完成结算。");
+    setMatchMessage("今日已休战，未参赛加减分已完成结算。");
+    appendAdminActionLog("手动设置了今日休战并结算未参赛加减分。");
+  } else {
+    setMessage("今日已休战。今日没有比赛，未触发积分结算。");
+    setMatchMessage("今日已休战。今日没有比赛，未触发积分结算。");
+    appendAdminActionLog("手动设置了今日休战（今日无比赛，未触发积分结算）。");
+  }
   requestImmediateRefresh({
     playerDriven: true,
     queue: true,

@@ -505,6 +505,7 @@ declare
   v_season_id uuid;
   v_match_date date;
   v_has_target boolean := false;
+  v_match_count integer := 0;
 begin
   v_season_id := p_season_id;
 
@@ -521,6 +522,16 @@ begin
   end if;
 
   v_match_date := public.get_beijing_match_date(now());
+
+  select count(*)
+  into v_match_count
+  from public.matches
+  where season_id = v_season_id
+    and coalesce(match_date, public.get_beijing_match_date(created_at)) = v_match_date;
+
+  if coalesce(v_match_count, 0) <= 0 then
+    return false;
+  end if;
 
   select exists (
     select 1
