@@ -621,6 +621,19 @@ button.season-total {
   gap: 8px;
 }
 
+.season-rollover-block {
+  display: grid;
+  gap: 6px;
+  justify-items: end;
+}
+
+.season-rollover-status {
+  margin: 0;
+  max-width: 320px;
+  text-align: right;
+  line-height: 1.5;
+}
+
 .season-rank-column,
 .season-unranked-section {
   display: grid;

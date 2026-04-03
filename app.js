@@ -56,6 +56,9 @@ const seasonPanelTitle = document.getElementById("seasonPanelTitle");
 const seasonPlayersCount = document.getElementById("seasonPlayersCount");
 const seasonPlayersList = document.getElementById("seasonPlayersList");
 const seasonPlayersEmpty = document.getElementById("seasonPlayersEmpty");
+const seasonRolloverBlock = document.getElementById("seasonRolloverBlock");
+const seasonRolloverBtn = document.getElementById("seasonRolloverBtn");
+const seasonRolloverStatus = document.getElementById("seasonRolloverStatus");
 const seasonRewardTotal = document.getElementById("seasonRewardTotal");
 const rewardPanel = document.getElementById("rewardPanel");
 const closeRewardPanelBtn = document.getElementById("closeRewardPanelBtn");
@@ -208,6 +211,8 @@ let singleDoublePickerOpen = {
   backfill: {},
 };
 let roleMembers = [];
+let seasonEndConfirmations = [];
+let seasonEndFeatureAvailable = true;
 let currentAccessSession = {
   role: "viewer",
   memberId: "",
@@ -2059,6 +2064,13 @@ function applyRolePermissions() {
     adminRecalculateScoresBtn.disabled = !isAdmin || !activeSeason?.id;
   }
   adminClearScorerRememberBtn.disabled = !isAdmin;
+  if (seasonRolloverBtn) {
+    seasonRolloverBtn.hidden = !canScore;
+  }
+  if (seasonRolloverBlock) {
+    seasonRolloverBlock.hidden = !canScore;
+  }
+  renderSeasonRolloverAction();
 
   if (canScore) {
     setMatchFormOpen(isMatchFormOpen);
@@ -2550,6 +2562,112 @@ function getPreviousBeijingBusinessDateString() {
   const prevMonth = String(date.getMonth() + 1).padStart(2, "0");
   const prevDay = String(date.getDate()).padStart(2, "0");
   return `${prevYear}-${prevMonth}-${prevDay}`;
+}
+
+function getBeijingNowDate() {
+  return new Date(new Date().toLocaleString("en-US", { timeZone: "Asia/Shanghai" }));
+}
+
+function getSeasonMonthLastDate(dateText) {
+  if (!dateText) return null;
+  const [yearText, monthText] = String(dateText).split("-");
+  const year = Number(yearText);
+  const month = Number(monthText);
+  if (!Number.isFinite(year) || !Number.isFinite(month)) return null;
+  const lastDay = new Date(year, month, 0).getDate();
+  return `${yearText}-${String(month).padStart(2, "0")}-${String(lastDay).padStart(2, "0")}`;
+}
+
+function getSeasonRolloverWindowInfo(season = activeSeason) {
+  if (!season) {
+    return {
+      isOpen: false,
+      cutoffDate: "",
+      cutoffLabel: "",
+    };
+  }
+
+  const referenceDate = season.end_date || season.start_date || getBeijingBusinessDateString();
+  const cutoffDate = getSeasonMonthLastDate(referenceDate);
+  if (!cutoffDate) {
+    return {
+      isOpen: false,
+      cutoffDate: "",
+      cutoffLabel: "",
+    };
+  }
+
+  const cutoffMoment = new Date(`${cutoffDate}T06:00:00`);
+  const beijingNow = getBeijingNowDate();
+  return {
+    isOpen: beijingNow.getTime() >= cutoffMoment.getTime(),
+    cutoffDate,
+    cutoffLabel: `${cutoffDate} 06:00`,
+  };
+}
+
+function getSeasonEndConfirmationActorName(entry) {
+  if (!entry) return "未知身份";
+  if (entry.role === "admin") {
+    const admins = getRoleMembersByRole("admin");
+    const adminIndex = admins.findIndex((member) => member.id === entry.role_member_id);
+    return adminIndex >= 0 ? getAdminDisplayName(adminIndex) : "管理员";
+  }
+
+  const member = roleMembers.find((item) => item.id === entry.role_member_id);
+  if (member?.display_name) {
+    return member.display_name;
+  }
+
+  const player = seasonPlayers.find((item) => item.id === entry.player_id);
+  return player?.display_name || "记分员";
+}
+
+function getSeasonEndScorerConfirmationCount() {
+  return seasonEndConfirmations.filter((entry) => entry.role === "scorer").length;
+}
+
+function renderSeasonRolloverAction() {
+  if (!seasonRolloverBlock || !seasonRolloverBtn || !seasonRolloverStatus) return;
+
+  const canScore = isCurrentRoleScorer();
+  seasonRolloverBlock.hidden = !canScore;
+  if (!canScore) {
+    return;
+  }
+
+  if (!seasonEndFeatureAvailable) {
+    seasonRolloverBtn.disabled = true;
+    seasonRolloverStatus.textContent = "赛季完结功能尚未同步到数据库，请先执行最新 SQL。";
+    return;
+  }
+
+  if (!activeSeason?.id) {
+    seasonRolloverBtn.disabled = true;
+    seasonRolloverStatus.textContent = "当前没有可完结的赛季。";
+    return;
+  }
+
+  const windowInfo = getSeasonRolloverWindowInfo(activeSeason);
+  const scorerCount = getSeasonEndScorerConfirmationCount();
+  const hasCurrentConfirmation = seasonEndConfirmations.some((entry) => entry.role_member_id === currentAccessSession.memberId);
+  const scorerNames = seasonEndConfirmations
+    .filter((entry) => entry.role === "scorer")
+    .map((entry) => getSeasonEndConfirmationActorName(entry));
+  const scorerText = scorerNames.length ? `已确认：${scorerNames.join("、")}。` : "";
+  const roleHint = currentAccessSession.role === "admin"
+    ? "管理员可登记确认，但仍需至少 2 位记分员确认。"
+    : "需要至少 2 位记分员登记确认后才会正式完结。";
+
+  seasonRolloverBtn.disabled = !windowInfo.isOpen;
+  seasonRolloverBtn.textContent = hasCurrentConfirmation ? "已登记赛季完结" : "赛季完结";
+
+  if (!windowInfo.isOpen) {
+    seasonRolloverStatus.textContent = `赛季完结将于北京时间 ${windowInfo.cutoffLabel} 开放。`;
+    return;
+  }
+
+  seasonRolloverStatus.textContent = `当前记分员确认 ${scorerCount}/2。${roleHint}${scorerText ? ` ${scorerText}` : ""}`;
 }
 
 function getRecordedMatchCountForDate(matchDate, seasonId = activeSeason?.id) {
@@ -3555,6 +3673,7 @@ function updateSeasonInfo() {
   const koiSuffix = activeSeason?.koi_player_id ? " · 已设锦鲤" : "";
   seasonToggleBtn.textContent = `当前赛季：${seasonName}${koiSuffix}`;
   seasonPanelTitle.textContent = `${seasonName} 选手名单`;
+  renderSeasonRolloverAction();
 }
 
 function updateSeasonRewardTotal(total) {
@@ -3894,6 +4013,7 @@ function renderRewardLogs() {
 function renderSeasonPlayersPanel() {
   seasonPlayersList.innerHTML = "";
   seasonPlayersCount.textContent = `${seasonPlayers.length} 人`;
+  renderSeasonRolloverAction();
 
   if (seasonPlayers.length === 0) {
     seasonPlayersEmpty.style.display = "block";
@@ -5174,7 +5294,7 @@ function renderRecentMatches(groups) {
 async function loadActiveSeason() {
   const { data, error } = await db
     .from("seasons")
-    .select("id, name, koi_player_id")
+    .select("id, name, start_date, end_date, koi_player_id")
     .eq("is_active", true)
     .limit(1)
     .maybeSingle();
@@ -5187,6 +5307,41 @@ async function loadActiveSeason() {
 
   activeSeason = data || null;
   updateSeasonInfo();
+  renderSeasonRolloverAction();
+}
+
+async function loadSeasonEndConfirmations() {
+  if (!seasonEndFeatureAvailable) {
+    seasonEndConfirmations = [];
+    renderSeasonRolloverAction();
+    return;
+  }
+
+  if (!activeSeason?.id) {
+    seasonEndConfirmations = [];
+    renderSeasonRolloverAction();
+    return;
+  }
+
+  const { data, error } = await db
+    .from("season_end_confirmations")
+    .select("id, season_id, role_member_id, role, player_id, confirmed_at")
+    .eq("season_id", activeSeason.id)
+    .order("confirmed_at", { ascending: true });
+
+  if (error) {
+    if (String(error.message || "").includes("season_end_confirmations")) {
+      seasonEndFeatureAvailable = false;
+    } else {
+      console.error("加载赛季完结确认失败：", error);
+    }
+    seasonEndConfirmations = [];
+    renderSeasonRolloverAction();
+    return;
+  }
+
+  seasonEndConfirmations = data || [];
+  renderSeasonRolloverAction();
 }
 
 async function loadRoleMembers() {
@@ -5222,6 +5377,7 @@ async function loadRoleMembers() {
   validateStoredAccessSession();
   renderRoleMembers();
   applyRolePermissions();
+  renderSeasonRolloverAction();
 }
 
 async function addScorerRoleByPlayer(playerId) {
@@ -5648,6 +5804,7 @@ async function refreshPlayerDrivenViews() {
     loadActiveMatchDay(),
     loadSeasonPlayers(),
     loadRoleMembers(),
+    loadSeasonEndConfirmations(),
     loadSeasons(),
     loadTodayPlayers(),
   ]);
@@ -5859,6 +6016,77 @@ async function resetCurrentSeason() {
   requestImmediateRefresh({
     seasonContext: true,
   });
+}
+
+async function confirmSeasonRollover() {
+  if (!ensureScorerAccess("仅记分员或管理员可登记赛季完结确认。")) return;
+  if (!activeSeason?.id) {
+    setMessage("当前没有可完结的赛季。", true);
+    return;
+  }
+  if (!seasonEndFeatureAvailable) {
+    setMessage("赛季完结功能尚未同步到数据库，请先执行最新 SQL。", true);
+    return;
+  }
+  if (!currentAccessSession.memberId) {
+    setMessage("当前身份缺少角色记录，暂时无法登记赛季完结确认。", true);
+    return;
+  }
+
+  const windowInfo = getSeasonRolloverWindowInfo(activeSeason);
+  if (!windowInfo.isOpen) {
+    setMessage(`赛季完结将于北京时间 ${windowInfo.cutoffLabel} 开放。`, true);
+    return;
+  }
+
+  const confirmText = window.prompt('请输入“确认赛季完结”以登记当前确认：', "");
+  if (confirmText !== "确认赛季完结") {
+    setMessage("未输入正确确认文字，已取消赛季完结登记。", true);
+    return;
+  }
+
+  seasonRolloverBtn.disabled = true;
+  setMessage("正在登记赛季完结确认...");
+
+  const { data, error } = await db.rpc("confirm_season_rollover", {
+    p_season_id: activeSeason.id,
+    p_role_member_id: currentAccessSession.memberId,
+  });
+
+  if (error) {
+    seasonRolloverBtn.disabled = false;
+    setMessage(`登记赛季完结失败：${error.message}。请先在 Supabase 执行最新 SQL。`, true);
+    await loadSeasonEndConfirmations();
+    return;
+  }
+
+  const result = Array.isArray(data) ? data[0] : data;
+  const scorerCount = Number(result?.scorer_confirmation_count ?? 0);
+  const finalized = Boolean(result?.finalized);
+  const actorRole = result?.actor_role || currentAccessSession.role;
+  const nextSeasonName = result?.next_season_name || "下赛季";
+
+  if (finalized) {
+    setMessage(`赛季已完结，系统已切换至 ${nextSeasonName}。`);
+    appendAdminActionLog(`完成了 ${activeSeason.name} 的赛季完结，并切换至 ${nextSeasonName}。`);
+    requestImmediateRefresh({
+      seasonContext: true,
+      playerDriven: true,
+      queue: true,
+      leaderboard: true,
+      rewardLogs: true,
+      recentMatches: true,
+    });
+    return;
+  }
+
+  const roleText = actorRole === "admin" ? "管理员确认已登记" : "记分员确认已登记";
+  const extraText = actorRole === "admin"
+    ? `当前记分员确认 ${scorerCount}/2，仍需至少 2 位记分员。`
+    : `当前记分员确认 ${scorerCount}/2。`;
+  setMessage(`${roleText}，${extraText}`);
+  appendAdminActionLog(`${getCurrentAccessActorLabel()} 登记了 ${activeSeason.name} 的赛季完结确认。`);
+  await loadSeasonEndConfirmations();
 }
 
 async function recalculateCurrentScores() {
@@ -7270,6 +7498,15 @@ function subscribeRealtime() {
     )
     .on(
       "postgres_changes",
+      { event: "*", schema: "public", table: "season_end_confirmations" },
+      () => {
+        scheduleRefresh({
+          seasonContext: true,
+        });
+      }
+    )
+    .on(
+      "postgres_changes",
       { event: "*", schema: "public", table: "season_players" },
       () => {
         scheduleRefresh({ playerDriven: true });
@@ -7388,6 +7625,9 @@ adminExitModeBtn.addEventListener("click", exitAccessRole);
 closeScorerPanelBtn.addEventListener("click", () => setScorerPanelOpen(false));
 closeAdminPanelBtn.addEventListener("click", () => setAdminPanelOpen(false));
 resetSeasonBtn.addEventListener("click", resetCurrentSeason);
+if (seasonRolloverBtn) {
+  seasonRolloverBtn.addEventListener("click", confirmSeasonRollover);
+}
 if (adminRecalculateScoresBtn) {
   adminRecalculateScoresBtn.addEventListener("click", recalculateCurrentScores);
 }
