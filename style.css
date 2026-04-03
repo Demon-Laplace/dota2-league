@@ -1636,6 +1636,12 @@ button:disabled {
   overflow: hidden;
 }
 
+.recent-match-card-empty {
+  border-style: dashed;
+  background:
+    linear-gradient(180deg, rgba(14, 28, 45, 0.78), rgba(11, 22, 36, 0.82));
+}
+
 .recent-match-card::before {
   content: "";
   position: absolute;
@@ -1727,7 +1733,6 @@ button:disabled {
 .match-day-toggle {
   display: inline-flex;
   align-items: center;
-  gap: 8px;
 }
 
 .match-day-toggle-icon {
@@ -1773,23 +1778,153 @@ button:disabled {
   font-size: 11px;
   line-height: 1.4;
   white-space: nowrap;
+  cursor: pointer;
+  box-shadow: none;
+}
+
+.match-day-player-count:hover {
+  filter: brightness(1.05);
+  transform: none;
 }
 
 .match-day-player-count::before {
-  content: "◉";
+  content: "▸";
   font-size: 10px;
   color: rgba(99, 213, 208, 0.92);
+  transition: transform 0.18s ease;
 }
 
 .match-day-player-list {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
   min-width: 0;
-  max-width: min(100%, 720px);
-  overflow: hidden;
-  white-space: nowrap;
-  text-overflow: ellipsis;
-  color: rgba(216, 228, 244, 0.76);
+  max-width: min(100%, 760px);
+}
+
+.match-day-player-name {
+  display: inline-flex;
+  align-items: center;
+  min-height: 20px;
+  padding: 1px 8px;
+  border-radius: 999px;
   font-size: 12px;
+  line-height: 1.4;
   letter-spacing: 0.01em;
+}
+
+.match-day-player-name-participant {
+  color: rgba(247, 252, 255, 0.98);
+  text-shadow:
+    0 0 10px rgba(255, 255, 255, 0.12),
+    0 0 18px rgba(150, 206, 255, 0.08);
+}
+
+.match-day-player-name-standby {
+  color: rgba(184, 196, 214, 0.82);
+  background: rgba(50, 62, 79, 0.22);
+}
+
+.match-day-player-name-absent {
+  color: rgba(163, 98, 98, 0.94);
+  background: linear-gradient(135deg, rgba(34, 16, 18, 0.9), rgba(16, 10, 12, 0.94));
+  box-shadow: inset 0 0 0 1px rgba(99, 32, 32, 0.28);
+}
+
+.match-day-group[data-attendance-expanded="true"] .match-day-player-count::before {
+  transform: rotate(90deg);
+}
+
+.match-day-attendance-panel {
+  display: none;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid rgba(124, 165, 209, 0.16);
+  border-radius: 12px;
+  background: rgba(11, 27, 45, 0.58);
+}
+
+.match-day-attendance-panel-open {
+  display: grid;
+}
+
+.match-day-attendance-panel-head h3 {
+  margin: 0;
+  font-size: 14px;
+}
+
+.match-day-attendance-panel-head p {
+  margin: 4px 0 0;
+}
+
+.match-day-attendance-form {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: center;
+}
+
+.match-day-attendance-form-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.match-day-attendance-list {
+  display: grid;
+  gap: 8px;
+}
+
+.match-day-attendance-note {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px solid rgba(124, 165, 209, 0.12);
+  background: rgba(13, 31, 53, 0.58);
+}
+
+.match-day-attendance-note-main {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.match-day-attendance-status {
+  display: inline-flex;
+  align-items: center;
+  min-height: 20px;
+  padding: 1px 8px;
+  border-radius: 999px;
+  font-size: 11px;
+  line-height: 1.4;
+}
+
+.match-day-attendance-note-standby .match-day-attendance-status {
+  color: #dbe5f4;
+  background: rgba(53, 67, 87, 0.44);
+  border: 1px solid rgba(130, 148, 173, 0.2);
+}
+
+.match-day-attendance-note-absent .match-day-attendance-status {
+  color: #f0c5c5;
+  background: linear-gradient(135deg, rgba(58, 20, 20, 0.76), rgba(24, 10, 12, 0.86));
+  border: 1px solid rgba(132, 56, 56, 0.26);
+}
+
+.match-day-attendance-empty {
+  margin: 0;
+}
+
+.match-day-matches {
+  display: grid;
+  gap: 12px;
 }
 
 .match-day-content {
@@ -3137,6 +3272,10 @@ ol {
   }
 
   .reward-summary-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .match-day-attendance-form {
     grid-template-columns: 1fr;
   }
 

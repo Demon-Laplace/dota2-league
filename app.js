@@ -157,8 +157,10 @@ let rewardCardUsageSummary = new Map();
 let seasonPlayerRewardTotal = 0;
 let externalRewardTotal = 0;
 let recentMatchesData = [];
+let recentMatchDayGroupsData = [];
 let roleMembersSupportAutoReconnect = true;
 let openRecentMatchGroups = new Set();
+let openRecentMatchAttendancePanels = new Set();
 let isMatchFormOpen = false;
 let isBackfillFormOpen = false;
 let isSeasonPanelOpen = false;
@@ -1414,7 +1416,7 @@ function applyRolePermissions() {
 
   renderScorerPanelSummary();
   renderSeasonPlayersPanel();
-  renderRecentMatches(recentMatchesData);
+  renderRecentMatches(recentMatchDayGroupsData);
 }
 
 function escapeHtml(str) {
@@ -1698,6 +1700,106 @@ function getMatchStatusBadge(winnerTeam) {
   return hasRecordedWinner(winnerTeam) ? "比赛完成" : "待补胜负";
 }
 
+function getMatchDayGroupKey(groupOrMatchDayId, matchDate = "") {
+  if (typeof groupOrMatchDayId === "object" && groupOrMatchDayId) {
+    return groupOrMatchDayId.match_day_id || groupOrMatchDayId.id || groupOrMatchDayId.match_date || "历史比赛";
+  }
+  return groupOrMatchDayId || matchDate || "历史比赛";
+}
+
+function getMatchDayAttendanceLabel(status) {
+  if (status === "standby") return "报名但替补";
+  if (status === "absent") return "报名未到场";
+  return "备注";
+}
+
+function getMatchDayParticipantEntries(matches) {
+  const seen = new Set();
+  const participants = [];
+
+  (matches || []).forEach((match) => {
+    parseRecentMatchPlayers(match.players).forEach((player) => {
+      const playerId = player.player_id || player.id || player.display_name;
+      const displayName = stripPlayerNameMeta(player.display_name || "未知选手");
+      if (!playerId || !displayName || seen.has(playerId)) return;
+      seen.add(playerId);
+      participants.push({
+        player_id: player.player_id || null,
+        display_name: displayName,
+      });
+    });
+  });
+
+  return participants;
+}
+
+function buildMatchDayPlayerSummaryHtml(participants, attendanceNotes) {
+  const participantHtml = (participants || []).map((player) => `
+    <span class="match-day-player-name match-day-player-name-participant">${escapeHtml(player.display_name)}</span>
+  `).join("");
+  const standbyHtml = (attendanceNotes || [])
+    .filter((entry) => entry.status === "standby")
+    .map((entry) => `<span class="match-day-player-name match-day-player-name-standby">${escapeHtml(entry.display_name || "未知选手")}</span>`)
+    .join("");
+  const absentHtml = (attendanceNotes || [])
+    .filter((entry) => entry.status === "absent")
+    .map((entry) => `<span class="match-day-player-name match-day-player-name-absent">${escapeHtml(entry.display_name || "未知选手")}</span>`)
+    .join("");
+
+  const html = [participantHtml, standbyHtml, absentHtml].filter(Boolean).join("");
+  return html ? `<div class="match-day-player-list">${html}</div>` : "";
+}
+
+function buildMatchDayAttendancePanelHtml(group, canScore) {
+  const participantEntries = group.participants || [];
+  const attendanceNotes = group.attendance_notes || [];
+  const availablePlayers = seasonPlayers.filter((player) => (
+    player.is_in_season
+    && !participantEntries.some((entry) => entry.player_id === player.id)
+    && !attendanceNotes.some((entry) => entry.player_id === player.id)
+  ));
+  const optionsHtml = availablePlayers.length
+    ? buildOptionsFromPlayers(availablePlayers)
+    : '<option value="">暂无可补记选手</option>';
+  const listHtml = attendanceNotes.length
+    ? attendanceNotes.map((entry) => `
+      <div class="match-day-attendance-note match-day-attendance-note-${entry.status}">
+        <div class="match-day-attendance-note-main">
+          <span class="match-day-attendance-status">${escapeHtml(getMatchDayAttendanceLabel(entry.status))}</span>
+          <strong>${escapeHtml(entry.display_name || "未知选手")}</strong>
+          ${entry.note ? `<span class="muted">${escapeHtml(entry.note)}</span>` : ""}
+        </div>
+        ${canScore ? `<button class="button-secondary match-day-attendance-remove-btn" type="button" data-note-id="${entry.id}" data-player-name="${escapeHtml(entry.display_name || "该选手")}">移除</button>` : ""}
+      </div>
+    `).join("")
+    : '<p class="muted match-day-attendance-empty">暂无补记名单</p>';
+
+  const isExpanded = openRecentMatchAttendancePanels.has(group.group_key);
+
+  return `
+    <div class="match-day-attendance-panel${isExpanded ? " match-day-attendance-panel-open" : ""}" data-match-day-key="${group.group_key}">
+      <div class="match-day-attendance-panel-head">
+        <div>
+          <h3>每日补记名单</h3>
+          <p class="muted">这里补充报名但替补、报名未到场等未参赛选手，后续可用于处罚或补充统计。</p>
+        </div>
+      </div>
+      ${canScore ? `
+        <div class="match-day-attendance-form">
+          <select data-role="attendance-player-select" data-match-day-id="${group.match_day_id || ""}" ${availablePlayers.length ? "" : "disabled"}>
+            ${optionsHtml}
+          </select>
+          <div class="match-day-attendance-form-actions">
+            <button class="button-secondary match-day-attendance-add-btn" type="button" data-status="standby" data-match-day-id="${group.match_day_id || ""}" data-match-date="${group.match_date || ""}" data-season-id="${group.season_id || ""}" ${group.match_day_id ? "" : "disabled"}>记为替补</button>
+            <button class="button-danger match-day-attendance-add-btn" type="button" data-status="absent" data-match-day-id="${group.match_day_id || ""}" data-match-date="${group.match_date || ""}" data-season-id="${group.season_id || ""}" ${group.match_day_id ? "" : "disabled"}>记为未到场</button>
+          </div>
+        </div>
+      ` : ""}
+      <div class="match-day-attendance-list">${listHtml}</div>
+    </div>
+  `;
+}
+
 function getWinnerToggleState(formType) {
   return formType === "backfill"
     ? { select: backfillWinnerSelect, hint: backfillWinnerToggleHint, panel: backfillFormPanel }
@@ -1736,18 +1838,13 @@ function updateRecentMatchGroupSummary(details, isActiveDay) {
     badge.textContent = isActiveDay ? "进行中" : "已归档";
   }
 
-  const toggleText = details.querySelector(".match-day-toggle-text");
-  if (toggleText) {
-    toggleText.textContent = details.open ? "点击收起" : "点击展开";
-  }
-
   details.dataset.expanded = details.open ? "true" : "false";
 }
 
 function rememberOpenRecentMatchGroups() {
   openRecentMatchGroups = new Set(
     [...recentMatchesList.querySelectorAll(".match-day-group[open]")]
-      .map((element) => element.dataset.matchDate)
+      .map((element) => element.dataset.groupKey || element.dataset.matchDate)
       .filter(Boolean)
   );
 }
@@ -3618,6 +3715,93 @@ function getMatchDayPlayerNames(matches) {
   return names;
 }
 
+function buildRecentMatchDayGroups(matches, matchDays = [], attendanceNotes = []) {
+  const groupMap = new Map();
+
+  (matchDays || []).forEach((matchDay) => {
+    const groupKey = getMatchDayGroupKey(matchDay);
+    groupMap.set(groupKey, {
+      group_key: groupKey,
+      match_day_id: matchDay.id || null,
+      season_id: matchDay.season_id || null,
+      match_date: matchDay.match_date || "历史比赛",
+      started_at: matchDay.started_at || null,
+      closed_at: matchDay.closed_at || null,
+      day_is_active: Boolean(matchDay.is_active),
+      note: matchDay.note || "",
+      matches: [],
+      attendance_notes: [],
+      participants: [],
+    });
+  });
+
+  (matches || []).forEach((match) => {
+    const groupKey = getMatchDayGroupKey(match.match_day_id, match.match_date || formatArchiveDate(match.created_at));
+    if (!groupMap.has(groupKey)) {
+      groupMap.set(groupKey, {
+        group_key: groupKey,
+        match_day_id: match.match_day_id || null,
+        season_id: match.season_id || null,
+        match_date: match.match_date || formatArchiveDate(match.created_at) || "历史比赛",
+        started_at: match.created_at || null,
+        closed_at: null,
+        day_is_active: Boolean(match.day_is_active),
+        note: "",
+        matches: [],
+        attendance_notes: [],
+        participants: [],
+      });
+    }
+
+    groupMap.get(groupKey).matches.push(match);
+  });
+
+  (attendanceNotes || []).forEach((entry) => {
+    const groupKey = getMatchDayGroupKey(entry.match_day_id, entry.match_date);
+    if (!groupMap.has(groupKey)) {
+      groupMap.set(groupKey, {
+        group_key: groupKey,
+        match_day_id: entry.match_day_id || null,
+        season_id: entry.season_id || null,
+        match_date: entry.match_date || "历史比赛",
+        started_at: entry.created_at || null,
+        closed_at: null,
+        day_is_active: false,
+        note: "",
+        matches: [],
+        attendance_notes: [],
+        participants: [],
+      });
+    }
+
+    groupMap.get(groupKey).attendance_notes.push(entry);
+  });
+
+  return [...groupMap.values()]
+    .map((group) => {
+      group.matches.sort((a, b) => {
+        const aTime = new Date(a.created_at || 0).getTime();
+        const bTime = new Date(b.created_at || 0).getTime();
+        return bTime - aTime;
+      });
+      group.attendance_notes.sort((a, b) => {
+        const aTime = new Date(a.created_at || 0).getTime();
+        const bTime = new Date(b.created_at || 0).getTime();
+        return aTime - bTime;
+      });
+      group.participants = getMatchDayParticipantEntries(group.matches);
+      return group;
+    })
+    .sort((a, b) => {
+      if (a.match_date !== b.match_date) {
+        return String(b.match_date).localeCompare(String(a.match_date), "zh-CN");
+      }
+      const aStarted = new Date(a.started_at || 0).getTime();
+      const bStarted = new Date(b.started_at || 0).getTime();
+      return bStarted - aStarted;
+    });
+}
+
 function getOrderedSingleDoubleCandidates(player, candidates, teamMap) {
   const selfCandidate = [];
   const opponentCandidates = [];
@@ -3638,45 +3822,38 @@ function getOrderedSingleDoubleCandidates(player, candidates, teamMap) {
   return [...selfCandidate, ...opponentCandidates];
 }
 
-function renderRecentMatches(data) {
-  recentMatchesData = data || [];
+function renderRecentMatches(groups) {
   recentMatchesList.innerHTML = "";
   const highestRewardIds = getHighestRewardPlayerIds(leaderboardPlayers);
   const hardcoreLoseIds = getHardcoreLoseTaggedPlayerIds(leaderboardPlayers);
   const canScore = isCurrentRoleScorer();
+  recentMatchDayGroupsData = groups || [];
 
-  if (!recentMatchesData || recentMatchesData.length === 0) {
+  if (!recentMatchDayGroupsData || recentMatchDayGroupsData.length === 0) {
     recentMatchesEmpty.style.display = "block";
     return;
   }
 
   recentMatchesEmpty.style.display = "none";
 
-  const groups = new Map();
-
-  recentMatchesData.forEach((match) => {
-    const key = match.match_date || formatArchiveDate(match.created_at) || "历史比赛";
-    if (!groups.has(key)) {
-      groups.set(key, []);
-    }
-    groups.get(key).push(match);
-  });
-
-  groups.forEach((matches, matchDate) => {
+  recentMatchDayGroupsData.forEach((group) => {
     const details = document.createElement("details");
-    const isActiveDay = matches.some((match) => match.day_is_active);
-    const matchDayPlayerNames = getMatchDayPlayerNames(matches);
-    const matchDayPlayerCount = matchDayPlayerNames.length;
-    const matchDayPlayerText = matchDayPlayerNames.join(" · ");
-    details.dataset.matchDate = matchDate;
+    const matches = group.matches || [];
+    const isActiveDay = Boolean(group.day_is_active);
+    const participantEntries = group.participants || [];
+    const matchDayPlayerCount = participantEntries.length;
+    const playerSummaryHtml = buildMatchDayPlayerSummaryHtml(participantEntries, group.attendance_notes || []);
+    details.dataset.matchDate = group.match_date;
+    details.dataset.groupKey = group.group_key;
+    details.dataset.attendanceExpanded = openRecentMatchAttendancePanels.has(group.group_key) ? "true" : "false";
     details.className = `match-day-group${isActiveDay ? " match-day-group-active-day" : " match-day-group-archive-day"}`;
-    details.open = isActiveDay || openRecentMatchGroups.has(matchDate);
+    details.open = isActiveDay || openRecentMatchGroups.has(group.group_key);
     details.dataset.expanded = details.open ? "true" : "false";
     details.addEventListener("toggle", () => {
       if (details.open) {
-        openRecentMatchGroups.add(matchDate);
+        openRecentMatchGroups.add(group.group_key);
       } else {
-        openRecentMatchGroups.delete(matchDate);
+        openRecentMatchGroups.delete(group.group_key);
       }
       updateRecentMatchGroupSummary(details, isActiveDay);
     });
@@ -3684,21 +3861,20 @@ function renderRecentMatches(data) {
     details.innerHTML = `
       <summary>
         <div class="match-day-summary">
-          <strong>${escapeHtml(matchDate)}</strong>
+          <strong>${escapeHtml(group.match_date || "历史比赛")}</strong>
           <span class="queue-slot">${matches.length} 场</span>
-          <span class="match-day-player-count" title="当日参赛选手总数">${matchDayPlayerCount} 人</span>
-          ${matchDayPlayerText
-            ? `<span class="match-day-player-list" title="${escapeHtml(matchDayPlayerText)}">${escapeHtml(matchDayPlayerText)}</span>`
-            : ""
-          }
+          <button class="match-day-player-count" type="button" data-role="toggle-attendance-panel" data-match-day-key="${group.group_key}" aria-expanded="${openRecentMatchAttendancePanels.has(group.group_key) ? "true" : "false"}" title="展开当日补记名单">${matchDayPlayerCount} 人</button>
+          ${playerSummaryHtml}
         </div>
         <span class="match-day-toggle">
           <span class="match-day-toggle-icon" aria-hidden="true"></span>
-          <span class="muted match-day-toggle-text">${details.open ? "点击收起" : "点击展开"}</span>
         </span>
       </summary>
       <div class="match-day-content">
-        <div class="match-day-content-inner"></div>
+        <div class="match-day-content-inner">
+          ${buildMatchDayAttendancePanelHtml(group, canScore)}
+          <div class="match-day-matches"></div>
+        </div>
       </div>
     `;
     updateRecentMatchGroupSummary(details, isActiveDay);
@@ -3706,7 +3882,26 @@ function renderRecentMatches(data) {
       window.setTimeout(() => updateRecentMatchGroupSummary(details, isActiveDay), 0);
     });
 
-    const content = details.querySelector(".match-day-content-inner");
+    const content = details.querySelector(".match-day-matches");
+
+    if (!matches.length) {
+      const emptyCard = document.createElement("article");
+      emptyCard.className = "recent-match-card recent-match-card-empty";
+      emptyCard.innerHTML = `
+        <span class="recent-match-round-badge">比赛日占位</span>
+        <div class="recent-match-head">
+          <div class="recent-match-title">
+            <strong class="recent-match-result-pending">${isActiveDay ? "当日暂无比赛记录" : "当日未记录比赛"}</strong>
+            <span class="winner-badge">等待补录</span>
+          </div>
+        </div>
+        <div class="recent-match-meta">
+          <span class="muted">比赛日期：${escapeHtml(group.match_date || "未知日期")}</span>
+          ${group.note ? `<span class="muted">备注：${escapeHtml(group.note)}</span>` : '<span class="muted">未来如有补录比赛，可直接归入这个比赛日。</span>'}
+        </div>
+      `;
+      content.appendChild(emptyCard);
+    }
 
     matches.forEach((match, matchIndex) => {
       const players = parseRecentMatchPlayers(match.players);
@@ -4328,17 +4523,60 @@ async function loadLeaderboard() {
 }
 
 async function loadRecentMatches() {
+  try {
+    await db.rpc("ensure_previous_match_day_placeholder", {
+      p_season_id: activeSeason?.id || null,
+    });
+  } catch (error) {
+    // Ignore when the latest SQL has not been applied yet.
+  }
+
+  let dayQuery = db
+    .from("match_days")
+    .select("id, season_id, match_date, started_at, closed_at, is_active, note")
+    .order("match_date", { ascending: false })
+    .order("started_at", { ascending: false })
+    .limit(60);
+
   let query = db
     .from("match_day_recent_matches")
     .select("match_id, match_day_id, season_id, match_date, day_is_active, winner_team, note, created_at, players, double_downs")
     .order("created_at", { ascending: false })
-    .limit(100);
+    .limit(200);
+
+  let attendanceQuery = db
+    .from("match_day_attendance_notes")
+    .select(`
+      id,
+      match_day_id,
+      season_id,
+      match_date,
+      player_id,
+      status,
+      note,
+      created_at,
+      players (
+        display_name
+      )
+    `)
+    .order("created_at", { ascending: true })
+    .limit(200);
 
   if (activeSeason?.id) {
+    dayQuery = dayQuery.eq("season_id", activeSeason.id);
     query = query.eq("season_id", activeSeason.id);
+    attendanceQuery = attendanceQuery.eq("season_id", activeSeason.id);
   }
 
-  let { data, error } = await query;
+  const [dayResult, matchResult, attendanceResult] = await Promise.all([
+    dayQuery,
+    query,
+    attendanceQuery,
+  ]);
+  const dayData = dayResult.data;
+  const dayError = dayResult.error;
+  let data = matchResult.data;
+  let error = matchResult.error;
 
   if (error && (error.message.includes("season_id") || error.message.includes("double_downs"))) {
     ({ data, error } = await db
@@ -4348,9 +4586,10 @@ async function loadRecentMatches() {
       .limit(100));
   }
 
-  if (error) {
-    console.error("加载最近比赛失败：", error);
+  if (error || dayError) {
+    console.error("加载最近比赛失败：", error || dayError);
     recentMatchesData = [];
+    recentMatchDayGroupsData = [];
     renderRecentMatches([]);
     if (leaderboardPlayers?.length) {
       renderLeaderboard(leaderboardPlayers);
@@ -4358,7 +4597,15 @@ async function loadRecentMatches() {
     return;
   }
 
-  renderRecentMatches(data || []);
+  recentMatchesData = data || [];
+  const attendanceNotes = attendanceResult?.error
+    ? []
+    : (attendanceResult?.data || []).map((entry) => ({
+      ...entry,
+      display_name: entry.players?.display_name || "未知选手",
+    }));
+  const groupedData = buildRecentMatchDayGroups(recentMatchesData, dayData || [], attendanceNotes);
+  renderRecentMatches(groupedData);
   if (leaderboardPlayers?.length) {
     renderLeaderboard(leaderboardPlayers);
   }
@@ -4995,6 +5242,73 @@ async function removeTodayPlayer(entryId, buttonEl) {
   });
 }
 
+async function addMatchDayAttendanceNote(matchDayId, seasonId, matchDate, status, playerId, buttonEl) {
+  if (!ensureScorerAccess("仅记分员或管理员可补记每日名单。")) return;
+  if (!matchDayId || !playerId || !status) {
+    setMessage("缺少比赛日或选手信息，无法补记。", true);
+    return;
+  }
+
+  if (buttonEl) {
+    buttonEl.disabled = true;
+  }
+
+  setMessage(`正在补记${status === "standby" ? "替补" : "未到场"}名单...`);
+
+  const payload = {
+    match_day_id: matchDayId,
+    season_id: seasonId || activeSeason?.id || null,
+    match_date: matchDate || null,
+    player_id: playerId,
+    status,
+  };
+
+  const { error } = await db.from("match_day_attendance_notes").insert([payload]);
+
+  if (buttonEl) {
+    buttonEl.disabled = false;
+  }
+
+  if (error) {
+    setMessage(`补记名单失败：${error.message}。请先在 Supabase 执行最新 SQL。`, true);
+    return;
+  }
+
+  setMessage(`已补记${status === "standby" ? "替补" : "未到场"}名单。`);
+  requestImmediateRefresh({
+    playerDriven: true,
+    recentMatches: true,
+  });
+}
+
+async function removeMatchDayAttendanceNote(noteId, playerName, buttonEl) {
+  if (!ensureScorerAccess("仅记分员或管理员可移除每日补记名单。")) return;
+  if (!noteId) return;
+
+  if (buttonEl) {
+    buttonEl.disabled = true;
+  }
+
+  setMessage(`正在移除 ${playerName || "该选手"} 的补记状态...`);
+
+  const { error } = await db.from("match_day_attendance_notes").delete().eq("id", noteId);
+
+  if (buttonEl) {
+    buttonEl.disabled = false;
+  }
+
+  if (error) {
+    setMessage(`移除补记名单失败：${error.message}。请先在 Supabase 执行最新 SQL。`, true);
+    return;
+  }
+
+  setMessage(`${playerName || "该选手"} 的补记状态已移除。`);
+  requestImmediateRefresh({
+    playerDriven: true,
+    recentMatches: true,
+  });
+}
+
 function getSelectionStateByFormType(formType) {
   return formType === "backfill"
     ? { selections: backfillTeamSelections, assignments: backfillHeroAssignments }
@@ -5153,7 +5467,7 @@ async function saveHeroSelection(heroName) {
     rememberOpenRecentMatchGroups();
     updateRecentMatchHeroLocally(heroPickerState.matchId, heroPickerState.playerId, normalizedHero);
     closeHeroPicker();
-    renderRecentMatches(recentMatchesData);
+    renderRecentMatches(recentMatchDayGroupsData);
     return;
   }
 
@@ -5569,6 +5883,16 @@ function subscribeRealtime() {
     )
     .on(
       "postgres_changes",
+      { event: "*", schema: "public", table: "match_day_attendance_notes" },
+      () => {
+        scheduleRefresh({
+          playerDriven: true,
+          recentMatches: true,
+        });
+      }
+    )
+    .on(
+      "postgres_changes",
       { event: "*", schema: "public", table: "matches" },
       () => {
         scheduleRefresh({
@@ -5927,6 +6251,48 @@ todayPlayersList.addEventListener("click", async (event) => {
 });
 
 recentMatchesList.addEventListener("click", async (event) => {
+  const attendanceToggleButton = event.target.closest('[data-role="toggle-attendance-panel"]');
+  if (attendanceToggleButton) {
+    event.preventDefault();
+    event.stopPropagation();
+    const groupKey = attendanceToggleButton.dataset.matchDayKey;
+    if (groupKey) {
+      if (openRecentMatchAttendancePanels.has(groupKey)) {
+        openRecentMatchAttendancePanels.delete(groupKey);
+      } else {
+        openRecentMatchAttendancePanels.add(groupKey);
+        openRecentMatchGroups.add(groupKey);
+      }
+      renderRecentMatches(recentMatchDayGroupsData);
+    }
+    return;
+  }
+
+  const attendanceAddButton = event.target.closest(".match-day-attendance-add-btn");
+  if (attendanceAddButton) {
+    const panel = attendanceAddButton.closest(".match-day-attendance-panel");
+    const playerSelect = panel?.querySelector('[data-role="attendance-player-select"]');
+    await addMatchDayAttendanceNote(
+      attendanceAddButton.dataset.matchDayId,
+      attendanceAddButton.dataset.seasonId,
+      attendanceAddButton.dataset.matchDate,
+      attendanceAddButton.dataset.status,
+      playerSelect?.value,
+      attendanceAddButton
+    );
+    return;
+  }
+
+  const attendanceRemoveButton = event.target.closest(".match-day-attendance-remove-btn");
+  if (attendanceRemoveButton) {
+    await removeMatchDayAttendanceNote(
+      attendanceRemoveButton.dataset.noteId,
+      attendanceRemoveButton.dataset.playerName,
+      attendanceRemoveButton
+    );
+    return;
+  }
+
   const playerButton = event.target.closest('[data-role="saved-hero-picker"]');
   if (playerButton) {
     if (!isCurrentRoleScorer()) return;
