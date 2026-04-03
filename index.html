@@ -155,6 +155,23 @@
             <button id="adminRecalculateScoresBtn" class="button-secondary" type="button">高级重新汇算当前分数</button>
           </div>
         </section>
+        <section class="admin-panel-card">
+          <div class="section-head">
+            <div>
+              <h3>人工积分</h3>
+              <p class="muted">管理员也可直接执行死亡一指和治疗之手，规则与记分员一致。</p>
+            </div>
+          </div>
+          <div class="row">
+            <select id="adminManualScorePlayerSelect">
+              <option value="">请选择当前赛季选手</option>
+            </select>
+          </div>
+          <div class="row admin-panel-actions">
+            <button id="adminDeathFingerBtn" class="button-danger" type="button">死亡一指 -1</button>
+            <button id="adminHealingHandBtn" class="button-secondary" type="button">治疗之手 +1</button>
+          </div>
+        </section>
       </div>
       <p id="adminPanelMessage" class="message"></p>
     </section>

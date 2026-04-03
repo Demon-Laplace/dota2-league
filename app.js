@@ -45,6 +45,9 @@ const scorerClearQueueBtn = document.getElementById("scorerClearQueueBtn");
 const scorerManualScorePlayerSelect = document.getElementById("scorerManualScorePlayerSelect");
 const scorerDeathFingerBtn = document.getElementById("scorerDeathFingerBtn");
 const scorerHealingHandBtn = document.getElementById("scorerHealingHandBtn");
+const adminManualScorePlayerSelect = document.getElementById("adminManualScorePlayerSelect");
+const adminDeathFingerBtn = document.getElementById("adminDeathFingerBtn");
+const adminHealingHandBtn = document.getElementById("adminHealingHandBtn");
 const adminActionLogsList = document.getElementById("adminActionLogsList");
 const adminActionLogsEmpty = document.getElementById("adminActionLogsEmpty");
 const adminAddScorerSelect = document.getElementById("adminAddScorerSelect");
@@ -168,6 +171,7 @@ let activeSeason = null;
 let activeMatchDay = null;
 let allSeasons = [];
 let backfillPlayers = [];
+let allPlayersDirectory = [];
 let leaderboardPlayers = [];
 let leaderboardDisplaySeasonName = "";
 let leaderboardDisplaySeasonId = null;
@@ -1961,7 +1965,7 @@ function renderAdminAddScorerOptions() {
   if (!adminAddScorerSelect) return;
   const scorerPlayerIds = new Set(getRoleMembersByRole("scorer").map((member) => member.player_id));
   const options = ['<option value="">请选择总表选手</option>'];
-  seasonPlayers
+  allPlayersDirectory
     .filter((player) => !scorerPlayerIds.has(player.id))
     .sort((a, b) => a.display_name.localeCompare(b.display_name, "zh-CN"))
     .forEach((player) => {
@@ -1980,6 +1984,18 @@ function renderScorerManualScoreOptions() {
       options.push(`<option value="${player.id}">${escapeHtml(player.display_name)}</option>`);
     });
   scorerManualScorePlayerSelect.innerHTML = options.join("");
+}
+
+function renderAdminManualScoreOptions() {
+  if (!adminManualScorePlayerSelect) return;
+  const options = ['<option value="">请选择当前赛季选手</option>'];
+  seasonPlayers
+    .filter((player) => player.is_in_season)
+    .sort((a, b) => a.display_name.localeCompare(b.display_name, "zh-CN"))
+    .forEach((player) => {
+      options.push(`<option value="${player.id}">${escapeHtml(player.display_name)}</option>`);
+    });
+  adminManualScorePlayerSelect.innerHTML = options.join("");
 }
 
 function renderScorerPanelSummary() {
@@ -2039,6 +2055,7 @@ function renderRoleMembers() {
   renderAccessScorerOptions();
   renderAdminAddScorerOptions();
   renderScorerManualScoreOptions();
+  renderAdminManualScoreOptions();
   renderAdminActionLogs();
   renderScorerPanelSummary();
 }
@@ -2143,6 +2160,15 @@ function applyRolePermissions() {
   }
   if (scorerHealingHandBtn) {
     scorerHealingHandBtn.disabled = !canScore || !activeSeason?.id;
+  }
+  if (adminManualScorePlayerSelect) {
+    adminManualScorePlayerSelect.disabled = !isAdmin || !activeSeason?.id;
+  }
+  if (adminDeathFingerBtn) {
+    adminDeathFingerBtn.disabled = !isAdmin || !activeSeason?.id;
+  }
+  if (adminHealingHandBtn) {
+    adminHealingHandBtn.disabled = !isAdmin || !activeSeason?.id;
   }
   if (seasonRolloverBtn) {
     seasonRolloverBtn.hidden = !canScore;
@@ -5458,14 +5484,32 @@ async function loadRoleMembers() {
   roleMembersSupportAutoReconnect = true;
   let { data, error } = await db
     .from("app_role_members")
-    .select("id, role, player_id, allow_auto_reconnect, auto_reconnect_device_id, created_at")
+    .select(`
+      id,
+      role,
+      player_id,
+      allow_auto_reconnect,
+      auto_reconnect_device_id,
+      created_at,
+      players (
+        display_name
+      )
+    `)
     .order("created_at", { ascending: true });
 
   if (error && (String(error.message || "").includes("allow_auto_reconnect") || String(error.message || "").includes("auto_reconnect_device_id"))) {
     roleMembersSupportAutoReconnect = false;
     ({ data, error } = await db
       .from("app_role_members")
-      .select("id, role, player_id, created_at")
+      .select(`
+        id,
+        role,
+        player_id,
+        created_at,
+        players (
+          display_name
+        )
+      `)
       .order("created_at", { ascending: true }));
   }
 
@@ -5477,12 +5521,11 @@ async function loadRoleMembers() {
     return;
   }
 
-  const nameMap = new Map(seasonPlayers.map((player) => [player.id, player.display_name]));
   roleMembers = (data || []).map((member) => ({
     ...member,
     allow_auto_reconnect: Boolean(member.allow_auto_reconnect),
     auto_reconnect_device_id: member.auto_reconnect_device_id || "",
-    display_name: member.player_id ? (nameMap.get(member.player_id) || "未命名选手") : "",
+    display_name: member.players?.display_name || "",
   }));
   validateStoredAccessSession();
   renderRoleMembers();
@@ -5813,13 +5856,22 @@ async function loadSeasonPlayers() {
     .order("display_name", { ascending: true });
 
   if (playersResult.error) {
+    allPlayersDirectory = [];
     seasonPlayers = [];
     renderSeasonPlayersPanel();
     renderSignupOptions();
     renderMatchForm();
+    renderAdminAddScorerOptions();
+    renderScorerManualScoreOptions();
+    renderAdminManualScoreOptions();
     setMessage(`加载玩家失败：${playersResult.error.message}`, true);
     return;
   }
+
+  allPlayersDirectory = (playersResult.data || []).map((player) => ({
+    id: player.id,
+    display_name: player.display_name || "未知选手",
+  })).sort((a, b) => a.display_name.localeCompare(b.display_name, "zh-CN"));
 
   let participantIds = new Set();
   let participantRanks = new Map();
@@ -6187,6 +6239,10 @@ async function resetCurrentSeason() {
   requestImmediateRefresh({
     seasonContext: true,
   });
+
+  renderAdminAddScorerOptions();
+  renderScorerManualScoreOptions();
+  renderAdminManualScoreOptions();
 }
 
 async function confirmSeasonRollover() {
@@ -6379,21 +6435,23 @@ async function clearSignupQueueForScorer() {
   requestImmediateRefresh({ queue: true });
 }
 
-async function applyManualScoreAdjustment(kind) {
+async function applyManualScoreAdjustment(kind, options = {}) {
   if (!ensureScorerAccess("仅记分员或管理员可执行人工积分调整。")) return;
+  const panelMessage = options.messageTarget === "admin" ? setAdminPanelMessage : setScorerPanelMessage;
   if (!activeSeason?.id) {
-    setScorerPanelMessage("当前没有可操作的赛季。", true);
+    panelMessage("当前没有可操作的赛季。", true);
     return;
   }
   if (!currentAccessSession.memberId) {
-    setScorerPanelMessage("当前身份缺少角色记录，暂时无法执行人工积分调整。", true);
+    panelMessage("当前身份缺少角色记录，暂时无法执行人工积分调整。", true);
     return;
   }
 
-  const playerId = scorerManualScorePlayerSelect?.value || "";
+  const sourceSelect = options.playerSelect || scorerManualScorePlayerSelect;
+  const playerId = sourceSelect?.value || "";
   const player = seasonPlayers.find((item) => item.id === playerId && item.is_in_season);
   if (!player) {
-    setScorerPanelMessage("请先选择一名当前赛季选手。", true);
+    panelMessage("请先选择一名当前赛季选手。", true);
     return;
   }
 
@@ -6404,7 +6462,7 @@ async function applyManualScoreAdjustment(kind) {
   const confirmed = window.confirm(`确认对 ${player.display_name} 执行${actionLabel}吗？这会固定 ${scoreLabel} 分。`);
   if (!confirmed) return;
 
-  setScorerPanelMessage(`正在对 ${player.display_name} 执行${actionLabel}...`);
+  panelMessage(`正在对 ${player.display_name} 执行${actionLabel}...`);
 
   const { error } = await db.rpc("apply_manual_score_adjustment", {
     p_season_id: activeSeason.id,
@@ -6415,12 +6473,12 @@ async function applyManualScoreAdjustment(kind) {
   });
 
   if (error) {
-    setScorerPanelMessage(`人工积分调整失败：${error.message}。请先在 Supabase 执行最新 SQL。`, true);
+    panelMessage(`人工积分调整失败：${error.message}。请先在 Supabase 执行最新 SQL。`, true);
     return;
   }
 
   scoreDetailSeasonCache.clear();
-  setScorerPanelMessage(`${player.display_name} 已执行${actionLabel}（${scoreLabel}）。`);
+  panelMessage(`${player.display_name} 已执行${actionLabel}（${scoreLabel}）。`);
   setMessage(`${player.display_name} 已执行${actionLabel}（${scoreLabel}）。`);
   appendAdminActionLog(`${getCurrentAccessActorLabel()} 对 ${player.display_name} 执行了${actionLabel}（${scoreLabel}）。`);
   requestImmediateRefresh({
@@ -7999,6 +8057,18 @@ if (scorerDeathFingerBtn) {
 }
 if (scorerHealingHandBtn) {
   scorerHealingHandBtn.addEventListener("click", () => applyManualScoreAdjustment("healing_hand"));
+}
+if (adminDeathFingerBtn) {
+  adminDeathFingerBtn.addEventListener("click", () => applyManualScoreAdjustment("death_finger", {
+    playerSelect: adminManualScorePlayerSelect,
+    messageTarget: "admin",
+  }));
+}
+if (adminHealingHandBtn) {
+  adminHealingHandBtn.addEventListener("click", () => applyManualScoreAdjustment("healing_hand", {
+    playerSelect: adminManualScorePlayerSelect,
+    messageTarget: "admin",
+  }));
 }
 startMatchDayBtn.addEventListener("click", async () => {
   if (activeMatchDay) {
