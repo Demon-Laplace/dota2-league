@@ -3568,32 +3568,34 @@ ol {
 .reward-glow-tier-base {
   box-shadow:
     inset 0 1px 0 rgba(255, 248, 212, 0.06),
-    0 0 0 1px rgba(255, 209, 82, 0.1),
-    0 0 12px rgba(228, 177, 60, 0.08);
+    0 0 0 1px rgba(255, 209, 82, 0.08),
+    0 0 8px rgba(228, 177, 60, 0.05);
 }
 
 .reward-glow-tier-warm {
   box-shadow:
     inset 0 1px 0 rgba(255, 248, 212, 0.08),
-    0 0 0 1px rgba(255, 214, 93, 0.14),
-    0 0 16px rgba(240, 193, 79, 0.14),
-    0 0 28px rgba(196, 136, 28, 0.08);
+    0 0 0 1px rgba(255, 214, 93, 0.18),
+    0 0 14px rgba(240, 193, 79, 0.18),
+    0 0 30px rgba(196, 136, 28, 0.1);
 }
 
 .reward-glow-tier-bright {
   box-shadow:
     inset 0 1px 0 rgba(255, 248, 212, 0.1),
-    0 0 0 1px rgba(255, 220, 112, 0.18),
-    0 0 20px rgba(255, 214, 93, 0.18),
-    0 0 38px rgba(224, 168, 44, 0.12);
+    0 0 0 1px rgba(255, 220, 112, 0.28),
+    0 0 22px rgba(255, 214, 93, 0.3),
+    0 0 44px rgba(224, 168, 44, 0.2),
+    0 0 72px rgba(255, 192, 74, 0.12);
 }
 
 .reward-glow-tier-blazing {
   box-shadow:
-    inset 0 1px 0 rgba(255, 250, 224, 0.12),
-    0 0 0 1px rgba(255, 224, 130, 0.2),
-    0 0 24px rgba(255, 220, 112, 0.24),
-    0 0 48px rgba(255, 181, 52, 0.16);
+    inset 0 1px 0 rgba(255, 250, 224, 0.14),
+    0 0 0 1px rgba(255, 224, 130, 0.34),
+    0 0 28px rgba(255, 220, 112, 0.42),
+    0 0 56px rgba(255, 181, 52, 0.3),
+    0 0 92px rgba(255, 192, 74, 0.18);
 }
 
 .leaderboard-score {

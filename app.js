@@ -5753,6 +5753,7 @@ function getDateMonthKey(dateString) {
 function shouldOpenSeasonGroupByDefault(seasonMeta, groups) {
   if (!seasonMeta) return true;
   if (openRecentMatchSeasons.has(seasonMeta.id)) return true;
+  if (activeSeason?.id && seasonMeta.id === activeSeason.id) return true;
 
   const todayMonth = getDateMonthKey(getBeijingBusinessDateString());
   const startMonth = getDateMonthKey(seasonMeta.start_date);
@@ -5935,6 +5936,8 @@ function renderRecentMatches(groups) {
     const seasonMeta = seasonEntry.season_meta;
     const dayGroups = seasonEntry.groups || [];
     const totalMatches = dayGroups.reduce((sum, group) => sum + (group.matches?.length || 0), 0);
+    const matchDayCount = dayGroups.filter((group) => (group.matches?.length || 0) > 0).length;
+    const restDayCount = Math.max(dayGroups.length - matchDayCount, 0);
     const isSeasonOpen = shouldOpenSeasonGroupByDefault(seasonMeta, dayGroups);
     seasonDetails.className = "recent-match-season-group";
     seasonDetails.dataset.seasonId = seasonEntry.season_id || "";
@@ -5955,7 +5958,7 @@ function renderRecentMatches(groups) {
       <summary class="recent-match-season-summary">
         <div class="recent-match-season-title-block">
           <strong>${escapeHtml(seasonEntry.season_name || getSeasonDisplayName(seasonEntry.season_id))}</strong>
-          <span class="muted">${dayGroups.length} 个比赛日 · ${totalMatches} 场比赛</span>
+          <span class="muted">${matchDayCount} 个比赛日 · ${restDayCount} 个休息日 · ${totalMatches} 场比赛</span>
         </div>
         <span class="match-day-toggle">
           <span class="match-day-toggle-icon" aria-hidden="true"></span>
