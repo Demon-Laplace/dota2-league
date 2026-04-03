@@ -2909,6 +2909,60 @@ function getNemesisMap(data, matches, minHeadToHeadGames = 8, minDelta = 25) {
   return nemesisMap;
 }
 
+function getSideSpecialistMap(matches, minTotalGames = 11, minPerSideGames = 4, minDelta = 22, minSideWinRate = 58) {
+  const sideMap = new Map();
+
+  (matches || []).forEach((match) => {
+    if (!hasRecordedWinner(match.winner_team)) return;
+    const players = parseRecentMatchPlayers(match.players);
+
+    players.forEach((player) => {
+      const playerId = player.player_id || player.id;
+      const team = player.team === "A" ? "A" : (player.team === "B" ? "B" : "");
+      if (!playerId || !team) return;
+
+      const current = sideMap.get(playerId) || {
+        A: { games: 0, wins: 0 },
+        B: { games: 0, wins: 0 },
+      };
+      current[team].games += 1;
+      if (team === match.winner_team) current[team].wins += 1;
+      sideMap.set(playerId, current);
+    });
+  });
+
+  const result = new Map();
+  sideMap.forEach((entry, playerId) => {
+    const radiantGames = Number(entry.A?.games || 0);
+    const direGames = Number(entry.B?.games || 0);
+    const totalGames = radiantGames + direGames;
+    if (totalGames < minTotalGames || radiantGames < minPerSideGames || direGames < minPerSideGames) return;
+
+    const radiantRate = radiantGames > 0 ? (Number(entry.A?.wins || 0) / radiantGames) * 100 : 0;
+    const direRate = direGames > 0 ? (Number(entry.B?.wins || 0) / direGames) * 100 : 0;
+    const delta = radiantRate - direRate;
+
+    if (delta >= minDelta && radiantRate >= minSideWinRate) {
+      result.set(playerId, { side: "A", delta, radiantRate, direRate });
+      return;
+    }
+
+    if (delta <= -minDelta && direRate >= minSideWinRate) {
+      result.set(playerId, { side: "B", delta, radiantRate, direRate });
+    }
+  });
+
+  return result;
+}
+
+function getRewardGlowTier(amount) {
+  const value = Number(amount ?? 0);
+  if (!Number.isFinite(value) || value < 20) return "base";
+  if (value < 100) return "warm";
+  if (value < 300) return "bright";
+  return "blazing";
+}
+
 function getLeaderboardNameRankClass(rank) {
   if (rank === 1) return "player-name-display-rank1";
   if (rank <= 3) return "player-name-display-rank23";
@@ -4280,9 +4334,11 @@ function updateSeasonInfo() {
 function updateSeasonRewardTotal(total) {
   if (total == null) {
     seasonRewardTotal.textContent = "本赛季赞助总额：--";
+    seasonRewardTotal.className = "season-total reward-glow-tier-base";
     return;
   }
 
+  seasonRewardTotal.className = `season-total reward-glow-tier-${getRewardGlowTier(total)}`;
   seasonRewardTotal.textContent = `本赛季赞助总额：${formatScore(total)}`;
 }
 
@@ -4548,10 +4604,11 @@ function renderRewardLogs() {
     rewardSummary.forEach((player) => {
       const item = document.createElement("article");
       item.className = "reward-summary-card";
+      const rewardTierClass = `reward-glow-tier-${getRewardGlowTier(player.total)}`;
       item.innerHTML = `
         <div class="reward-summary-head">
           <strong>${escapeHtml(player.display_name)}</strong>
-          <span class="reward-log-amount">总额 ${formatScore(player.total)}</span>
+          <span class="reward-log-amount reward-log-amount-total ${rewardTierClass}">总额 ${formatScore(player.total)}</span>
         </div>
         <div class="reward-category-list">
           ${player.categories.map((category) => buildRewardCategoryLineHtml(category)).join("")}
@@ -5178,6 +5235,7 @@ function renderLeaderboard(data) {
   const superDoubleIds = getSuperDoublePlayerIds(recentMatchesData);
   const teammateAffinity = getTeammateAffinityLeaders(data, recentMatchesData, 8, 12);
   const nemesisMap = getNemesisMap(data, recentMatchesData, 8, 25);
+  const sideSpecialistMap = getSideSpecialistMap(recentMatchesData, 11, 4, 22);
   const mvpIds = getMvpPlayerIds();
   const playerNameMap = new Map(data.map((player) => [player.player_id || player.id, stripPlayerNameMeta(player.display_name || "未知选手") || "未知选手"]));
 
@@ -5234,12 +5292,29 @@ function renderLeaderboard(data) {
       tags.push({ icon: "✿", label: "幸运星", tone: "pink", description: "同队时更容易赢" });
     }
 
+    const sideSpecialist = sideSpecialistMap.get(playerId);
+    if (sideSpecialist?.side === "A") {
+      tags.push({
+        icon: "☼",
+        label: "光明使者",
+        tone: "dawn",
+        description: `天辉胜率 ${formatWinRateValue(sideSpecialist.radiantRate)}，明显高于夜魇 ${formatWinRateValue(sideSpecialist.direRate)}`,
+      });
+    } else if (sideSpecialist?.side === "B") {
+      tags.push({
+        icon: "☽",
+        label: "夜魇暗潮",
+        tone: "abyss",
+        description: `夜魇胜率 ${formatWinRateValue(sideSpecialist.direRate)}，明显高于天辉 ${formatWinRateValue(sideSpecialist.radiantRate)}`,
+      });
+    }
+
     const nemesis = nemesisMap.get(playerId);
     if (nemesis?.opponentId) {
       const opponentName = playerNameMap.get(nemesis.opponentId) || "那位对手";
       tags.push({
         icon: "✹",
-        label: `${opponentName}的一生之敌`,
+        label: `${opponentName}一生之敌`,
         tone: "inferno",
         description: `面对 ${opponentName} 时更难赢`,
       });
