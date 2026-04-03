@@ -3,6 +3,7 @@ const SUPABASE_ANON_KEY = "sb_publishable_Ap-srffzI3MkOjmYAH0lag_kiP_1Ifm";
 const TEAM_SIZE = 5;
 const LOADING_SCREEN_MIN_MS = 900;
 const DAY_MS = 24 * 60 * 60 * 1000;
+const SCORE_DETAIL_RECENT_MATCH_DAY_COUNT = 3;
 const HARDCORE_TAG_MIN_GAMES = 10;
 const HARDCORE_TAG_LOVE_CAP_GAMES = 20;
 const HARDCORE_TAG_WIN_RATE_MAX = 40;
@@ -1362,6 +1363,44 @@ function compareScoreDetailMatches(a, b) {
   return String(a.match_id || "").localeCompare(String(b.match_id || ""));
 }
 
+function createArchivedScoreSummaryEntry(summary) {
+  if (!summary || !summary.matchCount) return null;
+
+  const dayCount = summary.matchDays.size;
+  const rangeLabel = summary.firstDate && summary.lastDate
+    ? (summary.firstDate === summary.lastDate ? summary.firstDate : `${summary.firstDate} 至 ${summary.lastDate}`)
+    : "更早比赛";
+  const noteParts = [
+    `${summary.winCount} 胜 ${summary.loseCount} 负`,
+    `累计上分 ${formatSignedScore(summary.positiveDelta || 0)}`,
+    `累计掉分 ${formatSignedScore(summary.negativeDelta || 0)}`,
+  ];
+
+  if (summary.teamDoubleCount) {
+    noteParts.push(`团队双倍 ${summary.teamDoubleCount} 次`);
+  }
+  if (summary.singleDoubleCount) {
+    noteParts.push(`个人双倍 ${summary.singleDoubleCount} 次`);
+  }
+  if (summary.koiCount) {
+    noteParts.push(`锦鲤加成 ${summary.koiCount} 次`);
+  }
+
+  return {
+    id: `archived-match-summary-${summary.firstDate || "older"}`,
+    delta: summary.delta,
+    title: "更早比赛综合简报",
+    subtitle: `仅保留最近 ${SCORE_DETAIL_RECENT_MATCH_DAY_COUNT} 个比赛日逐场明细`,
+    meta: `${rangeLabel} · ${dayCount} 个比赛日 · ${summary.matchCount} 场比赛`,
+    note: noteParts.join(" · "),
+    badges: [
+      { label: "历史汇总", tone: "team" },
+      { label: `${dayCount} 个比赛日`, tone: "rest" },
+      { label: `${summary.matchCount} 场`, tone: "single" },
+    ],
+  };
+}
+
 function shouldApplyMatchDayAbsenceAdjustmentClient(matchDate, closedAt) {
   if (!matchDate) return false;
   if (closedAt) return true;
@@ -1479,9 +1518,25 @@ function buildScoreDetailEntries(player, seasonData) {
   });
 
   const entries = [];
+  const detailedMatchDates = new Set([...matchesByDay.keys()].slice(-SCORE_DETAIL_RECENT_MATCH_DAY_COUNT));
+  const archivedMatchSummary = {
+    firstDate: "",
+    lastDate: "",
+    matchDays: new Set(),
+    matchCount: 0,
+    winCount: 0,
+    loseCount: 0,
+    positiveDelta: 0,
+    negativeDelta: 0,
+    delta: 0,
+    teamDoubleCount: 0,
+    singleDoubleCount: 0,
+    koiCount: 0,
+  };
 
   matchesByDay.forEach((dayMatches, matchDate) => {
     const participantsToday = new Set();
+    const shouldKeepMatchLevelEntries = detailedMatchDates.has(matchDate);
 
     dayMatches.forEach((match, matchIndex) => {
       const players = parseRecentMatchPlayers(match.players);
@@ -1509,8 +1564,7 @@ function buildScoreDetailEntries(player, seasonData) {
       if (!targetPlayer) return;
 
       const delta = Number(targetPlayer.score_change ?? 0);
-      if (!Number.isFinite(delta) || delta === 0) return;
-
+      if (!winnerRecorded && (!Number.isFinite(delta) || delta === 0)) return;
       const isTeamDouble = doubleDowns.some(
         (item) => item.mode === "team" && item.target_team === targetPlayer.team
       );
@@ -1551,6 +1605,27 @@ function buildScoreDetailEntries(player, seasonData) {
         getWinnerLabel(match.winner_team),
         getTeamLabel(targetPlayer.team),
       ];
+
+      if (!shouldKeepMatchLevelEntries) {
+        archivedMatchSummary.firstDate = archivedMatchSummary.firstDate || matchDate;
+        archivedMatchSummary.lastDate = matchDate;
+        archivedMatchSummary.matchDays.add(matchDate);
+        archivedMatchSummary.matchCount += 1;
+        archivedMatchSummary.delta += Number.isFinite(delta) ? delta : 0;
+        if (delta > 0) {
+          archivedMatchSummary.winCount += 1;
+          archivedMatchSummary.positiveDelta += delta;
+        } else if (delta < 0) {
+          archivedMatchSummary.loseCount += 1;
+          archivedMatchSummary.negativeDelta += delta;
+        }
+        if (isTeamDouble) archivedMatchSummary.teamDoubleCount += 1;
+        if (isSingleDouble) archivedMatchSummary.singleDoubleCount += 1;
+        if (isKoiBoost) archivedMatchSummary.koiCount += 1;
+        return;
+      }
+
+      if (!Number.isFinite(delta) || delta === 0) return;
 
       entries.push({
         id: `match-${match.match_id}-${targetPlayer.player_id}`,
@@ -1634,6 +1709,11 @@ function buildScoreDetailEntries(player, seasonData) {
       }
     }
   });
+
+  const archivedSummaryEntry = createArchivedScoreSummaryEntry(archivedMatchSummary);
+  if (archivedSummaryEntry) {
+    entries.unshift(archivedSummaryEntry);
+  }
 
   (seasonData?.manualAdjustments || []).forEach((adjustment) => {
     if (adjustment.player_id !== targetPlayerId || adjustment.revoked_at) return;
