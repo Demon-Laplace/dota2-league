@@ -7726,6 +7726,16 @@ document.addEventListener("click", (event) => {
 });
 
 async function init() {
+  const failedSteps = [];
+  const runInitStep = async (label, action) => {
+    try {
+      await action();
+    } catch (error) {
+      failedSteps.push(label);
+      console.error(`[init] ${label} 失败：`, error);
+    }
+  };
+
   try {
     renderLastUpdatedTime();
     setMatchFormOpen(false);
@@ -7742,13 +7752,19 @@ async function init() {
     renderRewardLogs();
     updateSeasonInfo();
     renderMatchDayStatus();
-    await loadActiveSeason();
-    await refreshPlayerDrivenViews();
-    await loadQueue();
-    await loadLeaderboard();
-    await loadRewardLogs();
-    await loadRecentMatches();
-    subscribeRealtime();
+    await runInitStep("加载当前赛季", loadActiveSeason);
+    await runInitStep("加载基础数据", refreshPlayerDrivenViews);
+    await runInitStep("加载报名队列", loadQueue);
+    await runInitStep("加载积分榜", loadLeaderboard);
+    await runInitStep("加载赛季赞助", loadRewardLogs);
+    await runInitStep("加载最近比赛", loadRecentMatches);
+    await runInitStep("建立实时订阅", async () => {
+      subscribeRealtime();
+    });
+
+    if (failedSteps.length) {
+      setMessage(`部分数据加载失败：${failedSteps.join("、")}。其它可用内容已继续显示，请刷新后再试。`, true);
+    }
   } finally {
     hideLoadingScreen();
   }
