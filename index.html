@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Dota2 宁德联赛</title>
-  <link rel="stylesheet" href="style.css?v=20260404-19" />
+  <link rel="stylesheet" href="style.css?v=20260404-20" />
 </head>
   <body>
   <div id="loadingScreen" class="loading-screen" aria-live="polite">
@@ -175,13 +175,23 @@
         </div>
         <button id="closeRewardPanelBtn" class="button-secondary" type="button">收起</button>
       </div>
-      <div class="row">
-        <select id="rewardPlayerSelect">
-          <option value="">请选择选手</option>
-        </select>
-        <input id="rewardOutsideNameInput" type="text" placeholder="场外赞助姓名" />
-        <input id="rewardExtraInput" type="number" min="0" step="1" placeholder="额外赞助额" />
-        <button id="addRewardBtn" type="button">添加赞助</button>
+      <div class="reward-entry-shell">
+        <div class="reward-entry-mode" role="tablist" aria-label="赞助登记方式">
+          <button id="rewardModePlayerBtn" class="button-secondary reward-mode-btn reward-mode-btn-active" type="button" aria-pressed="true">赛季选手赞助</button>
+          <button id="rewardModeOutsideBtn" class="button-secondary reward-mode-btn" type="button" aria-pressed="false">场外赞助</button>
+        </div>
+        <div id="rewardPlayerEntryRow" class="row reward-entry-row">
+          <select id="rewardPlayerSelect">
+            <option value="">请选择选手</option>
+          </select>
+          <input id="rewardExtraInput" type="number" min="0" step="1" placeholder="额外赞助额" />
+          <button id="addRewardBtn" type="button">添加赞助</button>
+        </div>
+        <div id="rewardOutsideEntryRow" class="row reward-entry-row" hidden>
+          <input id="rewardOutsideNameInput" type="text" placeholder="场外赞助姓名" />
+          <input id="rewardOutsideExtraInput" type="number" min="0" step="1" placeholder="场外赞助额" />
+          <button id="addOutsideRewardBtn" type="button">添加赞助</button>
+        </div>
       </div>
       <p id="rewardMinimumHint" class="muted">请选择选手后添加额外赞助。</p>
       <p id="rewardMessage" class="message"></p>
@@ -483,6 +493,6 @@
   </div>
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="app.js?v=20260403-42"></script>
+  <script src="app.js?v=20260404-20"></script>
 </body>
 </html>

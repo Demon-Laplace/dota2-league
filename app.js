@@ -104,10 +104,16 @@ const seasonRolloverStatus = document.getElementById("seasonRolloverStatus");
 const seasonRewardTotal = document.getElementById("seasonRewardTotal");
 const rewardPanel = document.getElementById("rewardPanel");
 const closeRewardPanelBtn = document.getElementById("closeRewardPanelBtn");
+const rewardModePlayerBtn = document.getElementById("rewardModePlayerBtn");
+const rewardModeOutsideBtn = document.getElementById("rewardModeOutsideBtn");
+const rewardPlayerEntryRow = document.getElementById("rewardPlayerEntryRow");
+const rewardOutsideEntryRow = document.getElementById("rewardOutsideEntryRow");
 const rewardPlayerSelect = document.getElementById("rewardPlayerSelect");
 const rewardOutsideNameInput = document.getElementById("rewardOutsideNameInput");
 const rewardExtraInput = document.getElementById("rewardExtraInput");
+const rewardOutsideExtraInput = document.getElementById("rewardOutsideExtraInput");
 const addRewardBtn = document.getElementById("addRewardBtn");
+const addOutsideRewardBtn = document.getElementById("addOutsideRewardBtn");
 const rewardMinimumHint = document.getElementById("rewardMinimumHint");
 const rewardMessageEl = document.getElementById("rewardMessage");
 const koiPlayerSelect = document.getElementById("koiPlayerSelect");
@@ -222,6 +228,7 @@ let roleMembersSupportAutoReconnect = true;
 let openRecentMatchGroups = new Set();
 let openRecentMatchSeasons = readOpenRecentMatchSeasons();
 let matchDayAttendanceSelectedIdsByGroup = new Map();
+let rewardEntryMode = "player";
 let isMatchFormOpen = false;
 let isBackfillFormOpen = false;
 let isSeasonPanelOpen = false;
@@ -273,6 +280,7 @@ let accessModalMode = "scorer";
 let heroPickerState = null;
 let realtimeChannel = null;
 let refreshTimer = null;
+let restDayBoundaryTimer = null;
 let refreshFlushPromise = null;
 let placeholderEnsureAttemptKey = "";
 let scoreDetailSeasonCache = new Map();
@@ -1017,6 +1025,22 @@ function formatShortLocalTime(value) {
   });
 }
 
+function getMonospaceTextWidth(text) {
+  return [...String(text || "")].reduce((sum, char) => (
+    /[\u4e00-\u9fff\uff00-\uffef]/.test(char) ? sum + 2 : sum + 1
+  ), 0);
+}
+
+function padMonospaceText(text, width, align = "start") {
+  const safeText = String(text || "");
+  const currentWidth = getMonospaceTextWidth(safeText);
+  const padding = Math.max(width - currentWidth, 0);
+  if (align === "end") {
+    return `${" ".repeat(padding)}${safeText}`;
+  }
+  return `${safeText}${" ".repeat(padding)}`;
+}
+
 function buildLeaderboardShareText(players = leaderboardPlayers) {
   const source = players || [];
   if (!source.length) {
@@ -1028,13 +1052,26 @@ function buildLeaderboardShareText(players = leaderboardPlayers) {
     ? `【${headerSeasonName}积分榜】`
     : "【积分榜】";
 
-  const lines = source.map((player, idx) => {
-    const playerName = stripPlayerNameMeta(player.display_name || "未知选手");
-    const score = formatScore(player.score);
-    const gamesPlayed = Number(player.games_played ?? 0);
-    const winRate = formatWinRateValue(player.win_rate, player.wins, player.games_played);
-    return `${idx + 1}. ${playerName}｜${score}分｜${gamesPlayed}场｜${winRate}`;
-  });
+  const rows = source.map((player, idx) => ({
+    rank: `${idx + 1}.`,
+    playerName: stripPlayerNameMeta(player.display_name || "未知选手"),
+    score: `${formatScore(player.score)}分`,
+    gamesPlayed: `${Number(player.games_played ?? 0)}场`,
+    winRate: formatWinRateValue(player.win_rate, player.wins, player.games_played),
+  }));
+
+  const rankWidth = Math.max(...rows.map((row) => getMonospaceTextWidth(row.rank)));
+  const nameWidth = Math.max(...rows.map((row) => getMonospaceTextWidth(row.playerName)));
+  const scoreWidth = Math.max(...rows.map((row) => getMonospaceTextWidth(row.score)));
+  const gameWidth = Math.max(...rows.map((row) => getMonospaceTextWidth(row.gamesPlayed)));
+
+  const lines = rows.map((row) => [
+    padMonospaceText(row.rank, rankWidth, "end"),
+    padMonospaceText(row.playerName, nameWidth),
+    padMonospaceText(row.score, scoreWidth, "end"),
+    padMonospaceText(row.gamesPlayed, gameWidth, "end"),
+    row.winRate,
+  ].join(" ｜ "));
 
   return [
     header,
@@ -1121,8 +1158,7 @@ function buildMatchDayBattleReportText(group) {
         .filter((player) => player.team === "B")
         .map((player) => stripPlayerNameMeta(player.display_name || "未知选手"));
       const matchLabel = `第${index + 1}场`;
-      const timeLabel = formatShortLocalTime(match.created_at);
-      const titleLine = [matchLabel, timeLabel, getWinnerLabel(match.winner_team)]
+      const titleLine = [matchLabel, getWinnerLabel(match.winner_team)]
         .filter(Boolean)
         .join("｜");
       lines.push(titleLine);
@@ -1258,6 +1294,34 @@ function setRewardPanelOpen(isOpen) {
   isRewardPanelOpen = isOpen;
   rewardPanel.hidden = !isOpen;
   seasonRewardTotal.setAttribute("aria-expanded", String(isOpen));
+}
+
+function setRewardEntryMode(mode = "player") {
+  rewardEntryMode = mode === "outside" ? "outside" : "player";
+  const isOutsideMode = rewardEntryMode === "outside";
+
+  if (rewardModePlayerBtn) {
+    rewardModePlayerBtn.classList.toggle("reward-mode-btn-active", !isOutsideMode);
+    rewardModePlayerBtn.setAttribute("aria-pressed", String(!isOutsideMode));
+  }
+  if (rewardModeOutsideBtn) {
+    rewardModeOutsideBtn.classList.toggle("reward-mode-btn-active", isOutsideMode);
+    rewardModeOutsideBtn.setAttribute("aria-pressed", String(isOutsideMode));
+  }
+  if (rewardPlayerEntryRow) {
+    rewardPlayerEntryRow.hidden = isOutsideMode;
+  }
+  if (rewardOutsideEntryRow) {
+    rewardOutsideEntryRow.hidden = !isOutsideMode;
+  }
+
+  if (isOutsideMode) {
+    rewardPlayerSelect.value = "";
+  } else {
+    rewardOutsideNameInput.value = "";
+  }
+
+  updateRewardMinimumHint();
 }
 
 function isCurrentRoleScorerOnly() {
@@ -2483,10 +2547,18 @@ function applyRolePermissions() {
   openBackfillFormBtn.hidden = !canScore;
   recordMatchBtn.hidden = !canScore;
   recordBackfillBtn.hidden = !canScore;
-  addRewardBtn.hidden = false;
-  rewardPlayerSelect.disabled = false;
-  rewardOutsideNameInput.disabled = false;
-  rewardExtraInput.disabled = false;
+  if (rewardModePlayerBtn) {
+    rewardModePlayerBtn.disabled = !canScore;
+  }
+  if (rewardModeOutsideBtn) {
+    rewardModeOutsideBtn.disabled = !canScore;
+  }
+  addRewardBtn.hidden = !canScore;
+  addOutsideRewardBtn.hidden = !canScore;
+  rewardPlayerSelect.disabled = !canScore;
+  rewardOutsideNameInput.disabled = !canScore;
+  rewardExtraInput.disabled = !canScore;
+  rewardOutsideExtraInput.disabled = !canScore;
   adminAddScorerBtn.disabled = !isAdmin;
   adminAddScorerSelect.disabled = !isAdmin;
   adminClearQueueBtn.disabled = !isAdmin;
@@ -2531,6 +2603,7 @@ function applyRolePermissions() {
 
   renderScorerPanelSummary();
   renderSeasonPlayersPanel();
+  renderRewardLogs();
   renderRecentMatches(recentMatchDayGroupsData);
 }
 
@@ -2541,6 +2614,10 @@ function escapeHtml(str) {
     .replaceAll(">", "&gt;")
     .replaceAll('"', "&quot;")
     .replaceAll("'", "&#039;");
+}
+
+function escapeRegExp(str) {
+  return String(str).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
 function formatLocalTime(value) {
@@ -3485,6 +3562,27 @@ function getPreviousBeijingBusinessDateString() {
 
 function getBeijingNowDate() {
   return new Date(new Date().toLocaleString("en-US", { timeZone: "Asia/Shanghai" }));
+}
+
+function scheduleRestDayBoundaryRefresh() {
+  if (restDayBoundaryTimer) {
+    window.clearTimeout(restDayBoundaryTimer);
+    restDayBoundaryTimer = null;
+  }
+
+  const beijingNow = getBeijingNowDate();
+  const nextBoundary = new Date(beijingNow);
+  nextBoundary.setHours(2, 0, 5, 0);
+  if (nextBoundary <= beijingNow) {
+    nextBoundary.setDate(nextBoundary.getDate() + 1);
+  }
+
+  const delayMs = Math.max(nextBoundary.getTime() - beijingNow.getTime(), 1000);
+  restDayBoundaryTimer = window.setTimeout(() => {
+    renderRecentMatches(recentMatchDayGroupsData);
+    renderMatchDayStatus();
+    scheduleRestDayBoundaryRefresh();
+  }, delayMs);
 }
 
 function getSeasonMonthLastDate(dateText) {
@@ -4834,6 +4932,44 @@ function renderRewardPlayerOptions() {
   rewardPlayerSelect.innerHTML = options.join("");
 }
 
+function getRewardCardUsageDetail(playerId) {
+  const summary = rewardCardUsageSummary.get(playerId) || null;
+  if (summary) {
+    return {
+      freeSingleRemaining: Math.max(Number(summary.freeSingleRemaining ?? 2), 0),
+      freeSingleUsed: Math.max(Number(summary.freeSingleUsed ?? 0), 0),
+      totalSingleCount: Math.max(Number(summary.totalSingleCount ?? 0), 0),
+      paidSingleCount: Math.max(Number(summary.paidSingleCount ?? 0), 0),
+      paidSingleAmount: Math.max(Number(summary.paidSingleAmount ?? 0), 0),
+      teamCount: Math.max(Number(summary.teamCount ?? 0), 0),
+      teamAmount: Math.max(Number(summary.teamAmount ?? 0), 0),
+    };
+  }
+
+  return {
+    freeSingleRemaining: 2,
+    freeSingleUsed: 0,
+    totalSingleCount: 0,
+    paidSingleCount: 0,
+    paidSingleAmount: 0,
+    teamCount: 0,
+    teamAmount: 0,
+  };
+}
+
+function buildLeaderboardRewardTooltip(playerId) {
+  const usage = getRewardCardUsageDetail(playerId);
+  const lines = [
+    `剩余免费个人双倍：${usage.freeSingleRemaining}`,
+    `个人双倍：共 ${usage.totalSingleCount} 次，免费 ${usage.freeSingleUsed} 次，购买 ${usage.paidSingleCount} 次（${formatScore(usage.paidSingleAmount)}）`,
+    `团队双倍：购买 ${usage.teamCount} 次（${formatScore(usage.teamAmount)}）`,
+  ];
+  return {
+    text: lines.join(" | "),
+    html: lines.map((line) => `<span>${escapeHtml(line)}</span>`).join(""),
+  };
+}
+
 function renderKoiPlayerOptions() {
   if (!koiPlayerSelect) return;
   const options = ['<option value="">不设置锦鲤</option>'];
@@ -4850,17 +4986,20 @@ function renderKoiPlayerOptions() {
 }
 
 function updateRewardMinimumHint() {
-  const selectedPlayer = leaderboardPlayers.find(
-    (player) => (player.player_id || player.id) === rewardPlayerSelect.value
-  );
-
-  if (!selectedPlayer) {
+  if (rewardEntryMode === "outside") {
     if (rewardOutsideNameInput.value.trim()) {
       rewardMinimumHint.textContent = `场外赞助人：${rewardOutsideNameInput.value.trim()}`;
       return;
     }
+    rewardMinimumHint.textContent = "请填写场外赞助人姓名后添加赞助额。";
+    return;
+  }
 
-    rewardMinimumHint.textContent = "请选择选手或填写场外赞助姓名后添加额外赞助额。";
+  const selectedPlayer = leaderboardPlayers.find(
+    (player) => (player.player_id || player.id) === rewardPlayerSelect.value
+  );
+  if (!selectedPlayer) {
+    rewardMinimumHint.textContent = "请选择赛季选手后添加额外赞助额。";
     return;
   }
 
@@ -5540,6 +5679,7 @@ function renderLeaderboard(data) {
     const playerId = player.player_id || player.id || "";
     const gamesPlayed = Number(player.games_played ?? 0);
     const rewardExtraPoints = Number(player.reward_extra_points ?? 0);
+    const rewardTooltip = buildLeaderboardRewardTooltip(playerId);
     const tags = [];
     const nameClassName = getPlayerNameStyleClass(playerId, {
       players: data,
@@ -5669,13 +5809,16 @@ function renderLeaderboard(data) {
       <td><span class="leaderboard-rank">${rank}</span></td>
       <td>
         <div class="leaderboard-player-cell">
-          <strong class="leaderboard-player-name">${buildDecoratedPlayerNameHtml(playerId, player.display_name, {
-            players: data,
-            highestRewardIds,
-            hardcoreLoseIds,
-            rank,
-            wrapperClassName: "player-name-stack",
-          })}</strong>
+          <div class="leaderboard-player-name-wrap" title="${escapeHtml(rewardTooltip.text)}" aria-label="${escapeHtml(rewardTooltip.text)}">
+            <strong class="leaderboard-player-name">${buildDecoratedPlayerNameHtml(playerId, player.display_name, {
+              players: data,
+              highestRewardIds,
+              hardcoreLoseIds,
+              rank,
+              wrapperClassName: "player-name-stack",
+            })}</strong>
+            <span class="leaderboard-player-hovercard">${rewardTooltip.html}</span>
+          </div>
           ${tagsHtml}
         </div>
       </td>
@@ -5702,15 +5845,19 @@ function renderLeaderboard(data) {
 }
 
 async function addRewardExtra() {
-  const playerId = rewardPlayerSelect.value;
-  const outsideName = rewardOutsideNameInput.value.trim();
+  if (!ensureScorerAccess("仅记分员或管理员可添加赞助记录。")) return;
+
+  const isOutsideMode = rewardEntryMode === "outside";
+  const playerId = isOutsideMode ? "" : rewardPlayerSelect.value;
+  const outsideName = isOutsideMode ? rewardOutsideNameInput.value.trim() : "";
   const selectedPlayer = leaderboardPlayers.find(
     (player) => (player.player_id || player.id) === playerId
   );
-  const extraAmount = Number.parseInt(rewardExtraInput.value, 10);
+  const amountInput = isOutsideMode ? rewardOutsideExtraInput : rewardExtraInput;
+  const extraAmount = Number.parseInt(amountInput.value, 10);
 
   if (!playerId && !outsideName) {
-    setRewardMessage("请先选择选手或填写场外赞助姓名。", true);
+    setRewardMessage(isOutsideMode ? "请先填写场外赞助姓名。" : "请先选择赛季选手。", true);
     return;
   }
 
@@ -5720,6 +5867,7 @@ async function addRewardExtra() {
   }
 
   addRewardBtn.disabled = true;
+  addOutsideRewardBtn.disabled = true;
   setRewardMessage(`正在添加赞助记录...`);
 
   if (outsideName && !playerId) {
@@ -5737,7 +5885,8 @@ async function addRewardExtra() {
     });
     writeExternalDonationLogs(activeSeason?.id || null, localLogs);
     addRewardBtn.disabled = false;
-    rewardExtraInput.value = "";
+    addOutsideRewardBtn.disabled = false;
+    rewardOutsideExtraInput.value = "";
     rewardOutsideNameInput.value = "";
     rewardPlayerSelect.value = "";
     setRewardMessage(`${outsideName} 的场外赞助已记录在本地。`);
@@ -5755,13 +5904,14 @@ async function addRewardExtra() {
   });
 
   addRewardBtn.disabled = false;
+  addOutsideRewardBtn.disabled = false;
 
   if (error) {
     setRewardMessage(`添加赞助失败：${error.message}。请先在 Supabase 执行对应 SQL。`, true);
     return;
   }
 
-  rewardExtraInput.value = "";
+  amountInput.value = "";
   rewardOutsideNameInput.value = "";
   rewardPlayerSelect.value = "";
   setRewardMessage(`${selectedPlayer?.display_name || outsideName} 已增加赞助额 ${extraAmount}。`);
@@ -5829,12 +5979,19 @@ async function loadRewardLogs() {
 
     rewardCardUsageSummary = new Map(
       [...usageMap.entries()].map(([playerId, usage]) => {
+        const freeSingleUsed = Math.min(usage.singleCount, 2);
+        const freeSingleRemaining = Math.max(2 - usage.singleCount, 0);
         const paidSingleCount = Math.max(usage.singleCount - 2, 0);
         return [playerId, {
           teamCount: usage.teamCount,
           teamAmount: usage.teamCount * 10,
+          totalSingleCount: usage.singleCount,
+          freeSingleUsed,
+          freeSingleRemaining,
           singleCount: paidSingleCount,
+          paidSingleCount,
           singleAmount: paidSingleCount * 5,
+          paidSingleAmount: paidSingleCount * 5,
         }];
       })
     );
@@ -5848,6 +6005,9 @@ async function loadRewardLogs() {
       .reduce((sum, log) => sum + Number(log.amount ?? 0), 0);
     refreshSeasonRewardTotal();
     renderRewardLogs();
+    if (leaderboardPlayers.length) {
+      renderLeaderboard(leaderboardPlayers);
+    }
     return;
   }
 
@@ -5859,6 +6019,9 @@ async function loadRewardLogs() {
     .reduce((sum, log) => sum + Number(log.amount ?? 0), 0);
   refreshSeasonRewardTotal();
   renderRewardLogs();
+  if (leaderboardPlayers.length) {
+    renderLeaderboard(leaderboardPlayers);
+  }
 }
 
 async function cancelRewardDonation(donationId, playerName, buttonEl) {
@@ -5940,6 +6103,29 @@ function getTeamLabel(team) {
   return team === "A" ? "天辉方" : team === "B" ? "夜魇方" : "未知方";
 }
 
+function buildHighlightedPlayerTextHtml(text, players = []) {
+  const rawText = String(text || "");
+  const highlightedNames = [...new Set(
+    (players || [])
+      .map((player) => stripPlayerNameMeta(player.display_name || ""))
+      .filter(Boolean)
+  )].sort((a, b) => b.length - a.length);
+
+  if (!rawText || !highlightedNames.length) {
+    return escapeHtml(rawText);
+  }
+
+  const nameSet = new Set(highlightedNames);
+  const pattern = new RegExp(`(${highlightedNames.map((name) => escapeRegExp(name)).join("|")})`, "g");
+
+  return rawText
+    .split(pattern)
+    .map((part) => (nameSet.has(part)
+      ? `<span class="match-note-player-name">${escapeHtml(part)}</span>`
+      : escapeHtml(part)))
+    .join("");
+}
+
 function getMatchEffectLogsByTeam(match, players, doubleDowns) {
   const playerMap = new Map(players.map((player) => [player.player_id, player]));
   const logsByTeam = { A: [], B: [] };
@@ -5982,7 +6168,11 @@ function getMatchEffectLogsByTeam(match, players, doubleDowns) {
 
     if (item.mode === "team") {
       if (targetTeam && logsByTeam[targetTeam]) {
-        logsByTeam[targetTeam].push({ text: `${userName}团队双倍，${effectText}`, tone });
+        logsByTeam[targetTeam].push({
+          actorName: userName,
+          description: `团队双倍，${effectText}`,
+          tone,
+        });
       }
       return;
     }
@@ -5990,9 +6180,10 @@ function getMatchEffectLogsByTeam(match, players, doubleDowns) {
     const targetName = playerMap.get(item.target_player_id)?.display_name || "未知选手";
     if (targetTeam && logsByTeam[targetTeam]) {
       logsByTeam[targetTeam].push({
-        text: item.user_player_id === item.target_player_id
-          ? `${userName}个人双倍，自己${effectText}`
-          : `${userName}个人双倍，${stripPlayerNameMeta(targetName)}${effectText}`,
+        actorName: userName,
+        description: item.user_player_id === item.target_player_id
+          ? `个人双倍，自己${effectText}`
+          : `个人双倍，${stripPlayerNameMeta(targetName)}${effectText}`,
         tone,
       });
     }
@@ -6003,7 +6194,8 @@ function getMatchEffectLogsByTeam(match, players, doubleDowns) {
     const koiPlayer = players.find((player) => player.player_id === koiPlayerId && player.team === match.winner_team);
     if (koiPlayer) {
       logsByTeam[match.winner_team].push({
-        text: `${stripPlayerNameMeta(koiPlayer.display_name || "锦鲤")}锦鲤效果，团队积分 +25%`,
+        actorName: stripPlayerNameMeta(koiPlayer.display_name || "锦鲤"),
+        description: "锦鲤效果，团队积分 +25%",
         tone: "gold",
       });
     }
@@ -6230,6 +6422,11 @@ function getOrderedSingleDoubleCandidates(player, candidates, teamMap) {
   return [...selfCandidate, ...opponentCandidates];
 }
 
+function shouldHideRestDayBanner(group) {
+  if (!group || (group.matches?.length || 0) > 0 || group.day_is_active) return false;
+  return String(group.match_date || "") < getBeijingBusinessDateString();
+}
+
 function renderRecentMatches(groups) {
   recentMatchesList.innerHTML = "";
   const highestRewardIds = getHighestRewardPlayerIds(leaderboardPlayers);
@@ -6252,10 +6449,14 @@ function renderRecentMatches(groups) {
     const seasonDetails = document.createElement("details");
     const seasonMeta = seasonEntry.season_meta;
     const dayGroups = seasonEntry.groups || [];
+    const visibleDayGroups = dayGroups.filter((group) => !shouldHideRestDayBanner(group));
+    if (!visibleDayGroups.length) {
+      return;
+    }
     const totalMatches = dayGroups.reduce((sum, group) => sum + (group.matches?.length || 0), 0);
-    const matchDayCount = dayGroups.filter((group) => (group.matches?.length || 0) > 0).length;
-    const restDayCount = Math.max(dayGroups.length - matchDayCount, 0);
-    const isSeasonOpen = shouldOpenSeasonGroupByDefault(seasonMeta, dayGroups);
+    const matchDayCount = visibleDayGroups.filter((group) => (group.matches?.length || 0) > 0).length;
+    const restDayCount = Math.max(visibleDayGroups.length - matchDayCount, 0);
+    const isSeasonOpen = shouldOpenSeasonGroupByDefault(seasonMeta, visibleDayGroups);
     if (seasonEntry.season_id && isSeasonOpen) {
       openRecentMatchSeasons.add(seasonEntry.season_id);
       writeOpenRecentMatchSeasons();
@@ -6292,6 +6493,9 @@ function renderRecentMatches(groups) {
     const seasonContent = seasonDetails.querySelector(".recent-match-season-content");
 
     dayGroups.forEach((group) => {
+      if (shouldHideRestDayBanner(group)) {
+        return;
+      }
       const details = document.createElement("details");
     const matches = group.matches || [];
     const isActiveDay = Boolean(group.day_is_active);
@@ -6378,10 +6582,14 @@ function renderRecentMatches(groups) {
       const effectLogsByTeam = getMatchEffectLogsByTeam(match, players, doubleDowns);
       const noteLines = getMatchNoteLines(match);
       const noteLogHtml = noteLines.length
-        ? `<div class="match-extra-logs">${noteLines.map((line) => `<p class="muted match-extra-log-line">${escapeHtml(line)}</p>`).join("")}</div>`
+        ? `<div class="match-extra-logs">${noteLines.map((line) => `<p class="muted match-extra-log-line">${buildHighlightedPlayerTextHtml(line, players)}</p>`).join("")}</div>`
         : "";
       const buildEffectLogHtml = (team) => effectLogsByTeam[team]?.length
-        ? `<div class="match-effect-logs">${effectLogsByTeam[team].map((item) => `<p class="match-effect-log-line match-effect-log-line-${item.tone}">${escapeHtml(item.text)}</p>`).join("")}</div>`
+        ? `<div class="match-effect-logs">${effectLogsByTeam[team].map((item) => `
+          <p class="match-effect-log-line match-effect-log-line-${item.tone}">
+            <span class="match-note-player-name">${escapeHtml(item.actorName || "未知选手")}</span>${buildHighlightedPlayerTextHtml(item.description || "", players)}
+          </p>
+        `).join("")}</div>`
         : "";
       const renderPlayerList = (teamPlayers, teamKey) => teamPlayers.map((player) => `
         <li>
@@ -9671,27 +9879,42 @@ closeRewardPanelBtn.addEventListener("click", () => {
   setRewardPanelOpen(false);
 });
 
+if (rewardModePlayerBtn) {
+  rewardModePlayerBtn.addEventListener("click", () => setRewardEntryMode("player"));
+}
+
+if (rewardModeOutsideBtn) {
+  rewardModeOutsideBtn.addEventListener("click", () => setRewardEntryMode("outside"));
+}
+
 rewardPlayerSelect.addEventListener("change", () => {
   if (rewardPlayerSelect.value) {
-    rewardOutsideNameInput.value = "";
+    setRewardEntryMode("player");
   }
   updateRewardMinimumHint();
 });
 
 rewardOutsideNameInput.addEventListener("input", () => {
   if (rewardOutsideNameInput.value.trim()) {
-    rewardPlayerSelect.value = "";
+    setRewardEntryMode("outside");
   }
   updateRewardMinimumHint();
 });
 
 addRewardBtn.addEventListener("click", addRewardExtra);
+addOutsideRewardBtn.addEventListener("click", addRewardExtra);
 
 if (setKoiBtn) {
   setKoiBtn.addEventListener("click", () => setSeasonKoi());
 }
 
 rewardExtraInput.addEventListener("keydown", async (event) => {
+  if (event.key !== "Enter") return;
+  event.preventDefault();
+  await addRewardExtra();
+});
+
+rewardOutsideExtraInput.addEventListener("keydown", async (event) => {
   if (event.key !== "Enter") return;
   event.preventDefault();
   await addRewardExtra();
@@ -9907,7 +10130,9 @@ async function init() {
     setSeasonPanelOpen(false);
     setRewardPanelOpen(false);
     setLeaderboardCompactMode(readStoredLeaderboardCompactState());
+    setRewardEntryMode("player");
     renderHeroOptions();
+    scheduleRestDayBoundaryRefresh();
     matchStartTimeInput.value = formatTime24(readStoredMatchDayStartTime()?.startTime || "");
     backfillDateInput.value = getPreviousBeijingBusinessDateString();
     renderMatchForm();
