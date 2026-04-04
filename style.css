@@ -3310,6 +3310,9 @@ ol {
 }
 
 .leaderboard-table tbody td {
+  position: relative;
+  z-index: 0;
+  overflow: visible;
   padding: 14px 10px;
   border-bottom: 0;
   background: rgba(13, 31, 53, 0.72);
@@ -3321,6 +3324,11 @@ ol {
     padding 0.28s cubic-bezier(0.22, 1, 0.36, 1),
     background-color 0.24s ease,
     box-shadow 0.24s ease;
+}
+
+.leaderboard-table tbody td:hover,
+.leaderboard-table tbody td:focus-within {
+  z-index: 12;
 }
 
 .leaderboard-table tbody tr td:first-child {
@@ -3395,9 +3403,15 @@ ol {
 
 .leaderboard-stat-wrap {
   position: relative;
+  z-index: 0;
   display: inline-flex;
   align-items: center;
   justify-content: center;
+}
+
+.leaderboard-stat-wrap:hover,
+.leaderboard-stat-wrap:focus-within {
+  z-index: 18;
 }
 
 .leaderboard-player-hovercard {
