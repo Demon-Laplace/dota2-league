@@ -1,5 +1,8 @@
 begin;
 
+alter table public.matches
+alter column winner_team drop not null;
+
 alter table public.players
 add column if not exists reward_double_bonus integer not null default 0;
 

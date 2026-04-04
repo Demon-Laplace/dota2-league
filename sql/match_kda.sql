@@ -1,5 +1,8 @@
 begin;
 
+alter table public.matches
+alter column winner_team drop not null;
+
 alter table public.match_results
 add column if not exists kills integer,
 add column if not exists deaths integer,

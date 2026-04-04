@@ -4189,20 +4189,21 @@ function createEmptySingleDoubleEntry() {
   };
 }
 
+function getPlayersInSelectionOrder(playerIds, players, team = "") {
+  const playerMap = new Map(players.map((player) => [player.id, player]));
+  return playerIds
+    .map((playerId) => playerMap.get(playerId))
+    .filter(Boolean)
+    .map((player) => (team ? { ...player, team } : player));
+}
+
 function getSelectedPlayersByFormType(formType) {
   const selections = formType === "backfill" ? backfillTeamSelections : matchTeamSelections;
   const players = formType === "backfill" ? backfillPlayers : getMatchRecordingPlayers();
-  const teamMap = new Map();
-
-  selections.teamA.forEach((playerId) => teamMap.set(playerId, "A"));
-  selections.teamB.forEach((playerId) => teamMap.set(playerId, "B"));
-
-  return players
-    .filter((player) => teamMap.has(player.id))
-    .map((player) => ({
-      ...player,
-      team: teamMap.get(player.id),
-    }));
+  return [
+    ...getPlayersInSelectionOrder(selections.teamA, players, "A"),
+    ...getPlayersInSelectionOrder(selections.teamB, players, "B"),
+  ];
 }
 
 function getDoubleStateByFormType(formType) {
@@ -4589,7 +4590,7 @@ function renderTeamSelectionUI({
     const oppositeTeamKey = teamKey === "teamA" ? "teamB" : "teamA";
     const selectedIds = new Set(selections[teamKey]);
     const oppositeIds = new Set(selections[oppositeTeamKey]);
-    const selectedPlayers = players.filter((player) => selectedIds.has(player.id));
+    const selectedPlayers = getPlayersInSelectionOrder(selections[teamKey], players);
     const summaryHtml = selectedPlayers.length
       ? selectedPlayers.map((player) => `
         <div class="match-picked-player-row">
