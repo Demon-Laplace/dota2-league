@@ -5722,7 +5722,7 @@ function renderLeaderboard(data) {
       const streak = winStreakMap.get(playerId);
       tags.push({
         icon: "▲",
-        label: "连胜",
+        label: "连胜中",
         tone: "ember",
         className: getStreakTagIntensityClass(streak),
         description: `${streak} 连胜`,
@@ -5733,7 +5733,7 @@ function renderLeaderboard(data) {
       const streak = loseStreakMap.get(playerId);
       tags.push({
         icon: "▼",
-        label: "连败",
+        label: "连败中",
         tone: "crimson",
         className: getStreakTagIntensityClass(streak),
         description: `${streak} 连败`,
