@@ -5672,7 +5672,7 @@ function renderLeaderboard(data) {
     8,
     ...(sortedData.map((player) => (stripPlayerNameMeta(player.display_name || "未知选手") || "未知选手").length))
   );
-  leaderboardCard?.style.setProperty("--leaderboard-name-ch", String(Math.min(longestNameLength + 2, 18)));
+  leaderboardCard?.style.setProperty("--leaderboard-name-ch", String(Math.min(longestNameLength + 1, 18)));
 
   if (!sortedData.length) {
     seasonPlayerRewardTotal = 0;
