@@ -6767,31 +6767,6 @@ function renderRecentMatches(groups) {
       const noteLogHtml = noteLines.length
         ? `<div class="match-extra-logs">${noteLines.map((line) => `<p class="muted match-extra-log-line">${buildHighlightedPlayerTextHtml(line, players)}</p>`).join("")}</div>`
         : "";
-      const quickWinnerHtml = canScore ? `
-        <div class="recent-match-winner-quick">
-          <button
-            type="button"
-            class="recent-match-winner-btn${match.winner_team === "A" ? " recent-match-winner-btn-active" : ""}"
-            data-role="saved-match-winner"
-            data-match-id="${match.match_id}"
-            data-winner-team="A"
-          >天辉胜</button>
-          <button
-            type="button"
-            class="recent-match-winner-btn${!hasRecordedWinner(match.winner_team) ? " recent-match-winner-btn-active" : ""}"
-            data-role="saved-match-winner"
-            data-match-id="${match.match_id}"
-            data-winner-team=""
-          >未定</button>
-          <button
-            type="button"
-            class="recent-match-winner-btn${match.winner_team === "B" ? " recent-match-winner-btn-active" : ""}"
-            data-role="saved-match-winner"
-            data-match-id="${match.match_id}"
-            data-winner-team="B"
-          >夜魇胜</button>
-        </div>
-      ` : "";
       const buildEffectLogHtml = (team) => effectLogsByTeam[team]?.length
         ? `<div class="match-effect-logs">${effectLogsByTeam[team].map((item) => `
           <p class="match-effect-log-line match-effect-log-line-${item.tone}">
@@ -6848,15 +6823,30 @@ function renderRecentMatches(groups) {
           <span class="muted">比赛日期：${escapeHtml(matchDateLabel)}</span>
           <span class="muted">登记时间：${escapeHtml(formatLocalTime(match.created_at))}</span>
         </div>
-        ${quickWinnerHtml}
         <div class="recent-match-teams">
           <div class="recent-match-team${match.winner_team === "A" ? " recent-match-team-winner" : ""}">
-            <h3>天辉方</h3>
+            ${canScore ? `
+              <button
+                type="button"
+                class="recent-match-team-title-btn${match.winner_team === "A" ? " recent-match-team-title-btn-active" : ""}"
+                data-role="saved-match-winner"
+                data-match-id="${match.match_id}"
+                data-winner-team="A"
+              >天辉方</button>
+            ` : "<h3>天辉方</h3>"}
             <ul>${renderPlayerList(teamAPlayers, "a")}</ul>
             ${buildEffectLogHtml("A")}
           </div>
           <div class="recent-match-team${match.winner_team === "B" ? " recent-match-team-winner" : ""}">
-            <h3>夜魇方</h3>
+            ${canScore ? `
+              <button
+                type="button"
+                class="recent-match-team-title-btn${match.winner_team === "B" ? " recent-match-team-title-btn-active" : ""}"
+                data-role="saved-match-winner"
+                data-match-id="${match.match_id}"
+                data-winner-team="B"
+              >夜魇方</button>
+            ` : "<h3>夜魇方</h3>"}
             <ul>${renderPlayerList(teamBPlayers, "b")}</ul>
             ${buildEffectLogHtml("B")}
           </div>
@@ -9314,8 +9304,8 @@ async function startEditingMatch(matchId) {
 
   const players = parseRecentMatchPlayers(match.players);
   const doubleDowns = parseRecentMatchPlayers(match.double_downs);
-  const teamAIds = players.filter((player) => player.team === "A").map((player) => player.player_id);
-  const teamBIds = players.filter((player) => player.team === "B").map((player) => player.player_id);
+  const teamAIds = getOrderedSavedMatchTeamPlayers(players, "A").map((player) => player.player_id);
+  const teamBIds = getOrderedSavedMatchTeamPlayers(players, "B").map((player) => player.player_id);
 
   if (teamAIds.length !== TEAM_SIZE || teamBIds.length !== TEAM_SIZE) {
     setMessage("这条比赛记录的队伍人数异常，暂时无法编辑。", true);
