@@ -5005,9 +5005,12 @@ function buildLeaderboardRewardTooltip(playerId) {
 function buildLeaderboardGamesTooltip(player) {
   const wins = Math.max(Number(player?.wins ?? 0), 0);
   const losses = Math.max(Number(player?.losses ?? 0), 0);
+  const playerId = player?.player_id || player?.id || "";
+  const rewardTooltip = buildLeaderboardRewardTooltip(playerId);
   const lines = [
     `胜场：${wins}`,
     `负场：${losses}`,
+    ...rewardTooltip.text.split(" | "),
   ];
   return {
     text: lines.join(" | "),
@@ -5714,7 +5717,6 @@ function renderLeaderboard(data) {
     const playerId = player.player_id || player.id || "";
     const gamesPlayed = Number(player.games_played ?? 0);
     const rewardExtraPoints = Number(player.reward_extra_points ?? 0);
-    const rewardTooltip = buildLeaderboardRewardTooltip(playerId);
     const gamesTooltip = buildLeaderboardGamesTooltip(player);
     const tags = [];
     const nameClassName = getPlayerNameStyleClass(playerId, {
@@ -5849,7 +5851,7 @@ function renderLeaderboard(data) {
       <td><span class="leaderboard-rank">${rank}</span></td>
       <td>
         <div class="leaderboard-player-cell">
-          <div class="leaderboard-player-name-wrap" aria-label="${escapeHtml(rewardTooltip.text)}">
+          <div class="leaderboard-player-name-wrap">
             <strong class="leaderboard-player-name">${buildDecoratedPlayerNameHtml(playerId, player.display_name, {
               players: sortedData,
               highestRewardIds,
@@ -5857,7 +5859,6 @@ function renderLeaderboard(data) {
               rank,
               wrapperClassName: "player-name-stack",
             })}</strong>
-            <span class="leaderboard-player-hovercard">${rewardTooltip.html}</span>
           </div>
           ${tagsHtml}
         </div>

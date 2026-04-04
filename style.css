@@ -3611,13 +3611,13 @@ ol {
 .leaderboard-player-tags {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
-  grid-auto-rows: minmax(24px, auto);
+  grid-auto-rows: minmax(28px, auto);
   align-content: center;
   justify-items: stretch;
-  gap: 5px;
+  gap: 4px;
   width: 100%;
   min-width: 0;
-  min-height: 82px;
+  min-height: 88px;
   transition:
     width 0.28s cubic-bezier(0.22, 1, 0.36, 1),
     min-height 0.28s cubic-bezier(0.22, 1, 0.36, 1),
@@ -3636,11 +3636,11 @@ ol {
   gap: 4px;
   width: 100%;
   min-width: 0;
-  min-height: 24px;
-  padding: 3px 6px;
+  min-height: 28px;
+  padding: 4px 6px;
   border-radius: 9px;
-  font-size: 10px;
-  line-height: 1.16;
+  font-size: 11px;
+  line-height: 1.18;
   font-weight: 600;
   letter-spacing: 0.02em;
   border: 1px solid rgba(124, 165, 209, 0.2);
@@ -3682,14 +3682,14 @@ ol {
 
 .leaderboard-card-compact .leaderboard-player-tags {
   min-width: 0;
-  min-height: 71px;
-  gap: 3px;
+  min-height: 76px;
+  gap: 2px;
 }
 
 .leaderboard-card-compact .leaderboard-tag {
-  min-height: 21px;
-  padding: 2px 5px;
-  font-size: 9px;
+  min-height: 24px;
+  padding: 3px 5px;
+  font-size: 10px;
 }
 
 .leaderboard-card-compact .leaderboard-score {
@@ -4091,8 +4091,8 @@ ol {
   min-width: 36px;
   padding: 4px 10px;
   border-radius: 999px;
-  font-size: 12px;
-  font-weight: 600;
+  font-size: 13px;
+  font-weight: 650;
 }
 
 .leaderboard-stat {
