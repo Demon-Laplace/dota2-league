@@ -4985,9 +4985,9 @@ function getRewardCardUsageDetail(playerId) {
 function buildLeaderboardRewardTooltip(playerId) {
   const usage = getRewardCardUsageDetail(playerId);
   const lines = [
-    `剩余免费个人双倍：${usage.freeSingleRemaining}`,
-    `个人双倍：共 ${usage.totalSingleCount} 次，免费 ${usage.freeSingleUsed} 次，购买 ${usage.paidSingleCount} 次`,
-    `团队双倍：购买 ${usage.teamCount} 次`,
+    `剩余双倍代币：${usage.freeSingleRemaining}`,
+    `个人双倍：使用 ${usage.totalSingleCount} 次，购买 ${usage.paidSingleCount} 次`,
+    `团队双倍：使用 ${usage.teamCount} 次，购买 ${usage.teamCount} 次`,
   ];
   return {
     text: lines.join(" | "),
