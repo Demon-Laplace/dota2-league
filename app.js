@@ -48,6 +48,7 @@ function writeOpenRecentMatchSeasons() {
 }
 
 const loadingScreen = document.getElementById("loadingScreen");
+const globalToast = document.getElementById("globalToast");
 const lastUpdatedText = document.getElementById("lastUpdatedText");
 const signupPlayerGrid = document.getElementById("signupPlayerGrid");
 const signupEmpty = document.getElementById("signupEmpty");
@@ -281,6 +282,7 @@ let heroPickerState = null;
 let realtimeChannel = null;
 let refreshTimer = null;
 let restDayBoundaryTimer = null;
+let toastTimer = null;
 let refreshFlushPromise = null;
 let placeholderEnsureAttemptKey = "";
 let scoreDetailSeasonCache = new Map();
@@ -963,6 +965,27 @@ function setMessage(text, isError = false) {
   messageEl.className = isError ? "message error" : "message";
 }
 
+function showGlobalToast(text, isError = false) {
+  if (!globalToast || !text) return;
+  if (toastTimer) {
+    window.clearTimeout(toastTimer);
+    toastTimer = null;
+  }
+
+  globalToast.textContent = text;
+  globalToast.hidden = false;
+  globalToast.className = isError ? "global-toast global-toast-error global-toast-visible" : "global-toast global-toast-visible";
+
+  toastTimer = window.setTimeout(() => {
+    globalToast.classList.remove("global-toast-visible");
+    window.setTimeout(() => {
+      globalToast.hidden = true;
+      globalToast.textContent = "";
+      globalToast.className = "global-toast";
+    }, 220);
+  }, 2200);
+}
+
 function setMatchMessage(text, isError = false) {
   matchMessageEl.textContent = text;
   matchMessageEl.className = isError ? "message error" : "message";
@@ -1121,11 +1144,14 @@ async function copyLeaderboardSummary() {
     const copied = await copyTextToClipboard(text);
     if (!copied) {
       setMessage("积分榜复制失败，请稍后重试。", true);
+      showGlobalToast("积分榜复制失败，请稍后重试。", true);
       return;
     }
     setMessage("积分榜文本已复制，可直接粘贴到微信。");
+    showGlobalToast("积分榜文本已复制");
   } catch (error) {
     setMessage(`积分榜复制失败：${error.message || "未知错误"}`, true);
+    showGlobalToast(`积分榜复制失败：${error.message || "未知错误"}`, true);
   } finally {
     if (leaderboardCopyBtn) {
       leaderboardCopyBtn.disabled = false;
@@ -1210,11 +1236,14 @@ async function copyMatchDayBattleReport(groupKey, buttonEl) {
     const copied = await copyTextToClipboard(text);
     if (!copied) {
       setMessage("战斗简报复制失败，请稍后重试。", true);
+      showGlobalToast("战斗简报复制失败，请稍后重试。", true);
       return;
     }
     setMessage(`${group.match_date || "该比赛日"}战斗简报已复制。`);
+    showGlobalToast(`${group.match_date || "该比赛日"}战斗简报已复制`);
   } catch (error) {
     setMessage(`战斗简报复制失败：${error.message || "未知错误"}`, true);
+    showGlobalToast(`战斗简报复制失败：${error.message || "未知错误"}`, true);
   } finally {
     if (buttonEl) {
       buttonEl.disabled = false;
