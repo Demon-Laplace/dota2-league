@@ -2861,6 +2861,36 @@ button:disabled {
   margin-bottom: 10px;
 }
 
+.recent-match-winner-quick {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 12px;
+}
+
+.recent-match-winner-btn {
+  min-height: 30px;
+  padding: 4px 11px;
+  border-radius: 999px;
+  border: 1px solid rgba(126, 165, 207, 0.18);
+  background: linear-gradient(180deg, rgba(20, 39, 63, 0.86), rgba(11, 24, 42, 0.84));
+  color: #d9e7f6;
+  font-size: 12px;
+  letter-spacing: 0.04em;
+  box-shadow: none;
+}
+
+.recent-match-winner-btn:hover:not(:disabled) {
+  box-shadow: none;
+  filter: brightness(1.04);
+}
+
+.recent-match-winner-btn-active {
+  border-color: rgba(240, 195, 106, 0.4);
+  background: linear-gradient(135deg, rgba(98, 70, 23, 0.62), rgba(43, 32, 16, 0.68));
+  color: #fff3d2;
+}
+
 .recent-match-player {
   display: inline-flex;
   align-items: center;

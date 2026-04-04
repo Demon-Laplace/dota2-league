@@ -3552,6 +3552,142 @@ function updateRecentMatchHeroLocally(matchId, playerId, heroName) {
   targetMatch.players = players;
 }
 
+function getSavedMatchById(matchId) {
+  return recentMatchesData.find((match) => match.match_id === matchId) || null;
+}
+
+function getOrderedSavedMatchTeamPlayers(players, team) {
+  return (players || [])
+    .map((player, index) => ({ ...player, __sourceIndex: index }))
+    .filter((player) => player.team === team)
+    .sort((a, b) => {
+      const aSlot = Number.isFinite(Number(a.team_slot)) ? Number(a.team_slot) : a.__sourceIndex + 1;
+      const bSlot = Number.isFinite(Number(b.team_slot)) ? Number(b.team_slot) : b.__sourceIndex + 1;
+      if (aSlot !== bSlot) return aSlot - bSlot;
+      return String(a.display_name || "").localeCompare(String(b.display_name || ""), "zh-CN");
+    })
+    .map(({ __sourceIndex, ...player }) => player);
+}
+
+function buildSavedMatchAssignmentsFromPlayers(players) {
+  return (players || []).map((player) => ({
+    player_id: player.player_id,
+    hero_name: player.hero_name || null,
+    kills: normalizeKdaValue(player.kills),
+    deaths: normalizeKdaValue(player.deaths),
+    assists: normalizeKdaValue(player.assists),
+  })).filter((item) =>
+    item.hero_name
+    || item.kills !== null
+    || item.deaths !== null
+    || item.assists !== null
+  );
+}
+
+function sanitizeSavedMatchDoubleDowns(doubleDowns, players) {
+  const validPlayers = players || [];
+  const validIds = new Set(validPlayers.map((player) => player.player_id).filter(Boolean));
+  const teamMap = new Map(validPlayers.map((player) => [player.player_id, player.team]));
+  const doubledTeams = new Set();
+  const doubledTargets = new Set();
+
+  return parseRecentMatchPlayers(doubleDowns).filter((entry) => {
+    if (entry?.mode === "team") {
+      if (!validIds.has(entry.user_player_id)) return false;
+      if (!["A", "B"].includes(entry.target_team || "")) return false;
+      if (teamMap.get(entry.user_player_id) !== entry.target_team) return false;
+      if (doubledTeams.has(entry.target_team)) return false;
+      doubledTeams.add(entry.target_team);
+      return true;
+    }
+
+    if (entry?.mode !== "single") return false;
+    if (!validIds.has(entry.user_player_id) || !validIds.has(entry.target_player_id)) return false;
+    const userTeam = teamMap.get(entry.user_player_id);
+    const targetTeam = teamMap.get(entry.target_player_id);
+    if (!userTeam || !targetTeam) return false;
+    if (entry.user_player_id !== entry.target_player_id && userTeam === targetTeam) return false;
+    if (doubledTeams.has(targetTeam) || doubledTargets.has(entry.target_player_id)) return false;
+    doubledTargets.add(entry.target_player_id);
+    return true;
+  });
+}
+
+function getSavedMatchDateValue(match) {
+  return match?.match_date || formatArchiveDate(match?.created_at) || "";
+}
+
+async function persistSavedMatchUpdate(match, nextPlayers, nextWinnerTeam, nextDoubleDowns) {
+  if (!match?.match_id) {
+    throw new Error("未找到要修改的比赛记录。");
+  }
+  if (!match.season_id) {
+    throw new Error("这条比赛记录缺少赛季信息，暂时无法直接修改。");
+  }
+
+  const teamAPlayers = getOrderedSavedMatchTeamPlayers(nextPlayers, "A");
+  const teamBPlayers = getOrderedSavedMatchTeamPlayers(nextPlayers, "B");
+  const teamAIds = teamAPlayers.map((player) => player.player_id);
+  const teamBIds = teamBPlayers.map((player) => player.player_id);
+  const validationError = validateMatchPlayers(teamAIds, teamBIds);
+  if (validationError) {
+    throw new Error(validationError);
+  }
+
+  const assignments = buildSavedMatchAssignmentsFromPlayers(nextPlayers);
+  const sanitizedDoubleDowns = sanitizeSavedMatchDoubleDowns(nextDoubleDowns, nextPlayers);
+  const { error } = await db.rpc("update_match_result", {
+    p_match_id: match.match_id,
+    p_team_a_player_ids: teamAIds,
+    p_team_b_player_ids: teamBIds,
+    p_winner_team: nextWinnerTeam || null,
+    p_note: match.note || null,
+    p_created_by: null,
+    p_season_id: match.season_id,
+    p_match_date: getSavedMatchDateValue(match),
+    p_assignments: assignments,
+    p_double_downs: sanitizedDoubleDowns,
+  });
+
+  if (error) {
+    throw new Error(error.message || "未知错误");
+  }
+}
+
+async function updateSavedMatchWinner(matchId, winnerTeam, triggerButton = null) {
+  if (!ensureScorerAccess("仅记分员或管理员可直接修改比赛胜负。")) return;
+  const match = getSavedMatchById(matchId);
+  if (!match) {
+    setMessage("未找到要修改的比赛记录。", true);
+    return;
+  }
+
+  const nextWinnerTeam = match.winner_team === winnerTeam ? "" : winnerTeam;
+  if (triggerButton) triggerButton.disabled = true;
+  setMessage("正在保存比赛胜负...");
+
+  try {
+    await persistSavedMatchUpdate(
+      match,
+      parseRecentMatchPlayers(match.players),
+      nextWinnerTeam,
+      parseRecentMatchPlayers(match.double_downs)
+    );
+  } catch (error) {
+    setMessage(`修改比赛胜负失败：${error.message}。请先在 Supabase 执行对应 SQL。`, true);
+    if (triggerButton) triggerButton.disabled = false;
+    return;
+  }
+
+  if (triggerButton) triggerButton.disabled = false;
+  rememberOpenRecentMatchGroups();
+  setMessage(nextWinnerTeam ? "比赛胜负已更新。" : "比赛已改为胜负未定。");
+  requestImmediateRefresh({
+    leaderboard: true,
+    recentMatches: true,
+  });
+}
+
 function getBeijingBusinessDateString() {
   const now = new Date();
   const beijing = new Date(
@@ -6618,8 +6754,8 @@ function renderRecentMatches(groups) {
 
     matches.forEach((match, matchIndex) => {
       const players = parseRecentMatchPlayers(match.players);
-      const teamAPlayers = players.filter((player) => player.team === "A");
-      const teamBPlayers = players.filter((player) => player.team === "B");
+      const teamAPlayers = getOrderedSavedMatchTeamPlayers(players, "A");
+      const teamBPlayers = getOrderedSavedMatchTeamPlayers(players, "B");
       const winnerLabel = getWinnerLabel(match.winner_team);
       const resultToneClass = match.winner_team === "A"
         ? "recent-match-result-a"
@@ -6631,6 +6767,31 @@ function renderRecentMatches(groups) {
       const noteLogHtml = noteLines.length
         ? `<div class="match-extra-logs">${noteLines.map((line) => `<p class="muted match-extra-log-line">${buildHighlightedPlayerTextHtml(line, players)}</p>`).join("")}</div>`
         : "";
+      const quickWinnerHtml = canScore ? `
+        <div class="recent-match-winner-quick">
+          <button
+            type="button"
+            class="recent-match-winner-btn${match.winner_team === "A" ? " recent-match-winner-btn-active" : ""}"
+            data-role="saved-match-winner"
+            data-match-id="${match.match_id}"
+            data-winner-team="A"
+          >天辉胜</button>
+          <button
+            type="button"
+            class="recent-match-winner-btn${!hasRecordedWinner(match.winner_team) ? " recent-match-winner-btn-active" : ""}"
+            data-role="saved-match-winner"
+            data-match-id="${match.match_id}"
+            data-winner-team=""
+          >未定</button>
+          <button
+            type="button"
+            class="recent-match-winner-btn${match.winner_team === "B" ? " recent-match-winner-btn-active" : ""}"
+            data-role="saved-match-winner"
+            data-match-id="${match.match_id}"
+            data-winner-team="B"
+          >夜魇胜</button>
+        </div>
+      ` : "";
       const buildEffectLogHtml = (team) => effectLogsByTeam[team]?.length
         ? `<div class="match-effect-logs">${effectLogsByTeam[team].map((item) => `
           <p class="match-effect-log-line match-effect-log-line-${item.tone}">
@@ -6687,6 +6848,7 @@ function renderRecentMatches(groups) {
           <span class="muted">比赛日期：${escapeHtml(matchDateLabel)}</span>
           <span class="muted">登记时间：${escapeHtml(formatLocalTime(match.created_at))}</span>
         </div>
+        ${quickWinnerHtml}
         <div class="recent-match-teams">
           <div class="recent-match-team${match.winner_team === "A" ? " recent-match-team-winner" : ""}">
             <h3>天辉方</h3>
@@ -9860,6 +10022,16 @@ recentMatchesList.addEventListener("click", async (event) => {
       attendanceRemoveButton.dataset.playerName,
       attendanceRemoveButton.dataset.statusLabel,
       attendanceRemoveButton
+    );
+    return;
+  }
+
+  const savedMatchWinnerButton = event.target.closest('[data-role="saved-match-winner"]');
+  if (savedMatchWinnerButton) {
+    await updateSavedMatchWinner(
+      savedMatchWinnerButton.dataset.matchId,
+      savedMatchWinnerButton.dataset.winnerTeam || "",
+      savedMatchWinnerButton
     );
     return;
   }
