@@ -242,11 +242,12 @@ select
     json_build_object(
       'player_id', mr.player_id,
       'team', mr.team,
+      'team_slot', mr.team_slot,
       'is_winner', mr.is_winner,
       'display_name', p.display_name,
       'hero_name', mr.hero_name
     )
-    order by mr.team, p.display_name
+    order by mr.team, coalesce(mr.team_slot, 999), p.display_name
   ) as players
 from public.matches m
 join public.match_results mr on mr.match_id = m.id

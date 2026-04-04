@@ -3999,10 +3999,11 @@ function restoreMatchDayAttendanceNoteLocally(entry) {
 
 function buildOptimisticMatchRecord(matchId, seasonId, matchDayId, matchDate, winner, note, teamAIds, teamBIds, assignments, kdaAssignments, doubleDowns, createdAt = new Date().toISOString()) {
   const playerMap = new Map(seasonPlayers.map((player) => [player.id, player.display_name]));
-  const buildPlayerRows = (ids, team) => ids.map((playerId) => ({
+  const buildPlayerRows = (ids, team) => ids.map((playerId, index) => ({
     player_id: playerId,
     display_name: playerMap.get(playerId) || "未知选手",
     team,
+    team_slot: index + 1,
     hero_name: assignments[playerId] || null,
     kills: normalizeKdaValue(kdaAssignments?.[playerId]?.kills),
     deaths: normalizeKdaValue(kdaAssignments?.[playerId]?.deaths),

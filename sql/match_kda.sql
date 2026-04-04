@@ -4,9 +4,25 @@ alter table public.matches
 alter column winner_team drop not null;
 
 alter table public.match_results
+add column if not exists team_slot integer,
 add column if not exists kills integer,
 add column if not exists deaths integer,
 add column if not exists assists integer;
+
+with ranked_match_results as (
+  select
+    id,
+    row_number() over (
+      partition by match_id, team
+      order by coalesce(team_slot, 999), player_id
+    )::integer as next_team_slot
+  from public.match_results
+)
+update public.match_results mr
+set team_slot = ranked_match_results.next_team_slot
+from ranked_match_results
+where mr.id = ranked_match_results.id
+  and mr.team_slot is distinct from ranked_match_results.next_team_slot;
 
 do $$
 begin
@@ -145,12 +161,13 @@ begin
   where match_id = p_match_id;
 
   insert into public.match_results (
-    match_id, player_id, team, is_winner, score_change, reward_change, hero_name, kills, deaths, assists
+    match_id, player_id, team, team_slot, is_winner, score_change, reward_change, hero_name, kills, deaths, assists
   )
   select
     p_match_id,
     team_a.player_id,
     'A',
+    team_a.team_slot,
     null,
     0,
     0,
@@ -158,7 +175,7 @@ begin
     assignment.kills,
     assignment.deaths,
     assignment.assists
-  from unnest(p_team_a_player_ids) as team_a(player_id)
+  from unnest(p_team_a_player_ids) with ordinality as team_a(player_id, team_slot)
   left join lateral (
     select
       nullif(trim(coalesce(item->>'hero_name', '')), '') as hero_name,
@@ -171,12 +188,13 @@ begin
   ) assignment on true;
 
   insert into public.match_results (
-    match_id, player_id, team, is_winner, score_change, reward_change, hero_name, kills, deaths, assists
+    match_id, player_id, team, team_slot, is_winner, score_change, reward_change, hero_name, kills, deaths, assists
   )
   select
     p_match_id,
     team_b.player_id,
     'B',
+    team_b.team_slot,
     null,
     0,
     0,
@@ -184,7 +202,7 @@ begin
     assignment.kills,
     assignment.deaths,
     assignment.assists
-  from unnest(p_team_b_player_ids) as team_b(player_id)
+  from unnest(p_team_b_player_ids) with ordinality as team_b(player_id, team_slot)
   left join lateral (
     select
       nullif(trim(coalesce(item->>'hero_name', '')), '') as hero_name,
@@ -254,6 +272,7 @@ select
     json_build_object(
       'player_id', mr.player_id,
       'team', mr.team,
+      'team_slot', mr.team_slot,
       'is_winner', mr.is_winner,
       'display_name', p.display_name,
       'hero_name', mr.hero_name,
@@ -262,7 +281,7 @@ select
       'assists', mr.assists,
       'score_change', mr.score_change
     )
-    order by mr.team, p.display_name
+    order by mr.team, coalesce(mr.team_slot, 999), p.display_name
   ) as players,
   coalesce((
     select json_agg(

@@ -6,7 +6,23 @@ alter table public.matches
 alter column winner_team drop not null;
 
 alter table public.match_results
-add column if not exists hero_name text;
+add column if not exists hero_name text,
+add column if not exists team_slot integer;
+
+with ranked_match_results as (
+  select
+    id,
+    row_number() over (
+      partition by match_id, team
+      order by coalesce(team_slot, 999), player_id
+    )::integer as next_team_slot
+  from public.match_results
+)
+update public.match_results mr
+set team_slot = ranked_match_results.next_team_slot
+from ranked_match_results
+where mr.id = ranked_match_results.id
+  and mr.team_slot is distinct from ranked_match_results.next_team_slot;
 
 create or replace function public.record_match_result(
   p_team_a_player_ids uuid[],
@@ -136,6 +152,7 @@ begin
     match_id,
     player_id,
     team,
+    team_slot,
     is_winner,
     score_change,
     reward_change
@@ -144,6 +161,7 @@ begin
     v_match_id,
     player_id,
     'A',
+    team_slot,
     case
       when p_winner_team = 'A' then true
       when p_winner_team = 'B' then false
@@ -151,12 +169,13 @@ begin
     end,
     v_score_delta_a,
     0
-  from unnest(p_team_a_player_ids) as t(player_id);
+  from unnest(p_team_a_player_ids) with ordinality as t(player_id, team_slot);
 
   insert into public.match_results (
     match_id,
     player_id,
     team,
+    team_slot,
     is_winner,
     score_change,
     reward_change
@@ -165,6 +184,7 @@ begin
     v_match_id,
     player_id,
     'B',
+    team_slot,
     case
       when p_winner_team = 'B' then true
       when p_winner_team = 'A' then false
@@ -172,7 +192,7 @@ begin
     end,
     v_score_delta_b,
     0
-  from unnest(p_team_b_player_ids) as t(player_id);
+  from unnest(p_team_b_player_ids) with ordinality as t(player_id, team_slot);
 
   if v_has_winner then
     update public.players
@@ -345,6 +365,7 @@ begin
     match_id,
     player_id,
     team,
+    team_slot,
     is_winner,
     score_change,
     reward_change
@@ -353,6 +374,7 @@ begin
     v_match_id,
     player_id,
     'A',
+    team_slot,
     case
       when p_winner_team = 'A' then true
       when p_winner_team = 'B' then false
@@ -360,12 +382,13 @@ begin
     end,
     v_score_delta_a,
     0
-  from unnest(p_team_a_player_ids) as t(player_id);
+  from unnest(p_team_a_player_ids) with ordinality as t(player_id, team_slot);
 
   insert into public.match_results (
     match_id,
     player_id,
     team,
+    team_slot,
     is_winner,
     score_change,
     reward_change
@@ -374,6 +397,7 @@ begin
     v_match_id,
     player_id,
     'B',
+    team_slot,
     case
       when p_winner_team = 'B' then true
       when p_winner_team = 'A' then false
@@ -381,7 +405,7 @@ begin
     end,
     v_score_delta_b,
     0
-  from unnest(p_team_b_player_ids) as t(player_id);
+  from unnest(p_team_b_player_ids) with ordinality as t(player_id, team_slot);
 
   if v_has_winner then
     update public.players
@@ -556,6 +580,7 @@ begin
     match_id,
     player_id,
     team,
+    team_slot,
     is_winner,
     score_change,
     reward_change,
@@ -565,6 +590,7 @@ begin
     p_match_id,
     team_a.player_id,
     'A',
+    team_a.team_slot,
     case
       when p_winner_team = 'A' then true
       when p_winner_team = 'B' then false
@@ -573,7 +599,7 @@ begin
     0,
     0,
     assignment.hero_name
-  from unnest(p_team_a_player_ids) as team_a(player_id)
+  from unnest(p_team_a_player_ids) with ordinality as team_a(player_id, team_slot)
   left join lateral (
     select nullif(trim(coalesce(item->>'hero_name', '')), '') as hero_name
     from jsonb_array_elements(coalesce(p_assignments, '[]'::jsonb)) as item
@@ -585,6 +611,7 @@ begin
     match_id,
     player_id,
     team,
+    team_slot,
     is_winner,
     score_change,
     reward_change,
@@ -594,6 +621,7 @@ begin
     p_match_id,
     team_b.player_id,
     'B',
+    team_b.team_slot,
     case
       when p_winner_team = 'B' then true
       when p_winner_team = 'A' then false
@@ -602,7 +630,7 @@ begin
     0,
     0,
     assignment.hero_name
-  from unnest(p_team_b_player_ids) as team_b(player_id)
+  from unnest(p_team_b_player_ids) with ordinality as team_b(player_id, team_slot)
   left join lateral (
     select nullif(trim(coalesce(item->>'hero_name', '')), '') as hero_name
     from jsonb_array_elements(coalesce(p_assignments, '[]'::jsonb)) as item
