@@ -614,17 +614,17 @@ grant execute on function public.recalculate_all_scores() to anon, authenticated
 grant execute on function public.finalize_active_match_day(uuid) to anon, authenticated;
 
 do $$
+declare
+  v_job_id bigint;
 begin
-  if not exists (
-    select 1
-    from cron.job
-    where jobname = 'recalculate-scores-beijing-2330'
-  ) then
-    perform cron.schedule(
-      'recalculate-scores-beijing-2330',
-      '30 15 * * *',
-      'select public.recalculate_all_scores();'
-    );
+  select jobid
+  into v_job_id
+  from cron.job
+  where jobname = 'recalculate-scores-beijing-2330'
+  limit 1;
+
+  if v_job_id is not null then
+    perform cron.unschedule(v_job_id);
   end if;
 exception
   when undefined_table then

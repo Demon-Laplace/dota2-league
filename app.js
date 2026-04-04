@@ -105,16 +105,9 @@ const seasonRolloverStatus = document.getElementById("seasonRolloverStatus");
 const seasonRewardTotal = document.getElementById("seasonRewardTotal");
 const rewardPanel = document.getElementById("rewardPanel");
 const closeRewardPanelBtn = document.getElementById("closeRewardPanelBtn");
-const rewardModePlayerBtn = document.getElementById("rewardModePlayerBtn");
-const rewardModeOutsideBtn = document.getElementById("rewardModeOutsideBtn");
-const rewardPlayerEntryRow = document.getElementById("rewardPlayerEntryRow");
-const rewardOutsideEntryRow = document.getElementById("rewardOutsideEntryRow");
-const rewardPlayerSelect = document.getElementById("rewardPlayerSelect");
-const rewardOutsideNameInput = document.getElementById("rewardOutsideNameInput");
+const rewardPlayerPicker = document.getElementById("rewardPlayerPicker");
 const rewardExtraInput = document.getElementById("rewardExtraInput");
-const rewardOutsideExtraInput = document.getElementById("rewardOutsideExtraInput");
 const addRewardBtn = document.getElementById("addRewardBtn");
-const addOutsideRewardBtn = document.getElementById("addOutsideRewardBtn");
 const rewardMinimumHint = document.getElementById("rewardMinimumHint");
 const rewardMessageEl = document.getElementById("rewardMessage");
 const koiPlayerSelect = document.getElementById("koiPlayerSelect");
@@ -229,7 +222,7 @@ let roleMembersSupportAutoReconnect = true;
 let openRecentMatchGroups = new Set();
 let openRecentMatchSeasons = readOpenRecentMatchSeasons();
 let matchDayAttendanceSelectedIdsByGroup = new Map();
-let rewardEntryMode = "player";
+let rewardSelectedPlayerId = "";
 let isMatchFormOpen = false;
 let isBackfillFormOpen = false;
 let isSeasonPanelOpen = false;
@@ -1296,31 +1289,9 @@ function setRewardPanelOpen(isOpen) {
   seasonRewardTotal.setAttribute("aria-expanded", String(isOpen));
 }
 
-function setRewardEntryMode(mode = "player") {
-  rewardEntryMode = mode === "outside" ? "outside" : "player";
-  const isOutsideMode = rewardEntryMode === "outside";
-
-  if (rewardModePlayerBtn) {
-    rewardModePlayerBtn.classList.toggle("reward-mode-btn-active", !isOutsideMode);
-    rewardModePlayerBtn.setAttribute("aria-pressed", String(!isOutsideMode));
-  }
-  if (rewardModeOutsideBtn) {
-    rewardModeOutsideBtn.classList.toggle("reward-mode-btn-active", isOutsideMode);
-    rewardModeOutsideBtn.setAttribute("aria-pressed", String(isOutsideMode));
-  }
-  if (rewardPlayerEntryRow) {
-    rewardPlayerEntryRow.hidden = isOutsideMode;
-  }
-  if (rewardOutsideEntryRow) {
-    rewardOutsideEntryRow.hidden = !isOutsideMode;
-  }
-
-  if (isOutsideMode) {
-    rewardPlayerSelect.value = "";
-  } else {
-    rewardOutsideNameInput.value = "";
-  }
-
+function selectRewardPlayer(playerId = "") {
+  rewardSelectedPlayerId = playerId || "";
+  renderRewardPlayerPicker();
   updateRewardMinimumHint();
 }
 
@@ -2547,18 +2518,8 @@ function applyRolePermissions() {
   openBackfillFormBtn.hidden = !canScore;
   recordMatchBtn.hidden = !canScore;
   recordBackfillBtn.hidden = !canScore;
-  if (rewardModePlayerBtn) {
-    rewardModePlayerBtn.disabled = !canScore;
-  }
-  if (rewardModeOutsideBtn) {
-    rewardModeOutsideBtn.disabled = !canScore;
-  }
   addRewardBtn.hidden = !canScore;
-  addOutsideRewardBtn.hidden = !canScore;
-  rewardPlayerSelect.disabled = !canScore;
-  rewardOutsideNameInput.disabled = !canScore;
   rewardExtraInput.disabled = !canScore;
-  rewardOutsideExtraInput.disabled = !canScore;
   adminAddScorerBtn.disabled = !isAdmin;
   adminAddScorerSelect.disabled = !isAdmin;
   adminClearQueueBtn.disabled = !isAdmin;
@@ -2603,6 +2564,7 @@ function applyRolePermissions() {
 
   renderScorerPanelSummary();
   renderSeasonPlayersPanel();
+  renderRewardPlayerPicker();
   renderRewardLogs();
   renderRecentMatches(recentMatchDayGroupsData);
 }
@@ -3739,7 +3701,6 @@ function getFinishMatchDayActionContext(seasonId = activeSeason?.id) {
   const targetDate = activeDate || businessDate;
   const targetMatchCount = getRecordedMatchCountForDate(targetDate, seasonId);
   const hasPastActiveDay = Boolean(activeDate && activeDate !== businessDate);
-  const isRestMode = !hasPastActiveDay && targetDate === businessDate && targetMatchCount === 0;
 
   return {
     businessDate,
@@ -3747,22 +3708,16 @@ function getFinishMatchDayActionContext(seasonId = activeSeason?.id) {
     targetDate,
     targetMatchCount,
     hasPastActiveDay,
-    isRestMode,
   };
 }
 
 function updateFinishTodayMatchDayButtonLabel() {
   if (!finishTodayMatchDayBtn) return;
   const actionContext = getFinishMatchDayActionContext(activeSeason?.id);
-  const label = actionContext.isRestMode ? "今日无比赛" : "结束比赛日";
-  finishTodayMatchDayBtn.textContent = label;
-  finishTodayMatchDayBtn.title = actionContext.isRestMode
-    ? ""
-    : (
-      actionContext.targetDate === actionContext.businessDate
-        ? "结束今日比赛日并结算比赛日未参赛加减分"
-        : `结束 ${actionContext.targetDate} 比赛日并结算比赛日未参赛加减分`
-    );
+  finishTodayMatchDayBtn.textContent = "今日比赛全部完结";
+  finishTodayMatchDayBtn.title = actionContext.targetDate === actionContext.businessDate
+    ? "结束今日比赛并触发一次积分汇算"
+    : `结束 ${actionContext.targetDate} 比赛日并触发一次积分汇算`;
   finishTodayMatchDayBtn.setAttribute("aria-label", finishTodayMatchDayBtn.title);
 }
 
@@ -4917,19 +4872,54 @@ function buildRewardCategoryLineHtml(item) {
   `;
 }
 
-function renderRewardPlayerOptions() {
-  const options = ['<option value="">请选择选手</option>'];
-  const sortedPlayers = [...leaderboardPlayers].sort((a, b) =>
-    a.display_name.localeCompare(b.display_name, "zh-CN")
-  );
+function renderRewardPlayerPicker() {
+  if (!rewardPlayerPicker) return;
 
-  sortedPlayers.forEach((player) => {
-    options.push(
-      `<option value="${player.player_id || player.id}">${escapeHtml(player.display_name)}</option>`
-    );
+  const allRewardPlayers = [...seasonPlayers].sort((a, b) => {
+    if (a.is_in_season !== b.is_in_season) {
+      return a.is_in_season ? -1 : 1;
+    }
+    return a.display_name.localeCompare(b.display_name, "zh-CN");
   });
 
-  rewardPlayerSelect.innerHTML = options.join("");
+  if (rewardSelectedPlayerId && !allRewardPlayers.some((player) => player.id === rewardSelectedPlayerId)) {
+    rewardSelectedPlayerId = "";
+  }
+
+  if (!allRewardPlayers.length) {
+    rewardPlayerPicker.innerHTML = '<p class="muted">暂无可选选手</p>';
+    return;
+  }
+
+  const groups = [
+    { title: "赛季选手", players: allRewardPlayers.filter((player) => player.is_in_season), empty: "暂无赛季选手" },
+    { title: "未参赛选手", players: allRewardPlayers.filter((player) => !player.is_in_season), empty: "暂无未参赛选手" },
+  ];
+
+  rewardPlayerPicker.innerHTML = groups.map((group) => `
+    <section class="reward-player-group">
+      <div class="reward-player-group-head">
+        <h3>${group.title}</h3>
+        <span class="season-rank-count">${group.players.length} 人</span>
+      </div>
+      ${group.players.length ? `
+        <div class="reward-player-chip-list">
+          ${group.players.map((player) => `
+            <button
+              type="button"
+              class="manual-score-player-chip reward-player-chip${rewardSelectedPlayerId === player.id ? " manual-score-player-chip-active reward-player-chip-active" : ""}${player.is_in_season ? "" : " reward-player-chip-outside"}"
+              data-role="reward-player-chip"
+              data-player-id="${player.id}"
+              aria-pressed="${rewardSelectedPlayerId === player.id ? "true" : "false"}"
+              ${isCurrentRoleScorer() ? "" : "disabled"}
+            >
+              ${escapeHtml(player.display_name)}
+            </button>
+          `).join("")}
+        </div>
+      ` : `<p class="muted">${group.empty}</p>`}
+    </section>
+  `).join("");
 }
 
 function getRewardCardUsageDetail(playerId) {
@@ -4986,24 +4976,15 @@ function renderKoiPlayerOptions() {
 }
 
 function updateRewardMinimumHint() {
-  if (rewardEntryMode === "outside") {
-    if (rewardOutsideNameInput.value.trim()) {
-      rewardMinimumHint.textContent = `场外赞助人：${rewardOutsideNameInput.value.trim()}`;
-      return;
-    }
-    rewardMinimumHint.textContent = "请填写场外赞助人姓名后添加赞助额。";
-    return;
-  }
-
-  const selectedPlayer = leaderboardPlayers.find(
-    (player) => (player.player_id || player.id) === rewardPlayerSelect.value
-  );
+  const selectedPlayer = seasonPlayers.find((player) => player.id === rewardSelectedPlayerId);
   if (!selectedPlayer) {
-    rewardMinimumHint.textContent = "请选择赛季选手后添加额外赞助额。";
+    rewardMinimumHint.textContent = "点选一位选手";
     return;
   }
 
-  rewardMinimumHint.textContent = `${selectedPlayer.display_name} 当前基础项 ${Number(selectedPlayer.reward_minimum ?? 20)}，当前额外赞助 ${Number(selectedPlayer.reward_extra_points ?? 0)}。`;
+  rewardMinimumHint.textContent = selectedPlayer.is_in_season
+    ? `已选：${selectedPlayer.display_name}`
+    : `已选：${selectedPlayer.display_name} · 记为场外赞助`;
 }
 
 function renderRewardLogs() {
@@ -5026,7 +5007,6 @@ function renderRewardLogs() {
       <div class="section-head">
         <div>
           <h3>选手赞助构成</h3>
-          <p class="muted">报名费固定计入；积分卡、额外赞助和后续道具按分类汇总。</p>
         </div>
       </div>
       <div class="reward-summary-grid"></div>
@@ -5061,8 +5041,7 @@ function renderRewardLogs() {
   detailSection.innerHTML = `
     <div class="section-head">
       <div>
-        <h3>额外赞助明细</h3>
-        <p class="muted">这里保留额外赞助与场外赞助的逐笔记录，方便后续核对或取消。</p>
+        <h3>赞助明细</h3>
       </div>
     </div>
     <div class="reward-detail-list"></div>
@@ -5216,7 +5195,7 @@ function renderMatchDayStatus() {
   const matchGateMessage = getActiveSeasonMatchGateMessage();
   updateFinishTodayMatchDayButtonLabel();
   if (finishTodayMatchDayBtn) {
-    finishTodayMatchDayBtn.disabled = !isCurrentRoleScorer() || !activeSeason?.id || !isActiveSeasonReadyForMatches() || getFinishMatchDayActionContext(activeSeason?.id).isRestMode;
+    finishTodayMatchDayBtn.disabled = !isCurrentRoleScorer() || !activeSeason?.id || !isActiveSeasonReadyForMatches();
   }
 
   if (activeMatchDay) {
@@ -5642,7 +5621,7 @@ function renderLeaderboard(data) {
   if (!data || data.length === 0) {
     seasonPlayerRewardTotal = 0;
     refreshSeasonRewardTotal();
-    renderRewardPlayerOptions();
+    renderRewardPlayerPicker();
     updateRewardMinimumHint();
     const tr = document.createElement("tr");
     tr.innerHTML = '<td colspan="5" class="muted leaderboard-empty">暂无排行榜数据</td>';
@@ -5655,7 +5634,7 @@ function renderLeaderboard(data) {
     0
   );
   refreshSeasonRewardTotal();
-  renderRewardPlayerOptions();
+  renderRewardPlayerPicker();
   updateRewardMinimumHint();
 
   const highestRewardIds = getHighestRewardPlayerIds(data);
@@ -5847,17 +5826,15 @@ function renderLeaderboard(data) {
 async function addRewardExtra() {
   if (!ensureScorerAccess("仅记分员或管理员可添加赞助记录。")) return;
 
-  const isOutsideMode = rewardEntryMode === "outside";
-  const playerId = isOutsideMode ? "" : rewardPlayerSelect.value;
-  const outsideName = isOutsideMode ? rewardOutsideNameInput.value.trim() : "";
-  const selectedPlayer = leaderboardPlayers.find(
-    (player) => (player.player_id || player.id) === playerId
-  );
-  const amountInput = isOutsideMode ? rewardOutsideExtraInput : rewardExtraInput;
-  const extraAmount = Number.parseInt(amountInput.value, 10);
+  const selectedPlayer = seasonPlayers.find((player) => player.id === rewardSelectedPlayerId) || null;
+  const playerId = selectedPlayer?.id || "";
+  const outsideName = selectedPlayer && !selectedPlayer.is_in_season
+    ? selectedPlayer.display_name || ""
+    : "";
+  const extraAmount = Number.parseInt(rewardExtraInput.value, 10);
 
-  if (!playerId && !outsideName) {
-    setRewardMessage(isOutsideMode ? "请先填写场外赞助姓名。" : "请先选择赛季选手。", true);
+  if (!selectedPlayer) {
+    setRewardMessage("请先点选一位选手。", true);
     return;
   }
 
@@ -5867,10 +5844,9 @@ async function addRewardExtra() {
   }
 
   addRewardBtn.disabled = true;
-  addOutsideRewardBtn.disabled = true;
   setRewardMessage(`正在添加赞助记录...`);
 
-  if (outsideName && !playerId) {
+  if (!selectedPlayer.is_in_season) {
     const localLogs = readExternalDonationLogs(activeSeason?.id || null);
     localLogs.unshift({
       id: `local-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
@@ -5885,10 +5861,7 @@ async function addRewardExtra() {
     });
     writeExternalDonationLogs(activeSeason?.id || null, localLogs);
     addRewardBtn.disabled = false;
-    addOutsideRewardBtn.disabled = false;
-    rewardOutsideExtraInput.value = "";
-    rewardOutsideNameInput.value = "";
-    rewardPlayerSelect.value = "";
+    rewardExtraInput.value = "";
     setRewardMessage(`${outsideName} 的场外赞助已记录在本地。`);
     appendAdminActionLog(`记录了一笔场外赞助 ${outsideName} +${extraAmount}。`);
     await loadRewardLogs();
@@ -5904,16 +5877,13 @@ async function addRewardExtra() {
   });
 
   addRewardBtn.disabled = false;
-  addOutsideRewardBtn.disabled = false;
 
   if (error) {
     setRewardMessage(`添加赞助失败：${error.message}。请先在 Supabase 执行对应 SQL。`, true);
     return;
   }
 
-  amountInput.value = "";
-  rewardOutsideNameInput.value = "";
-  rewardPlayerSelect.value = "";
+  rewardExtraInput.value = "";
   setRewardMessage(`${selectedPlayer?.display_name || outsideName} 已增加赞助额 ${extraAmount}。`);
   appendAdminActionLog(`为 ${selectedPlayer?.display_name || outsideName || "该选手"} 添加了赞助 +${extraAmount}。`);
   updateRewardMinimumHint();
@@ -6454,8 +6424,8 @@ function renderRecentMatches(groups) {
       return;
     }
     const totalMatches = dayGroups.reduce((sum, group) => sum + (group.matches?.length || 0), 0);
-    const matchDayCount = visibleDayGroups.filter((group) => (group.matches?.length || 0) > 0).length;
-    const restDayCount = Math.max(visibleDayGroups.length - matchDayCount, 0);
+    const matchDayCount = dayGroups.filter((group) => (group.matches?.length || 0) > 0).length;
+    const restDayCount = Math.max(dayGroups.length - matchDayCount, 0);
     const isSeasonOpen = shouldOpenSeasonGroupByDefault(seasonMeta, visibleDayGroups);
     if (seasonEntry.season_id && isSeasonOpen) {
       openRecentMatchSeasons.add(seasonEntry.season_id);
@@ -7276,6 +7246,7 @@ async function loadSeasonPlayers() {
   });
 
   renderSeasonPlayersPanel();
+  renderRewardPlayerPicker();
   renderAdminAddScorerOptions();
   renderScorerManualScoreOptions();
   renderAdminManualScoreOptions();
@@ -8353,17 +8324,17 @@ async function cancelMatchDay() {
 async function finishTodayMatchDay() {
   if (!ensureScorerAccess("仅记分员或管理员可结束比赛日。")) return;
   if (!activeSeason?.id) {
-    setMessage("当前缺少可用赛季，暂时无法设置今日休战。", true);
+    setMessage("当前缺少可用赛季，暂时无法完结今日比赛。", true);
     return;
   }
 
   const actionContext = getFinishMatchDayActionContext(activeSeason.id);
-  if (actionContext.isRestMode) {
-    return;
-  }
-  const todayMatchCount = getTodayRecordedMatchCount(activeSeason.id);
+  const targetMatchCount = actionContext.targetMatchCount;
+  const targetLabel = actionContext.targetDate === actionContext.businessDate ? "今日比赛" : `${actionContext.targetDate} 比赛日`;
   const confirmed = window.confirm(
-    `确认结束 ${actionContext.targetDate === actionContext.businessDate ? "今日" : actionContext.targetDate} 比赛日吗？这会立刻按“比赛日未参赛”规则结算“总榜榜首缺席 -1 / 总榜榜尾缺席 +1”，并清空对应比赛日后的报名队列与当日名单。若之后该比赛日又新增或补录比赛，系统仍会自动重新回算。`
+    targetMatchCount > 0
+      ? `确认将${targetLabel}标记为全部完结吗？这会立刻执行一次积分汇算，并按“比赛日未参赛”规则结算对应加减分，同时清空相关报名队列与当日名单。`
+      : `确认将${targetLabel}标记为全部完结吗？当前没有已记录比赛，也会执行一次积分汇算，并清空相关报名队列与当日名单。`
   );
   if (!confirmed) {
     return;
@@ -8373,14 +8344,14 @@ async function finishTodayMatchDay() {
     finishTodayMatchDayBtn.disabled = true;
   }
 
-  setMessage("正在结束比赛日并结算...");
-  setMatchMessage("正在结束比赛日并结算...");
+  setMessage("正在完结比赛日并汇算...");
+  setMatchMessage("正在完结比赛日并汇算...");
   setBackfillMessage("");
 
   let data = null;
   let error = null;
 
-  if (actionContext.targetDate === actionContext.businessDate && todayMatchCount > 0) {
+  if (actionContext.targetDate === actionContext.businessDate && targetMatchCount > 0) {
     ({ data, error } = await db.rpc("finalize_active_match_day", {
       p_season_id: activeSeason.id,
     }));
@@ -8402,7 +8373,7 @@ async function finishTodayMatchDay() {
   }
 
   if (error) {
-    const failurePrefix = "结束比赛日失败";
+    const failurePrefix = "完结比赛日失败";
     setMessage(`${failurePrefix}：${error.message}。请先在 Supabase 执行最新 SQL。`, true);
     setMatchMessage(`${failurePrefix}：${error.message}。请先在 Supabase 执行最新 SQL。`, true);
     return;
@@ -8416,10 +8387,9 @@ async function finishTodayMatchDay() {
 
   clearStoredMatchDayStartTime();
   matchStartTimeInput.value = "";
-  const targetLabel = actionContext.targetDate === actionContext.businessDate ? "今日比赛日" : `${actionContext.targetDate} 比赛日`;
-  setMessage(`${targetLabel}已结束，比赛日未参赛加减分已完成结算。`);
-  setMatchMessage(`${targetLabel}已结束，比赛日未参赛加减分已完成结算。`);
-  appendAdminActionLog(`手动结束了 ${actionContext.targetDate} 比赛日并结算比赛日未参赛加减分。`);
+  setMessage(`${targetLabel}已全部完结，积分已完成汇算。`);
+  setMatchMessage(`${targetLabel}已全部完结，积分已完成汇算。`);
+  appendAdminActionLog(`手动完结了 ${actionContext.targetDate} 比赛日并触发了一次积分汇算。`);
   requestImmediateRefresh({
     playerDriven: true,
     queue: true,
@@ -9868,7 +9838,7 @@ seasonPlayersList.addEventListener("click", async (event) => {
 
 seasonRewardTotal.addEventListener("click", () => {
   setRewardPanelOpen(!isRewardPanelOpen);
-  renderRewardPlayerOptions();
+  renderRewardPlayerPicker();
   updateRewardMinimumHint();
   if (isRewardPanelOpen) {
     loadRewardLogs();
@@ -9879,42 +9849,19 @@ closeRewardPanelBtn.addEventListener("click", () => {
   setRewardPanelOpen(false);
 });
 
-if (rewardModePlayerBtn) {
-  rewardModePlayerBtn.addEventListener("click", () => setRewardEntryMode("player"));
-}
-
-if (rewardModeOutsideBtn) {
-  rewardModeOutsideBtn.addEventListener("click", () => setRewardEntryMode("outside"));
-}
-
-rewardPlayerSelect.addEventListener("change", () => {
-  if (rewardPlayerSelect.value) {
-    setRewardEntryMode("player");
-  }
-  updateRewardMinimumHint();
-});
-
-rewardOutsideNameInput.addEventListener("input", () => {
-  if (rewardOutsideNameInput.value.trim()) {
-    setRewardEntryMode("outside");
-  }
-  updateRewardMinimumHint();
+rewardPlayerPicker.addEventListener("click", (event) => {
+  const button = event.target.closest('[data-role="reward-player-chip"]');
+  if (!button || button.disabled) return;
+  selectRewardPlayer(button.dataset.playerId || "");
 });
 
 addRewardBtn.addEventListener("click", addRewardExtra);
-addOutsideRewardBtn.addEventListener("click", addRewardExtra);
 
 if (setKoiBtn) {
   setKoiBtn.addEventListener("click", () => setSeasonKoi());
 }
 
 rewardExtraInput.addEventListener("keydown", async (event) => {
-  if (event.key !== "Enter") return;
-  event.preventDefault();
-  await addRewardExtra();
-});
-
-rewardOutsideExtraInput.addEventListener("keydown", async (event) => {
   if (event.key !== "Enter") return;
   event.preventDefault();
   await addRewardExtra();
@@ -10130,7 +10077,7 @@ async function init() {
     setSeasonPanelOpen(false);
     setRewardPanelOpen(false);
     setLeaderboardCompactMode(readStoredLeaderboardCompactState());
-    setRewardEntryMode("player");
+    selectRewardPlayer("");
     renderHeroOptions();
     scheduleRestDayBoundaryRefresh();
     matchStartTimeInput.value = formatTime24(readStoredMatchDayStartTime()?.startTime || "");

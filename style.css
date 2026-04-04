@@ -403,25 +403,60 @@ button.season-total {
   gap: 10px;
 }
 
-.reward-entry-mode {
+.reward-player-picker {
+  display: grid;
+  gap: 12px;
+}
+
+.reward-player-group {
+  display: grid;
+  gap: 8px;
+}
+
+.reward-player-group-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.reward-player-group-head h3 {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.3;
+}
+
+.reward-player-chip-list {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
 }
 
-.reward-mode-btn {
-  min-width: 124px;
+.reward-player-chip {
+  min-width: 0;
 }
 
-.reward-mode-btn.reward-mode-btn-active {
-  color: #fff6dc;
-  border-color: rgba(240, 195, 106, 0.38);
+.reward-player-chip.reward-player-chip-active {
+  border-color: rgba(240, 195, 106, 0.34);
   background:
-    linear-gradient(135deg, rgba(115, 83, 27, 0.66), rgba(66, 45, 10, 0.74)),
-    rgba(10, 24, 41, 0.52);
+    linear-gradient(135deg, rgba(118, 82, 22, 0.5), rgba(88, 58, 14, 0.42)),
+    rgba(14, 31, 54, 0.62);
+  color: #fff1c7;
   box-shadow:
-    inset 0 1px 0 rgba(255, 240, 208, 0.08),
-    0 8px 18px rgba(58, 39, 10, 0.16);
+    inset 0 1px 0 rgba(255, 240, 208, 0.06),
+    0 8px 18px rgba(58, 39, 10, 0.12);
+}
+
+.reward-player-chip.reward-player-chip-outside {
+  border-color: rgba(157, 179, 208, 0.16);
+}
+
+.reward-player-chip.reward-player-chip-outside.reward-player-chip-active {
+  border-color: rgba(156, 205, 255, 0.28);
+  background:
+    linear-gradient(135deg, rgba(39, 74, 116, 0.48), rgba(18, 37, 63, 0.54)),
+    rgba(14, 31, 54, 0.62);
+  color: #eef7ff;
 }
 
 .reward-entry-row {
@@ -2290,7 +2325,7 @@ button:disabled {
   font-size: 0;
   line-height: 1;
   color: transparent;
-  margin-left: 8px;
+  margin-left: 14px;
   background: rgba(12, 28, 47, 0.38);
   border: 1px solid rgba(124, 165, 209, 0.14);
   box-shadow:

@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Dota2 宁德联赛</title>
-  <link rel="stylesheet" href="style.css?v=20260404-21" />
+  <link rel="stylesheet" href="style.css?v=20260404-23" />
 </head>
   <body>
   <div id="loadingScreen" class="loading-screen" aria-live="polite">
@@ -172,29 +172,18 @@
       <div class="section-head">
         <div>
           <h2>赛季赞助</h2>
-          <p class="muted">这里汇总报名费、积分卡和额外赞助；下方仍可登记额外赞助与场外赞助。</p>
+          <p class="muted">点选选手后登记赞助。</p>
         </div>
         <button id="closeRewardPanelBtn" class="button-secondary" type="button">收起</button>
       </div>
       <div class="reward-entry-shell">
-        <div class="reward-entry-mode" role="tablist" aria-label="赞助登记方式">
-          <button id="rewardModePlayerBtn" class="button-secondary reward-mode-btn reward-mode-btn-active" type="button" aria-pressed="true">赛季选手赞助</button>
-          <button id="rewardModeOutsideBtn" class="button-secondary reward-mode-btn" type="button" aria-pressed="false">场外赞助</button>
-        </div>
-        <div id="rewardPlayerEntryRow" class="row reward-entry-row">
-          <select id="rewardPlayerSelect">
-            <option value="">请选择选手</option>
-          </select>
-          <input id="rewardExtraInput" type="number" min="0" step="1" placeholder="额外赞助额" />
+        <div id="rewardPlayerPicker" class="reward-player-picker"></div>
+        <div class="row reward-entry-row">
+          <input id="rewardExtraInput" type="number" min="0" step="1" placeholder="赞助额" />
           <button id="addRewardBtn" type="button">添加赞助</button>
         </div>
-        <div id="rewardOutsideEntryRow" class="row reward-entry-row" hidden>
-          <input id="rewardOutsideNameInput" type="text" placeholder="场外赞助姓名" />
-          <input id="rewardOutsideExtraInput" type="number" min="0" step="1" placeholder="场外赞助额" />
-          <button id="addOutsideRewardBtn" type="button">添加赞助</button>
-        </div>
       </div>
-      <p id="rewardMinimumHint" class="muted">请选择选手后添加额外赞助。</p>
+      <p id="rewardMinimumHint" class="muted">点选一位选手</p>
       <p id="rewardMessage" class="message"></p>
       <div id="rewardLogsList" class="reward-logs"></div>
       <p id="rewardLogsEmpty" class="muted">暂无赛季赞助数据</p>
@@ -315,7 +304,7 @@
           <div class="section-head record-entry-head">
             <div class="record-entry-title-block">
               <h2 id="recordEntryTitle">记录比赛</h2>
-              <button id="finishTodayMatchDayBtn" class="button-secondary record-entry-finish-btn">今日休战</button>
+              <button id="finishTodayMatchDayBtn" class="button-secondary record-entry-finish-btn">今日比赛全部完结</button>
             </div>
             <div class="row">
               <button id="openMatchFormBtn">添加当日比赛</button>
@@ -494,6 +483,6 @@
   </div>
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="app.js?v=20260404-21"></script>
+  <script src="app.js?v=20260404-23"></script>
 </body>
 </html>
