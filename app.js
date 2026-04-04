@@ -3453,19 +3453,26 @@ function buildMatchDayAttendancePanelHtml(group, canScore) {
     `;
     }).join("")
     : "";
+  const registeredCountText = attendanceNotes.length ? `（已登记 ${attendanceNotes.length}）` : "";
 
   return `
-    <div class="match-day-attendance-panel" data-match-day-key="${group.group_key}">
-      ${canScore ? `
+    <details class="match-day-attendance-panel" data-match-day-key="${group.group_key}">
+      <summary class="match-day-attendance-summary">
+        <span>登记迟到选手</span>
+        <span class="match-day-attendance-summary-meta">${registeredCountText}</span>
+      </summary>
+      <div class="match-day-attendance-content">
+        ${canScore ? `
         <div class="match-day-attendance-form">
           ${chipsHtml}
           <div class="match-day-attendance-form-actions">
             <button class="button-danger match-day-attendance-add-btn" type="button" data-status="absent" data-group-key="${group.group_key}" data-match-day-id="${group.match_day_id || ""}" data-match-date="${group.match_date || ""}" data-season-id="${group.season_id || ""}" ${(group.match_day_id && selectedIds.size) ? "" : "disabled"}>登记迟到选手${selectedIds.size ? `（${selectedIds.size}）` : ""}</button>
           </div>
         </div>
-      ` : ""}
-      ${listHtml ? `<div class="match-day-attendance-list">${listHtml}</div>` : ""}
-    </div>
+        ` : ""}
+        ${listHtml ? `<div class="match-day-attendance-list">${listHtml}</div>` : ""}
+      </div>
+    </details>
   `;
 }
 

@@ -1394,25 +1394,62 @@ button:disabled {
   pointer-events: none;
 }
 
-#startMatchDayBtn {
-  background:
-    linear-gradient(135deg, rgba(38, 53, 77, 0.97), rgba(18, 31, 51, 0.99) 52%, rgba(58, 54, 35, 0.97)),
-    linear-gradient(180deg, rgba(212, 194, 150, 0.1), transparent 62%);
-  border-color: rgba(169, 152, 108, 0.26);
+#addRewardBtn {
+  background: linear-gradient(135deg, #f8da78, #e3ad2f);
+  border-color: rgba(173, 119, 14, 0.34);
   box-shadow:
-    inset 0 1px 0 rgba(238, 232, 216, 0.07),
-    inset 16px 0 24px rgba(58, 108, 162, 0.06),
-    inset -16px 0 24px rgba(162, 146, 91, 0.08),
-    0 14px 30px rgba(11, 23, 38, 0.28);
+    inset 0 1px 0 rgba(255, 247, 212, 0.62),
+    0 12px 24px rgba(124, 83, 8, 0.24);
+  color: #4f3200;
+  font-weight: 700;
+}
+
+#addRewardBtn::before {
+  background: linear-gradient(180deg, rgba(255, 252, 240, 0.38), transparent);
+}
+
+#addRewardBtn:hover:not(:disabled) {
+  filter: brightness(1.03);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 250, 226, 0.72),
+    0 14px 28px rgba(124, 83, 8, 0.28);
+}
+
+#startMatchDayBtn,
+#openMatchFormBtn {
+  background: linear-gradient(135deg, #366ea7, #245789);
+  border-color: rgba(123, 166, 210, 0.28);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.12),
+    0 12px 24px rgba(12, 37, 67, 0.22);
+  color: #f5f9ff;
+}
+
+#startMatchDayBtn::before,
+#openMatchFormBtn::before {
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.1), transparent);
+}
+
+#startMatchDayBtn {
+  background: linear-gradient(135deg, #3a75b1, #285d91);
+}
+
+#openMatchFormBtn {
+  background: linear-gradient(135deg, #4a84be, #31679c);
+}
+
+#startMatchDayBtn:hover:not(:disabled),
+#openMatchFormBtn:hover:not(:disabled) {
+  filter: brightness(1.04);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.16),
+    0 14px 28px rgba(12, 37, 67, 0.26);
 }
 
 #startMatchDayBtn:hover:not(:disabled) {
   box-shadow:
-    inset 0 1px 0 rgba(248, 240, 224, 0.1),
-    inset 16px 0 26px rgba(72, 132, 197, 0.08),
-    inset -16px 0 26px rgba(182, 164, 101, 0.1),
-    0 16px 34px rgba(13, 25, 42, 0.31),
-    0 0 16px rgba(173, 157, 101, 0.1);
+    inset 0 1px 0 rgba(255, 255, 255, 0.16),
+    0 16px 30px rgba(12, 37, 67, 0.28);
 }
 
 #startMatchDayBtn.button-cancel-state {
@@ -2240,6 +2277,14 @@ button:disabled {
   display: none;
 }
 
+.recent-match-season-summary:focus,
+.recent-match-season-summary:focus-visible,
+.match-day-group summary:focus,
+.match-day-group summary:focus-visible {
+  outline: none;
+  box-shadow: none;
+}
+
 .recent-match-season-title-block {
   display: grid;
   gap: 4px;
@@ -2441,11 +2486,49 @@ button:disabled {
 .match-day-attendance-panel {
   display: grid;
   gap: 8px;
-  padding: 8px 12px;
   border: 1px solid rgba(124, 165, 209, 0.14);
   border-radius: 12px;
   background: linear-gradient(180deg, rgba(12, 28, 45, 0.72), rgba(9, 22, 37, 0.6));
   box-shadow: inset 0 1px 0 rgba(219, 231, 245, 0.03);
+}
+
+.match-day-attendance-summary {
+  list-style: none;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 10px 12px;
+  cursor: pointer;
+  color: #e8f2ff;
+  font-weight: 600;
+}
+
+.match-day-attendance-summary::-webkit-details-marker {
+  display: none;
+}
+
+.match-day-attendance-summary::after {
+  content: "▾";
+  color: rgba(214, 227, 245, 0.76);
+  font-size: 12px;
+  transition: transform 0.2s ease;
+}
+
+.match-day-attendance-panel[open] .match-day-attendance-summary::after {
+  transform: rotate(180deg);
+}
+
+.match-day-attendance-summary-meta {
+  color: rgba(180, 196, 215, 0.74);
+  font-weight: 500;
+  font-size: 12px;
+}
+
+.match-day-attendance-content {
+  display: grid;
+  gap: 8px;
+  padding: 0 12px 12px;
 }
 
 .match-day-attendance-form {
