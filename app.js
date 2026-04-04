@@ -3532,8 +3532,10 @@ function updateRecentMatchGroupSummary(details, isActiveDay) {
 }
 
 function rememberOpenRecentMatchGroups() {
+  const businessDate = getBeijingBusinessDateString();
   openRecentMatchGroups = new Set(
     [...recentMatchesList.querySelectorAll(".match-day-group[open]")]
+      .filter((element) => (element.dataset.matchDate || "") !== businessDate)
       .map((element) => element.dataset.groupKey || element.dataset.matchDate)
       .filter(Boolean)
   );
@@ -6610,6 +6612,11 @@ function shouldHideRestDayBanner(group) {
   return String(group.match_date || "") < getBeijingBusinessDateString();
 }
 
+function isCurrentBusinessDayGroup(group) {
+  if (!group) return false;
+  return String(group.match_date || "") === getBeijingBusinessDateString();
+}
+
 function renderRecentMatches(groups) {
   recentMatchesList.innerHTML = "";
   const highestRewardIds = getHighestRewardPlayerIds(leaderboardPlayers);
@@ -6682,13 +6689,14 @@ function renderRecentMatches(groups) {
       const details = document.createElement("details");
     const matches = group.matches || [];
     const isActiveDay = Boolean(group.day_is_active);
+    const isBusinessDay = isCurrentBusinessDayGroup(group);
     const participantEntries = group.participants || [];
     const matchDayPlayerCount = participantEntries.length;
     const playerSummaryHtml = buildMatchDayPlayerSummaryHtml(participantEntries, group.attendance_notes || []);
     details.dataset.matchDate = group.match_date;
     details.dataset.groupKey = group.group_key;
     details.className = `match-day-group${isActiveDay ? " match-day-group-active-day" : " match-day-group-archive-day"}`;
-    details.open = isActiveDay || openRecentMatchGroups.has(group.group_key);
+    details.open = isBusinessDay || isActiveDay || openRecentMatchGroups.has(group.group_key);
     details.dataset.expanded = details.open ? "true" : "false";
     details.addEventListener("toggle", () => {
       if (details.open) {
