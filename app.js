@@ -5002,6 +5002,19 @@ function buildLeaderboardRewardTooltip(playerId) {
   };
 }
 
+function buildLeaderboardGamesTooltip(player) {
+  const wins = Math.max(Number(player?.wins ?? 0), 0);
+  const losses = Math.max(Number(player?.losses ?? 0), 0);
+  const lines = [
+    `胜场：${wins}`,
+    `负场：${losses}`,
+  ];
+  return {
+    text: lines.join(" | "),
+    html: lines.map((line) => `<span>${escapeHtml(line)}</span>`).join(""),
+  };
+}
+
 function renderKoiPlayerOptions() {
   if (!koiPlayerSelect) return;
   const options = ['<option value="">不设置锦鲤</option>'];
@@ -5702,6 +5715,7 @@ function renderLeaderboard(data) {
     const gamesPlayed = Number(player.games_played ?? 0);
     const rewardExtraPoints = Number(player.reward_extra_points ?? 0);
     const rewardTooltip = buildLeaderboardRewardTooltip(playerId);
+    const gamesTooltip = buildLeaderboardGamesTooltip(player);
     const tags = [];
     const nameClassName = getPlayerNameStyleClass(playerId, {
       players: sortedData,
@@ -5854,7 +5868,12 @@ function renderLeaderboard(data) {
           title="查看积分变动明细"
         >${formatScore(player.score)}</button>
       </td>
-      <td><span class="leaderboard-stat${gamesPlayed > 5 ? " leaderboard-stat-active" : ""}">${gamesPlayed}</span></td>
+      <td>
+        <span class="leaderboard-stat-wrap" aria-label="${escapeHtml(gamesTooltip.text)}">
+          <span class="leaderboard-stat${gamesPlayed > 5 ? " leaderboard-stat-active" : ""}">${gamesPlayed}</span>
+          <span class="leaderboard-stat-hovercard">${gamesTooltip.html}</span>
+        </span>
+      </td>
       <td>
         <div class="leaderboard-rate" style="--rate-percent: ${winRateNumber}%; --rate-glow: ${Math.max(14, winRateNumber)}%;">
           <span class="leaderboard-rate-bar" aria-hidden="true"></span>
