@@ -3796,6 +3796,21 @@ ol {
   color: #eff8ff;
 }
 
+.leaderboard-tag-wasabi {
+  color: #e5f7da;
+  border-color: rgba(157, 210, 107, 0.26);
+  background:
+    linear-gradient(135deg, rgba(78, 112, 46, 0.42), rgba(46, 76, 28, 0.38));
+  box-shadow:
+    inset 0 1px 0 rgba(236, 250, 224, 0.06),
+    0 0 12px rgba(126, 182, 82, 0.08);
+}
+
+.leaderboard-tag-wasabi .leaderboard-tag-icon {
+  background: linear-gradient(135deg, rgba(209, 239, 153, 0.18), rgba(124, 184, 72, 0.2));
+  color: #d8f19b;
+}
+
 .leaderboard-tag-streak-1 {
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.04),

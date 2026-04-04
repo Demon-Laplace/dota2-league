@@ -5761,6 +5761,10 @@ function renderLeaderboard(data) {
       });
     }
 
+    if (Number(player.score ?? 0) < 0) {
+      tags.push({ icon: "☘", label: "面有菜色", tone: "wasabi", description: "太菜了" });
+    }
+
     if (bronzeFeederIds.has(playerId)) {
       tags.push({ icon: "◈", label: "送分童子", tone: "brass", description: "常规败场明显偏多" });
     }
