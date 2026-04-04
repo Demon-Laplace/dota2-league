@@ -1041,6 +1041,41 @@ function formatShortLocalTime(value) {
   });
 }
 
+function compareLeaderboardPlayers(a, b) {
+  const scoreDiff = Number(b.score ?? 0) - Number(a.score ?? 0);
+  if (scoreDiff !== 0) return scoreDiff;
+
+  const gamesDiff = Number(b.games_played ?? 0) - Number(a.games_played ?? 0);
+  if (gamesDiff !== 0) return gamesDiff;
+
+  const winRateDiff = getWinRateNumber(b.win_rate, b.wins, b.games_played) - getWinRateNumber(a.win_rate, a.wins, a.games_played);
+  if (Math.abs(winRateDiff) > 0.0001) return winRateDiff;
+
+  return String(a.display_name || "").localeCompare(String(b.display_name || ""), "zh-CN");
+}
+
+function sortLeaderboardPlayers(players = []) {
+  return [...players].sort(compareLeaderboardPlayers);
+}
+
+function isSameLeaderboardRankGroup(a, b) {
+  if (!a || !b) return false;
+  return Number(a.score ?? 0) === Number(b.score ?? 0)
+    && Number(a.games_played ?? 0) === Number(b.games_played ?? 0)
+    && Math.abs(
+      getWinRateNumber(a.win_rate, a.wins, a.games_played)
+      - getWinRateNumber(b.win_rate, b.wins, b.games_played)
+    ) < 0.0001;
+}
+
+function getLeaderboardDisplayRankAtIndex(players, index) {
+  if (!Array.isArray(players) || index < 0 || index >= players.length) return 0;
+  if (index === 0) return 1;
+  return isSameLeaderboardRankGroup(players[index], players[index - 1])
+    ? getLeaderboardDisplayRankAtIndex(players, index - 1)
+    : index + 1;
+}
+
 function buildLeaderboardShareText(players = leaderboardPlayers) {
   const source = players || [];
   if (!source.length) {
@@ -1053,11 +1088,12 @@ function buildLeaderboardShareText(players = leaderboardPlayers) {
     : "【积分榜】";
 
   const lines = source.map((player, idx) => {
+    const displayRank = getLeaderboardDisplayRankAtIndex(source, idx);
     const playerName = stripPlayerNameMeta(player.display_name || "未知选手");
     const score = formatScore(player.score);
     const gamesPlayed = Number(player.games_played ?? 0);
     const winRate = formatWinRateValue(player.win_rate, player.wins, player.games_played);
-    return `${idx + 1}. ${playerName}｜${score}分｜${gamesPlayed}场｜${winRate}`;
+    return `${displayRank}. ${playerName}｜${score}分｜${gamesPlayed}场｜${winRate}`;
   });
 
   return [
@@ -2518,8 +2554,8 @@ function applyRolePermissions() {
   openBackfillFormBtn.hidden = !canScore;
   recordMatchBtn.hidden = !canScore;
   recordBackfillBtn.hidden = !canScore;
-  addRewardBtn.hidden = !canScore;
-  rewardExtraInput.disabled = !canScore;
+  addRewardBtn.hidden = false;
+  rewardExtraInput.disabled = false;
   adminAddScorerBtn.disabled = !isAdmin;
   adminAddScorerSelect.disabled = !isAdmin;
   adminClearQueueBtn.disabled = !isAdmin;
@@ -3177,7 +3213,7 @@ function getLeaderboardNameRankClass(rank) {
 function getLeaderboardRankByPlayerId(playerId, players = leaderboardPlayers) {
   if (!playerId || !players?.length) return 0;
   const index = players.findIndex((player) => (player.player_id || player.id) === playerId);
-  return index >= 0 ? index + 1 : 0;
+  return index >= 0 ? getLeaderboardDisplayRankAtIndex(players, index) : 0;
 }
 
 function buildDecoratedPlayerNameHtml(playerId, displayName, options = {}) {
@@ -4911,7 +4947,6 @@ function renderRewardPlayerPicker() {
               data-role="reward-player-chip"
               data-player-id="${player.id}"
               aria-pressed="${rewardSelectedPlayerId === player.id ? "true" : "false"}"
-              ${isCurrentRoleScorer() ? "" : "disabled"}
             >
               ${escapeHtml(player.display_name)}
             </button>
@@ -5611,14 +5646,15 @@ function renderTodayPlayers() {
 
 function renderLeaderboard(data) {
   leaderboardBody.innerHTML = "";
-  leaderboardPlayers = data || [];
+  leaderboardPlayers = sortLeaderboardPlayers(data || []);
+  const sortedData = leaderboardPlayers;
   const longestNameLength = Math.max(
     8,
-    ...((data || []).map((player) => (stripPlayerNameMeta(player.display_name || "未知选手") || "未知选手").length))
+    ...(sortedData.map((player) => (stripPlayerNameMeta(player.display_name || "未知选手") || "未知选手").length))
   );
   leaderboardCard?.style.setProperty("--leaderboard-name-ch", String(Math.min(longestNameLength + 2, 18)));
 
-  if (!data || data.length === 0) {
+  if (!sortedData.length) {
     seasonPlayerRewardTotal = 0;
     refreshSeasonRewardTotal();
     renderRewardPlayerPicker();
@@ -5629,7 +5665,7 @@ function renderLeaderboard(data) {
     return;
   }
 
-  seasonPlayerRewardTotal = data.reduce(
+  seasonPlayerRewardTotal = sortedData.reduce(
     (sum, player) => sum + Number(player.reward_points ?? 0),
     0
   );
@@ -5637,31 +5673,31 @@ function renderLeaderboard(data) {
   renderRewardPlayerPicker();
   updateRewardMinimumHint();
 
-  const highestRewardIds = getHighestRewardPlayerIds(data);
-  const hardcoreLoseIds = getHardcoreLoseTaggedPlayerIds(data);
+  const highestRewardIds = getHighestRewardPlayerIds(sortedData);
+  const hardcoreLoseIds = getHardcoreLoseTaggedPlayerIds(sortedData);
   const winStreakMap = getActiveWinStreakMap(recentMatchesData, 3);
   const loseStreakMap = getActiveLoseStreakMap(recentMatchesData, 3);
-  const bronzeFeederIds = getBronzeFeederPlayerIds(data, recentMatchesData);
+  const bronzeFeederIds = getBronzeFeederPlayerIds(sortedData, recentMatchesData);
   const goldenTouchIds = getGoldenTouchPlayerIds(recentMatchesData);
   const superDoubleIds = getSuperDoublePlayerIds(recentMatchesData);
-  const teammateAffinity = getTeammateAffinityLeaders(data, recentMatchesData, 8, 12);
-  const nemesisMap = getNemesisMap(data, recentMatchesData, 8, 25);
+  const teammateAffinity = getTeammateAffinityLeaders(sortedData, recentMatchesData, 8, 12);
+  const nemesisMap = getNemesisMap(sortedData, recentMatchesData, 8, 25);
   const sideSpecialistMap = getSideSpecialistMap(recentMatchesData, 11, 4, 22);
   const lateArrivalIds = getLateArrivalTaggedPlayerIds(recentMatchDayGroupsData, 3);
   const mvpIds = getMvpPlayerIds();
-  const playerNameMap = new Map(data.map((player) => [player.player_id || player.id, stripPlayerNameMeta(player.display_name || "未知选手") || "未知选手"]));
+  const playerNameMap = new Map(sortedData.map((player) => [player.player_id || player.id, stripPlayerNameMeta(player.display_name || "未知选手") || "未知选手"]));
 
-  data.forEach((player, idx) => {
+  sortedData.forEach((player, idx) => {
     const tr = document.createElement("tr");
-    const rank = idx + 1;
-    const isBottomTwo = data.length >= 2 && rank >= data.length - 1;
+    const rank = getLeaderboardDisplayRankAtIndex(sortedData, idx);
+    const isBottomTwo = sortedData.length >= 2 && idx >= sortedData.length - 2;
     const playerId = player.player_id || player.id || "";
     const gamesPlayed = Number(player.games_played ?? 0);
     const rewardExtraPoints = Number(player.reward_extra_points ?? 0);
     const rewardTooltip = buildLeaderboardRewardTooltip(playerId);
     const tags = [];
     const nameClassName = getPlayerNameStyleClass(playerId, {
-      players: data,
+      players: sortedData,
       highestRewardIds,
       hardcoreLoseIds,
     });
@@ -5790,7 +5826,7 @@ function renderLeaderboard(data) {
         <div class="leaderboard-player-cell">
           <div class="leaderboard-player-name-wrap" title="${escapeHtml(rewardTooltip.text)}" aria-label="${escapeHtml(rewardTooltip.text)}">
             <strong class="leaderboard-player-name">${buildDecoratedPlayerNameHtml(playerId, player.display_name, {
-              players: data,
+              players: sortedData,
               highestRewardIds,
               hardcoreLoseIds,
               rank,
@@ -5824,8 +5860,6 @@ function renderLeaderboard(data) {
 }
 
 async function addRewardExtra() {
-  if (!ensureScorerAccess("仅记分员或管理员可添加赞助记录。")) return;
-
   const selectedPlayer = seasonPlayers.find((player) => player.id === rewardSelectedPlayerId) || null;
   const playerId = selectedPlayer?.id || "";
   const outsideName = selectedPlayer && !selectedPlayer.is_in_season
