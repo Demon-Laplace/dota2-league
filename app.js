@@ -4144,44 +4144,37 @@ function getSelectedBackfillPlayerIds() {
   return [...backfillTeamSelections.teamA, ...backfillTeamSelections.teamB];
 }
 
-function getTodayMatchPlayers() {
-  const linkedPlayers = getLinkedTodayPlayers();
-  const seasonRankMap = new Map(seasonPlayers.map((player) => [player.id, player.player_rank || null]));
-  const basePlayers = linkedPlayers.length
-    ? linkedPlayers
-    : seasonPlayers.filter((player) => player.is_in_season);
-
-  return basePlayers.map((player) => ({
-    id: player.player_id || player.id,
-    display_name: player.display_name,
-    player_rank: seasonRankMap.get(player.player_id || player.id) || null,
-  }));
-}
-
-function getLinkedTodayPlayers() {
-  const linkedPlayers = [];
+function getTodayRosterPlayers() {
+  const rosterPlayers = [];
   const seen = new Set();
-  const matchDate = activeMatchDay?.match_date || getBeijingBusinessDateString();
-  const todayGroup = (recentMatchDayGroupsData || []).find((group) => group.match_date === matchDate);
 
-  const pushEntry = (entry, source = "roster") => {
+  const pushEntry = (entry) => {
     if (!entry) return;
     const playerId = entry.player_id || entry.id || null;
     const displayName = stripPlayerNameMeta(entry.display_name || "未知选手");
     const key = playerId || displayName;
     if (!key || seen.has(key)) return;
     seen.add(key);
-    linkedPlayers.push({
+    rosterPlayers.push({
       player_id: playerId,
       display_name: displayName,
-      source,
+      source: entry.source || "roster",
     });
   };
 
-  (todayPlayers || []).forEach((entry) => pushEntry(entry, entry.source || "roster"));
-  (todayGroup?.participants || []).forEach((entry) => pushEntry(entry, "record"));
+  (todayPlayers || []).forEach((entry) => pushEntry(entry));
 
-  return linkedPlayers;
+  return rosterPlayers;
+}
+
+function getMatchRecordingPlayers() {
+  return seasonPlayers
+    .filter((player) => player.is_in_season)
+    .map((player) => ({
+      id: player.id,
+      display_name: player.display_name,
+      player_rank: player.player_rank || null,
+    }));
 }
 
 function canUseMatchRecordingForm() {
@@ -4198,7 +4191,7 @@ function createEmptySingleDoubleEntry() {
 
 function getSelectedPlayersByFormType(formType) {
   const selections = formType === "backfill" ? backfillTeamSelections : matchTeamSelections;
-  const players = formType === "backfill" ? backfillPlayers : getTodayMatchPlayers();
+  const players = formType === "backfill" ? backfillPlayers : getMatchRecordingPlayers();
   const teamMap = new Map();
 
   selections.teamA.forEach((playerId) => teamMap.set(playerId, "A"));
@@ -4680,7 +4673,7 @@ function renderTeamSelectionUI({
 
 function refreshMatchSelectOptions() {
   renderTeamSelectionUI({
-    players: getTodayMatchPlayers(),
+    players: getMatchRecordingPlayers(),
     selections: matchTeamSelections,
     assignments: matchHeroAssignments,
     kdaAssignments: matchKdaAssignments,
@@ -5656,7 +5649,7 @@ function renderQueue(data) {
 }
 
 function renderTodayPlayers() {
-  const displayPlayers = getLinkedTodayPlayers();
+  const displayPlayers = getTodayRosterPlayers();
   todayPlayersList.innerHTML = "";
   todayPlayersCount.textContent = `${displayPlayers.length} 人`;
 
