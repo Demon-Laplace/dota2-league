@@ -3664,6 +3664,16 @@ ol {
   overflow-wrap: anywhere;
 }
 
+.leaderboard-tag-fit-1 {
+  font-size: 12px;
+  letter-spacing: 0.01em;
+}
+
+.leaderboard-tag-fit-2 {
+  font-size: 11px;
+  letter-spacing: 0;
+}
+
 .leaderboard-card-compact .leaderboard-table tbody td {
   padding: 8px 10px;
 }
@@ -3690,6 +3700,14 @@ ol {
   min-height: 26px;
   padding: 3px 5px;
   font-size: 12px;
+}
+
+.leaderboard-card-compact .leaderboard-tag-fit-1 {
+  font-size: 11px;
+}
+
+.leaderboard-card-compact .leaderboard-tag-fit-2 {
+  font-size: 10px;
 }
 
 .leaderboard-card-compact .leaderboard-score {

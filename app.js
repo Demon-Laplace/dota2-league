@@ -3203,6 +3203,20 @@ function getStreakTagIntensityClass(streak) {
   return "leaderboard-tag-streak-1";
 }
 
+function getLeaderboardTagFitClass(label) {
+  const text = String(label || "").trim();
+  if (!text) return "";
+  const widthUnits = Array.from(text).reduce((sum, char) => {
+    if (/[\u4e00-\u9fff]/u.test(char)) return sum + 1;
+    if (/[A-Z0-9]/.test(char)) return sum + 0.72;
+    if (/[a-z]/.test(char)) return sum + 0.62;
+    return sum + 0.78;
+  }, 0);
+  if (widthUnits >= 7.6) return "leaderboard-tag-fit-2";
+  if (widthUnits >= 6.2) return "leaderboard-tag-fit-1";
+  return "";
+}
+
 function getLeaderboardNameRankClass(rank) {
   if (rank === 1) return "player-name-display-rank1";
   if (rank <= 3) return "player-name-display-rank23";
@@ -4993,8 +5007,8 @@ function buildLeaderboardRewardTooltip(playerId) {
   const usage = getRewardCardUsageDetail(playerId);
   const lines = [
     `剩余双倍代币：${usage.freeSingleRemaining}`,
-    `个人双倍：使用 ${usage.totalSingleCount} 次，购买 ${usage.paidSingleCount} 次`,
-    `团队双倍：使用 ${usage.teamCount} 次，购买 ${usage.teamCount} 次`,
+    `个人双倍：使用 ${usage.totalSingleCount}，购买 ${usage.paidSingleCount}`,
+    `团队双倍：使用 ${usage.teamCount}，购买 ${usage.teamCount}`,
   ];
   return {
     text: lines.join(" | "),
@@ -5826,12 +5840,15 @@ function renderLeaderboard(data) {
     // Future follow-up: if tags exceed 12, add an admin action log entry so we can revisit tag prioritization.
     const tagsHtml = `
       <div class="leaderboard-player-tags${tags.length ? "" : " leaderboard-player-tags-empty"}">
-        ${tags.slice(0, 12).map((tag) => `
-        <span class="leaderboard-tag leaderboard-tag-${tag.tone}${tag.className ? ` ${tag.className}` : ""}" title="${escapeHtml(tag.description || tag.label)}" aria-label="${escapeHtml(tag.description || tag.label)}">
+        ${tags.slice(0, 12).map((tag) => {
+          const fitClassName = getLeaderboardTagFitClass(tag.label);
+          return `
+        <span class="leaderboard-tag leaderboard-tag-${tag.tone}${tag.className ? ` ${tag.className}` : ""}${fitClassName ? ` ${fitClassName}` : ""}" title="${escapeHtml(tag.description || tag.label)}" aria-label="${escapeHtml(tag.description || tag.label)}">
           <span class="leaderboard-tag-icon">${escapeHtml(tag.icon)}</span>
           <span class="leaderboard-tag-label">${escapeHtml(tag.label)}</span>
         </span>
-      `).join("")}
+      `;
+        }).join("")}
       </div>
     `;
     const winRateNumber = getWinRateNumber(player.win_rate, player.wins, player.games_played);
