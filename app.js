@@ -1048,22 +1048,6 @@ function formatShortLocalTime(value) {
   });
 }
 
-function getMonospaceTextWidth(text) {
-  return [...String(text || "")].reduce((sum, char) => (
-    /[\u4e00-\u9fff\uff00-\uffef]/.test(char) ? sum + 2 : sum + 1
-  ), 0);
-}
-
-function padMonospaceText(text, width, align = "start") {
-  const safeText = String(text || "");
-  const currentWidth = getMonospaceTextWidth(safeText);
-  const padding = Math.max(width - currentWidth, 0);
-  if (align === "end") {
-    return `${" ".repeat(padding)}${safeText}`;
-  }
-  return `${safeText}${" ".repeat(padding)}`;
-}
-
 function buildLeaderboardShareText(players = leaderboardPlayers) {
   const source = players || [];
   if (!source.length) {
@@ -1075,26 +1059,13 @@ function buildLeaderboardShareText(players = leaderboardPlayers) {
     ? `【${headerSeasonName}积分榜】`
     : "【积分榜】";
 
-  const rows = source.map((player, idx) => ({
-    rank: `${idx + 1}.`,
-    playerName: stripPlayerNameMeta(player.display_name || "未知选手"),
-    score: `${formatScore(player.score)}分`,
-    gamesPlayed: `${Number(player.games_played ?? 0)}场`,
-    winRate: formatWinRateValue(player.win_rate, player.wins, player.games_played),
-  }));
-
-  const rankWidth = Math.max(...rows.map((row) => getMonospaceTextWidth(row.rank)));
-  const nameWidth = Math.max(...rows.map((row) => getMonospaceTextWidth(row.playerName)));
-  const scoreWidth = Math.max(...rows.map((row) => getMonospaceTextWidth(row.score)));
-  const gameWidth = Math.max(...rows.map((row) => getMonospaceTextWidth(row.gamesPlayed)));
-
-  const lines = rows.map((row) => [
-    padMonospaceText(row.rank, rankWidth, "end"),
-    padMonospaceText(row.playerName, nameWidth),
-    padMonospaceText(row.score, scoreWidth, "end"),
-    padMonospaceText(row.gamesPlayed, gameWidth, "end"),
-    row.winRate,
-  ].join(" ｜ "));
+  const lines = source.map((player, idx) => {
+    const playerName = stripPlayerNameMeta(player.display_name || "未知选手");
+    const score = formatScore(player.score);
+    const gamesPlayed = Number(player.games_played ?? 0);
+    const winRate = formatWinRateValue(player.win_rate, player.wins, player.games_played);
+    return `${idx + 1}. ${playerName}｜${score}分｜${gamesPlayed}场｜${winRate}`;
+  });
 
   return [
     header,
