@@ -4986,8 +4986,8 @@ function buildLeaderboardRewardTooltip(playerId) {
   const usage = getRewardCardUsageDetail(playerId);
   const lines = [
     `剩余免费个人双倍：${usage.freeSingleRemaining}`,
-    `个人双倍：共 ${usage.totalSingleCount} 次，免费 ${usage.freeSingleUsed} 次，购买 ${usage.paidSingleCount} 次（${formatScore(usage.paidSingleAmount)}）`,
-    `团队双倍：购买 ${usage.teamCount} 次（${formatScore(usage.teamAmount)}）`,
+    `个人双倍：共 ${usage.totalSingleCount} 次，免费 ${usage.freeSingleUsed} 次，购买 ${usage.paidSingleCount} 次`,
+    `团队双倍：购买 ${usage.teamCount} 次`,
   ];
   return {
     text: lines.join(" | "),
@@ -5824,7 +5824,7 @@ function renderLeaderboard(data) {
       <td><span class="leaderboard-rank">${rank}</span></td>
       <td>
         <div class="leaderboard-player-cell">
-          <div class="leaderboard-player-name-wrap" title="${escapeHtml(rewardTooltip.text)}" aria-label="${escapeHtml(rewardTooltip.text)}">
+          <div class="leaderboard-player-name-wrap" aria-label="${escapeHtml(rewardTooltip.text)}">
             <strong class="leaderboard-player-name">${buildDecoratedPlayerNameHtml(playerId, player.display_name, {
               players: sortedData,
               highestRewardIds,
