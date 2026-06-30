@@ -1,0 +1,61 @@
+project_id = "dota2sys"
+
+[api]
+enabled = true
+port = 54321
+schemas = ["public", "graphql_public"]
+extra_search_path = ["public", "extensions", "private"]
+max_rows = 1000
+
+[db]
+port = 54322
+major_version = 17
+
+[db.seed]
+enabled = true
+sql_paths = ["./seed.sql"]
+
+[auth]
+enabled = true
+site_url = "http://localhost:5500"
+additional_redirect_urls = [
+  "http://localhost:3000",
+  "http://localhost:4173",
+  "http://127.0.0.1:5500",
+  "http://localhost:5500"
+]
+jwt_expiry = 3600
+enable_refresh_token_rotation = true
+
+[functions.username-login]
+verify_jwt = false
+
+[functions.admin-list-users]
+verify_jwt = false
+
+[functions.admin-save-user-mapping]
+verify_jwt = false
+
+[functions.admin-create-user]
+verify_jwt = false
+
+[functions.admin-reset-password]
+verify_jwt = false
+
+[functions.admin-set-user-status]
+verify_jwt = false
+
+[functions.apply-item-effect]
+verify_jwt = false
+
+[functions.manual-adjust-score]
+verify_jwt = false
+
+[functions.submit-match]
+verify_jwt = false
+
+[functions.approve-match]
+verify_jwt = false
+
+[functions.rollback-match]
+verify_jwt = false

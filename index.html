@@ -1,0 +1,1244 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title data-copy="meta.documentTitle"></title>
+  <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin />
+  <link rel="preconnect" href="https://klxkkwwszqtgeuozwtkw.supabase.co" crossorigin />
+  <link rel="preload" as="image" href="./assets/Dota2_logo.png" fetchpriority="high" />
+  <link rel="stylesheet" href="style.css?v=20260608-realtime-rewards" />
+</head>
+  <body>
+  <div id="loadingScreen" class="loading-screen" aria-live="polite">
+    <div class="loading-screen__overlay"></div>
+    <div class="loading-screen__content">
+      <div class="league-brand league-brand-loading">
+        <div class="league-brand-mark">
+          <img src="./assets/Dota2_logo.png" alt="Dota 2 Logo" class="league-brand-logo" />
+        </div>
+        <div class="league-brand-copy">
+          <p class="league-brand-kicker" data-copy="brand.kicker"></p>
+          <h1 class="league-brand-title">
+            <span class="league-brand-title-main" data-copy="brand.mainTitle"></span>
+            <span id="loadingBrandMonth" class="league-brand-title-sub">0000-00</span>
+          </h1>
+        </div>
+      </div>
+      <p data-copy="brand.loadingStatus"></p>
+    </div>
+  </div>
+  <div id="globalToast" class="global-toast" hidden aria-live="polite"></div>
+  <div id="systemPromptModal" class="hero-picker-modal system-prompt-modal" hidden>
+    <div id="systemPromptBackdrop" class="hero-picker-backdrop"></div>
+    <div class="hero-picker-dialog system-prompt-dialog" role="dialog" aria-modal="true" aria-labelledby="systemPromptTitle" aria-describedby="systemPromptBody">
+      <div class="system-prompt-head">
+        <div>
+          <h2 id="systemPromptTitle">确认操作</h2>
+          <p id="systemPromptBody" class="muted"></p>
+        </div>
+      </div>
+      <label id="systemPromptInputWrap" class="system-prompt-input-wrap" for="systemPromptInput" hidden>
+        <span id="systemPromptInputLabel" class="muted system-prompt-input-label"></span>
+        <input id="systemPromptInput" type="text" autocomplete="off" />
+      </label>
+      <div class="system-prompt-actions">
+        <button id="systemPromptCancelBtn" class="button-secondary" type="button">取消</button>
+        <button id="systemPromptConfirmBtn" class="button-secondary" type="button">确认</button>
+      </div>
+    </div>
+  </div>
+  <main class="container">
+    <div class="page-head">
+      <div class="league-brand">
+        <div class="league-brand-mark">
+          <img src="./assets/Dota2_logo.png" alt="Dota 2 Logo" class="league-brand-logo" />
+          <button id="homeStealthToggle" class="home-stealth-trigger" type="button" tabindex="-1" aria-hidden="true"></button>
+        </div>
+        <div class="league-brand-copy">
+          <p class="league-brand-kicker" data-copy="brand.kicker"></p>
+          <h1 class="league-brand-title">
+            <span class="league-brand-title-main" data-copy="brand.mainTitle"></span>
+            <button id="brandMonthBadge" class="league-brand-title-sub league-brand-season-trigger" type="button" aria-haspopup="listbox" aria-expanded="false" title="切换积分榜赛季">0000-00</button>
+            <select id="leaderboardSeasonSelect" class="league-brand-title-sub league-brand-season-select" aria-label="选择积分榜赛季" hidden></select>
+          </h1>
+        </div>
+      </div>
+      <div class="page-head-meta">
+        <button id="scorerModeBtn" class="season-chip" type="button" hidden data-copy="header.scorerMode"></button>
+        <button id="adminModeBtn" class="season-chip" type="button" hidden data-copy="header.adminMode"></button>
+        <button id="openAuthModalBtn" class="season-chip" type="button" data-copy="header.signIn"></button>
+        <button id="signOutBtn" class="button-secondary" type="button" hidden data-copy="header.signOut"></button>
+        <button id="seasonRewardTotal" class="season-total" type="button" aria-expanded="false" data-copy="header.seasonRewardTotalDefault"></button>
+      </div>
+    </div>
+    <p class="sub" hidden><span data-copy="meta.betaNoticePrefix"></span><span id="lastUpdatedText">读取中...</span></p>
+    <section id="scorerPanel" class="season-panel admin-panel" hidden>
+      <div class="section-head">
+        <div>
+          <h2 data-copy="scorerPanel.title"></h2>
+          <p id="scorerPanelSummary" class="muted" data-copy="adminPanel.summaryLoading"></p>
+        </div>
+        <div class="row">
+          <button id="scorerExitModeBtn" class="button-secondary" type="button" data-copy="scorerPanel.exit"></button>
+          <button id="closeScorerPanelBtn" class="button-secondary" type="button" data-copy="scorerPanel.collapse"></button>
+        </div>
+      </div>
+      <div class="admin-panel-grid">
+        <section class="admin-panel-card">
+          <div class="section-head">
+            <h3 data-copy="scorerPanel.toolsTitle"></h3>
+          </div>
+          <div class="row admin-panel-actions">
+            <button id="scorerOpenManualScoreBtn" class="button-secondary" type="button" data-copy="scorerPanel.scoreToolButton"></button>
+            <button id="scorerOpenSeasonRulesBtn" class="button-secondary" type="button" data-copy="scorerPanel.pointRuleButton"></button>
+            <button id="scorerOpenPowerManagementBtn" class="button-secondary" type="button" data-copy="scorerPanel.powerManageButton"></button>
+            <button id="scorerOpenPlayerManagementBtn" class="button-secondary" type="button" data-copy="scorerPanel.playerManageButton"></button>
+            <button
+              id="scorerItemCatalogToggleBtn"
+              class="button-secondary admin-panel-compact-btn item-management-toggle-btn"
+              type="button"
+              aria-expanded="false"
+            ></button>
+            <button id="scorerOpenLogsBtn" class="button-secondary" type="button" data-copy="scorerPanel.logsButton"></button>
+            <button id="scorerFinishTodayMatchDayBtn" class="button-secondary recent-match-tool recent-match-tool-finish admin-panel-finish-match-day-btn" type="button" data-copy="scorerPanel.finishToday"></button>
+            <button id="scorerRecalculateScoresBtn" class="button-secondary" type="button" data-copy="scorerPanel.recalculate"></button>
+            <div class="season-rollover-block season-rollover-block-toolbar" data-role="season-rollover-block" hidden>
+              <button class="button-danger season-rollover-btn season-panel-action-btn" type="button" data-role="season-rollover-btn">赛季完结</button>
+              <p class="muted season-rollover-status" data-role="season-rollover-status"></p>
+            </div>
+            <button id="scorerClearQueueBtn" class="button-danger" type="button" hidden data-copy="scorerPanel.clearQueue"></button>
+            <button id="scorerFullSignOutBtn" class="button-danger" type="button">清除登录状态</button>
+          </div>
+          <div class="admin-toolbar-section">
+            <div class="section-head admin-toolbar-subhead">
+              <h3 data-copy="scorerPanel.itemManageSectionTitle"></h3>
+              <button
+                id="scorerOpenItemHistoryBtn"
+                class="button-secondary admin-panel-compact-btn item-history-open-btn"
+                type="button"
+                data-copy-title="scorerPanel.itemHistoryButtonAriaLabel"
+                data-copy-aria-label="scorerPanel.itemHistoryButtonAriaLabel"
+              ></button>
+            </div>
+            <div id="scorerItemCatalogList" class="admin-members-list item-catalog-list"></div>
+          </div>
+        </section>
+      </div>
+      <p id="scorerPanelMessage" class="message"></p>
+    </section>
+    <section id="adminPanel" class="season-panel admin-panel" hidden>
+      <div class="section-head">
+        <div>
+          <h2 data-copy="adminPanel.title"></h2>
+          <p id="adminPanelSummary" class="muted" data-copy="adminPanel.summaryLoading"></p>
+        </div>
+        <div class="row">
+          <button id="adminExitModeBtn" class="button-secondary" type="button" data-copy="adminPanel.exit"></button>
+          <button id="closeAdminPanelBtn" class="button-secondary" type="button" data-copy="adminPanel.collapse"></button>
+        </div>
+      </div>
+      <div class="admin-panel-grid">
+        <section class="admin-panel-card">
+          <div class="section-head">
+            <h3 data-copy="adminPanel.toolsTitle"></h3>
+          </div>
+          <div class="row admin-panel-actions">
+            <button id="adminOpenManualScoreBtn" class="button-secondary" type="button" data-copy="adminPanel.scoreToolButton"></button>
+            <button id="adminOpenSeasonRulesBtn" class="button-secondary" type="button" data-copy="adminPanel.pointRuleButton"></button>
+            <button id="adminOpenPowerManagementBtn" class="button-secondary" type="button" data-copy="adminPanel.powerManageButton"></button>
+            <button id="adminOpenPlayerManagementBtn" class="button-secondary" type="button" data-copy="adminPanel.playerManageButton"></button>
+            <button
+              id="adminItemCatalogToggleBtn"
+              class="button-secondary admin-panel-compact-btn item-management-toggle-btn"
+              type="button"
+              aria-expanded="false"
+            ></button>
+            <button id="adminOpenLogsBtn" class="button-secondary" type="button" data-copy="adminPanel.logsButton"></button>
+            <button id="adminFinishTodayMatchDayBtn" class="button-secondary recent-match-tool recent-match-tool-finish admin-panel-finish-match-day-btn" type="button" data-copy="adminPanel.finishToday"></button>
+            <button id="adminRecalculateScoresBtn" class="button-secondary" type="button" data-copy="adminPanel.recalculate"></button>
+            <div class="season-rollover-block season-rollover-block-toolbar" data-role="season-rollover-block" hidden>
+              <button class="button-danger season-rollover-btn season-panel-action-btn" type="button" data-role="season-rollover-btn">赛季完结</button>
+              <p class="muted season-rollover-status" data-role="season-rollover-status"></p>
+            </div>
+            <button id="adminClearQueueBtn" class="button-danger" type="button" hidden data-copy="adminPanel.clearQueue"></button>
+            <button id="adminClearTodayPlayersBtn" class="button-danger" type="button" data-copy="adminPanel.clearTodayPlayers" hidden></button>
+            <button id="adminClearScorerRememberBtn" class="button-secondary" type="button" data-copy="adminPanel.clearRememberedDevices"></button>
+            <button id="adminFullSignOutBtn" class="button-danger" type="button">清除登录状态</button>
+          </div>
+          <div id="adminResetSeasonRow" class="row admin-panel-actions admin-panel-actions-secondary">
+            <button id="adminResetSeasonBtn" class="button-danger" type="button" data-copy="adminPanel.resetSeason"></button>
+            <button id="adminExportSeasonBtn" class="button-secondary" type="button" data-copy="adminPanel.exportSeasonAction"></button>
+            <button id="adminPrizeDistributionBtn" class="button-secondary" type="button" data-copy="adminPanel.prizeDistributionAction"></button>
+            <button id="adminParticipationRulesBtn" class="button-secondary" type="button" data-copy="adminPanel.participationRulesAction"></button>
+            <button id="adminBackgroundPickerBtn" class="button-secondary" type="button" data-copy="adminPanel.backgroundPickerAction"></button>
+          </div>
+          <div class="admin-toolbar-section">
+            <div class="section-head admin-toolbar-subhead">
+              <h3 data-copy="adminPanel.itemManageSectionTitle"></h3>
+              <button
+                id="adminOpenItemHistoryBtn"
+                class="button-secondary admin-panel-compact-btn item-history-open-btn"
+                type="button"
+                data-copy-title="adminPanel.itemHistoryButtonAriaLabel"
+                data-copy-aria-label="adminPanel.itemHistoryButtonAriaLabel"
+              ></button>
+            </div>
+            <div id="adminItemCatalogList" class="admin-members-list item-catalog-list"></div>
+          </div>
+        </section>
+        <section class="admin-panel-card">
+          <div class="section-head">
+            <div>
+              <h3 data-copy="adminPanel.scorersTitle"></h3>
+              <p id="scorerMembersCount" class="muted" data-copy="adminPanel.scorersCountDefault"></p>
+            </div>
+          </div>
+          <div class="row admin-panel-actions admin-identity-toolbar">
+            <input
+              id="adminIdentityEmailSelect"
+              class="admin-identity-email-field"
+              type="email"
+              list="adminIdentityEmailOptions"
+              autocomplete="email"
+              placeholder="输入或选择邮箱"
+            />
+            <datalist id="adminIdentityEmailOptions"></datalist>
+            <input id="adminIdentityUsernameInput" type="text" maxlength="10" placeholder="输入用户名" />
+            <button id="adminSaveIdentityBtn" class="admin-panel-compact-btn" type="button">保存映射</button>
+          </div>
+          <div class="row">
+            <select id="adminAddScorerSelect">
+              <option value="" data-copy="adminPanel.addScorerDefault"></option>
+            </select>
+            <button id="adminAddScorerBtn" type="button" data-copy="adminPanel.addScorerAction"></button>
+          </div>
+          <div id="scorerMembersList" class="admin-members-list admin-identity-list admin-identity-list-compact"></div>
+        </section>
+      </div>
+      <p id="adminPanelMessage" class="message"></p>
+    </section>
+    <section id="rewardPanel" class="season-panel" hidden>
+      <div class="section-head">
+        <div>
+          <h2 data-copy="rewards.title"></h2>
+          <p class="muted" data-copy="rewards.description"></p>
+        </div>
+        <button id="closeRewardPanelBtn" class="button-secondary" type="button" data-copy="rewards.collapse"></button>
+      </div>
+      <div class="reward-entry-shell">
+        <div id="rewardPlayerPicker" class="reward-player-picker"></div>
+        <div class="row reward-entry-row">
+          <input id="rewardExtraInput" type="number" min="0" step="1" data-copy-placeholder="rewards.amountPlaceholder" />
+          <button id="addRewardBtn" type="button" data-copy="rewards.addAction"></button>
+        </div>
+      </div>
+      <p id="rewardMinimumHint" class="muted" data-copy="rewards.minimumHint"></p>
+      <p id="rewardMessage" class="message"></p>
+      <div id="rewardLogsList" class="reward-logs"></div>
+      <p id="rewardLogsEmpty" class="muted" data-copy="rewards.empty"></p>
+    </section>
+    <section id="seasonPlayersPanel" class="season-panel" hidden>
+      <div class="section-head">
+        <div>
+          <h2 id="seasonPanelTitle" data-copy="seasonPlayers.title"></h2>
+          <p id="seasonPlayersCount" class="muted" data-copy="seasonPlayers.countDefault"></p>
+        </div>
+        <div class="row season-panel-actions-row">
+          <button id="resetSeasonBtn" class="button-danger" type="button" hidden data-copy="seasonPlayers.resetSeason"></button>
+        </div>
+      </div>
+      <div id="seasonPlayersList" class="season-players-list"></div>
+      <p id="seasonPlayersEmpty" class="muted" data-copy="seasonPlayers.empty"></p>
+    </section>
+
+    <div class="layout">
+      <div class="layout-left">
+        <section id="todayPlayersSection" class="card" hidden>
+          <div class="section-head">
+            <h2 data-copy="todayPlayers.title"></h2>
+            <span id="todayPlayersCount" class="muted" data-copy="todayPlayers.countDefault"></span>
+          </div>
+          <ul id="todayPlayersList" class="today-players-list"></ul>
+          <p id="todayPlayersEmpty" class="muted" data-copy="todayPlayers.empty"></p>
+        </section>
+
+        <section id="matchDaySection" class="card match-day-card" hidden>
+          <div class="section-head match-day-head">
+            <h2 data-copy="matchDay.title"></h2>
+            <span id="matchDayStatus" class="muted match-day-status-pill" data-copy="matchDay.statusDefault"></span>
+          </div>
+          <div class="match-day-start-row">
+            <input id="matchStartTimeInput" type="text" inputmode="numeric" maxlength="5" data-copy-placeholder="matchDay.startTimePlaceholder" />
+            <button id="startMatchDayBtn" data-copy="matchDay.startAction"></button>
+          </div>
+          <div class="match-day-meta">
+            <p id="matchStartTimeDisplay" class="muted"></p>
+            <p id="matchDayInfo" class="muted"></p>
+          </div>
+        </section>
+
+        <section id="leaderboardCard" class="card leaderboard-card">
+          <div class="section-head leaderboard-head">
+            <div class="leaderboard-title-block">
+              <h2 data-copy="leaderboard.title"></h2>
+              <button
+                id="leaderboardChampionsBtn"
+                class="season-chip leaderboard-copy-btn leaderboard-champions-btn"
+                type="button"
+                data-copy-aria-label="leaderboard.championsAriaLabel"
+                data-copy-title="leaderboard.championsAriaLabel"
+              >
+                <span class="leaderboard-action-icon leaderboard-champion-shield-icon" aria-hidden="true"></span>
+              </button>
+              <button
+                id="leaderboardLifetimeRewardsBtn"
+                class="season-chip leaderboard-copy-btn leaderboard-lifetime-rewards-btn"
+                type="button"
+                aria-label="查看历届赞助总额"
+                title="查看历届赞助总额"
+              >
+                <span class="leaderboard-action-icon leaderboard-coin-icon" aria-hidden="true"></span>
+              </button>
+            </div>
+            <div class="leaderboard-head-actions">
+              <button
+                id="leaderboardPowerViewBtn"
+                class="season-chip leaderboard-copy-btn leaderboard-power-view-btn"
+                type="button"
+                data-copy-aria-label="leaderboard.powerViewAriaLabel"
+                data-copy-title="leaderboard.powerViewAriaLabel"
+              >
+                <span class="leaderboard-action-icon leaderboard-power-view-icon" aria-hidden="true"></span>
+              </button>
+              <button
+                id="leaderboardParticipationViewBtn"
+                class="season-chip leaderboard-copy-btn leaderboard-participation-view-btn"
+                type="button"
+                data-copy-aria-label="leaderboard.participationViewAriaLabel"
+                data-copy-title="leaderboard.participationViewAriaLabel"
+              >
+                <span class="leaderboard-action-icon leaderboard-participation-view-icon" aria-hidden="true"></span>
+              </button>
+              <button
+                id="leaderboardCopyBtn"
+                class="season-chip leaderboard-copy-btn"
+                type="button"
+                data-copy-aria-label="leaderboard.copyAriaLabel"
+                data-copy-title="leaderboard.copyAriaLabel"
+              >
+                <span class="leaderboard-action-icon leaderboard-copy-icon" aria-hidden="true">⎙</span>
+              </button>
+            </div>
+          </div>
+          <div class="leaderboard-scroll-shell">
+            <table class="leaderboard-table">
+              <thead>
+                <tr>
+                  <th data-copy="leaderboard.rankColumn"></th>
+                  <th data-copy="leaderboard.playerColumn"></th>
+                  <th>
+                    <button
+                      id="leaderboardScoreSortBtn"
+                      class="leaderboard-score-sort-btn"
+                      type="button"
+                      data-copy="leaderboard.scoreColumn"
+                      aria-label="按胜负积分排序"
+                    ></button>
+                  </th>
+                  <th data-copy="leaderboard.gamesColumn"></th>
+                  <th data-copy="leaderboard.winRateColumn"></th>
+                </tr>
+              </thead>
+              <tbody id="leaderboardBody"></tbody>
+            </table>
+          </div>
+        </section>
+
+        <section id="signupSection" class="card" hidden>
+          <div class="section-head">
+            <h2 data-copy="signup.title"></h2>
+            <button id="signupAllBtn" class="button-secondary signup-all-btn" type="button" hidden data-copy="signup.signupAll"></button>
+          </div>
+          <div id="signupPlayerGrid" class="signup-player-grid"></div>
+          <p id="signupEmpty" class="muted" data-copy="signup.empty"></p>
+          <p id="message" class="message"></p>
+        </section>
+
+        <section id="queueSection" class="card" hidden>
+          <div class="section-head">
+            <h2 data-copy="queue.title"></h2>
+            <div class="row">
+              <button id="confirmQueueBtn" class="button-secondary" disabled data-copy="queue.confirmAllReady"></button>
+              <button id="clearQueueBtn" class="button-danger" hidden data-copy="queue.clearQueue"></button>
+            </div>
+          </div>
+          <ol id="queueList"></ol>
+          <p id="queueEmpty" class="muted" data-copy="queue.empty"></p>
+        </section>
+
+      </div>
+
+      <div class="layout-right">
+        <section id="recentMatchesSection" class="card">
+          <div class="section-head recent-matches-head">
+            <div>
+              <h2 data-copy="recentMatches.title"></h2>
+            </div>
+            <div class="recent-matches-toolbar">
+              <button id="openMatchFormBtn" class="recent-match-tool recent-match-tool-primary" data-copy="recentMatches.addTodayMatch"></button>
+              <button id="openBackfillFormBtn" class="button-secondary recent-match-tool recent-match-tool-secondary" data-copy="recentMatches.backfillMatch"></button>
+            </div>
+          </div>
+          <div id="matchFormPanel" class="match-form-panel recent-match-form-panel" hidden>
+            <div class="match-form-head">
+              <div>
+                <h3 data-copy="recentMatches.matchFormTitle"></h3>
+                <div class="match-form-head-meta match-form-head-meta-hidden">
+                  <button id="matchExhibitionToggleBtn" class="button-secondary match-type-toggle-btn" type="button" hidden>娱乐赛</button>
+                </div>
+              </div>
+              <span class="queue-slot" data-copy="recentMatches.liveSaveBadge"></span>
+            </div>
+            <div class="match-grid">
+              <div class="team-panel">
+                <div class="team-panel-head">
+                  <h3><button type="button" class="team-title-toggle" data-role="winner-toggle" data-form-type="match" data-winner="A" data-copy="recentMatches.radiantTeam"></button></h3>
+                  <div id="matchTeamADoubleSlot" class="team-double-slot"></div>
+                </div>
+                <div id="teamAFields" class="team-fields"></div>
+              </div>
+              <div class="team-panel">
+                <div class="team-panel-head">
+                  <h3><button type="button" class="team-title-toggle" data-role="winner-toggle" data-form-type="match" data-winner="B" data-copy="recentMatches.direTeam"></button></h3>
+                  <div id="matchTeamBDoubleSlot" class="team-double-slot"></div>
+                </div>
+                <div id="teamBFields" class="team-fields"></div>
+              </div>
+            </div>
+            <div class="match-meta-row">
+              <select id="winnerSelect" hidden>
+                <option value="" data-copy="recentMatches.matchWinnerPending"></option>
+                <option value="A" data-copy="recentMatches.matchWinnerRadiant"></option>
+                <option value="B" data-copy="recentMatches.matchWinnerDire"></option>
+              </select>
+              <div class="match-inline-actions">
+                <button id="recordMatchBtn" data-copy="recentMatches.saveMatch"></button>
+                <button id="closeMatchFormBtn" class="button-secondary" data-copy="recentMatches.collapse"></button>
+              </div>
+            </div>
+            <div class="match-note-row">
+              <input id="matchNote" class="match-note-input" type="text" data-copy-placeholder="recentMatches.matchNotePlaceholder" />
+            </div>
+            <div id="matchDoublePanel" class="double-panel"></div>
+            <p id="matchMessage" class="message"></p>
+          </div>
+          <div id="backfillFormPanel" class="match-form-panel recent-match-form-panel" hidden>
+            <div class="match-form-head">
+              <div>
+                <h3 data-copy="recentMatches.backfillTitle"></h3>
+                <p class="muted" data-copy="recentMatches.backfillDescription"></p>
+              </div>
+              <span class="queue-slot" data-copy="recentMatches.archiveBadge"></span>
+            </div>
+            <div class="match-meta-grid">
+              <select id="backfillSeasonSelect">
+                <option value="" data-copy="recentMatches.selectSeasonDefault"></option>
+              </select>
+              <label id="backfillDateShell" class="date-input-shell" for="backfillDateInput">
+                <span class="date-input-shell-kicker" data-copy="recentMatches.backfillDateLabel"></span>
+                <input id="backfillDateInput" type="date" />
+              </label>
+            </div>
+            <div class="match-grid">
+              <div class="team-panel">
+                <div class="team-panel-head">
+                  <h3><button type="button" class="team-title-toggle" data-role="winner-toggle" data-form-type="backfill" data-winner="A" data-copy="recentMatches.radiantTeam"></button></h3>
+                  <div id="backfillTeamADoubleSlot" class="team-double-slot"></div>
+                </div>
+                <div id="backfillTeamAFields" class="team-fields"></div>
+              </div>
+              <div class="team-panel">
+                <div class="team-panel-head">
+                  <h3><button type="button" class="team-title-toggle" data-role="winner-toggle" data-form-type="backfill" data-winner="B" data-copy="recentMatches.direTeam"></button></h3>
+                  <div id="backfillTeamBDoubleSlot" class="team-double-slot"></div>
+                </div>
+                <div id="backfillTeamBFields" class="team-fields"></div>
+              </div>
+            </div>
+            <div class="match-meta-row">
+              <select id="backfillWinnerSelect" hidden>
+                <option value="" data-copy="recentMatches.matchWinnerPending"></option>
+                <option value="A" data-copy="recentMatches.matchWinnerRadiant"></option>
+                <option value="B" data-copy="recentMatches.matchWinnerDire"></option>
+              </select>
+              <div class="match-inline-actions">
+                <button id="backfillExhibitionToggleBtn" class="button-secondary match-type-toggle-btn" type="button" hidden>娱乐赛</button>
+                <button id="recordBackfillBtn" data-copy="recentMatches.saveBackfill"></button>
+                <button id="closeBackfillFormBtn" class="button-secondary" data-copy="recentMatches.collapse"></button>
+              </div>
+            </div>
+            <div class="match-note-row">
+              <input id="backfillMatchNote" class="match-note-input" type="text" data-copy-placeholder="recentMatches.backfillNotePlaceholder" />
+            </div>
+            <div id="backfillDoublePanel" class="double-panel"></div>
+            <p id="backfillMessage" class="message"></p>
+          </div>
+          <div id="recentMatchesList" class="recent-matches"></div>
+          <p id="recentMatchesEmpty" class="muted" data-copy="recentMatches.empty"></p>
+        </section>
+      </div>
+    </div>
+  </main>
+
+  <div id="accessModal" class="hero-picker-modal" hidden>
+    <div id="accessModalBackdrop" class="hero-picker-backdrop"></div>
+    <div class="hero-picker-dialog access-dialog" role="dialog" aria-modal="true" aria-labelledby="accessModalTitle">
+      <div class="section-head">
+        <div>
+          <h2 id="accessModalTitle" data-copy="accessModal.title"></h2>
+          <p id="accessModalHint" class="muted" data-copy="accessModal.hint"></p>
+        </div>
+        <button id="closeAccessModalBtn" class="button-secondary" type="button" data-copy="accessModal.close"></button>
+      </div>
+      <div id="accessScorerPicker" class="access-scorer-picker">
+        <p id="accessScorerPickerTitle" class="muted access-scorer-picker-title" data-copy="accessModal.playerPickerLabel"></p>
+        <p id="accessScorerPickerHint" class="muted" data-copy="accessModal.playerPickerHint"></p>
+        <div id="accessScorerChips" class="access-scorer-chips"></div>
+      </div>
+      <div class="access-field">
+        <label for="authUsernameInput" class="muted access-field-label" data-copy="accessModal.usernameLabel"></label>
+        <input id="authUsernameInput" type="text" autocomplete="username" data-copy-placeholder="accessModal.usernamePlaceholder" />
+      </div>
+      <div class="access-field">
+        <label for="authPasswordInput" class="muted access-field-label" data-copy="accessModal.passwordLabel"></label>
+        <input id="authPasswordInput" type="password" autocomplete="current-password" data-copy-placeholder="accessModal.passwordPlaceholder" />
+      </div>
+      <div class="row">
+        <button id="confirmAccessBtn" type="button" data-copy="accessModal.submit"></button>
+      </div>
+      <p id="accessMessage" class="message"></p>
+    </div>
+  </div>
+
+  <div id="heroPickerModal" class="hero-picker-modal" hidden>
+    <div id="heroPickerBackdrop" class="hero-picker-backdrop"></div>
+    <div class="hero-picker-dialog" role="dialog" aria-modal="true" aria-labelledby="heroPickerTitle">
+      <div class="section-head">
+        <div>
+          <h2 id="heroPickerTitle" data-copy="heroPicker.title"></h2>
+          <p id="heroPickerSubtitle" class="muted" data-copy="heroPicker.subtitle"></p>
+        </div>
+        <button id="closeHeroPickerBtn" class="button-secondary" type="button" data-copy="heroPicker.close"></button>
+      </div>
+      <div class="row">
+        <input id="heroSearchInput" type="text" data-copy-placeholder="heroPicker.searchPlaceholder" />
+      </div>
+      <div id="heroSearchSuggestions" class="hero-search-suggestions" hidden></div>
+      <div class="row">
+        <select id="heroSelect">
+          <option value="" data-copy="heroPicker.emptyOption"></option>
+        </select>
+      </div>
+      <div class="row">
+        <button id="saveHeroBtn" type="button" data-copy="heroPicker.save"></button>
+        <button id="clearHeroBtn" class="button-secondary" type="button" data-copy="heroPicker.clear"></button>
+      </div>
+      <p id="heroPickerMessage" class="message"></p>
+    </div>
+  </div>
+
+  <div id="scoreDetailModal" class="hero-picker-modal" hidden>
+    <div id="scoreDetailBackdrop" class="hero-picker-backdrop"></div>
+    <div class="hero-picker-dialog score-detail-dialog" role="dialog" aria-modal="true" aria-labelledby="scoreDetailTitle">
+      <div class="section-head">
+        <div>
+          <h2 id="scoreDetailTitle" data-copy="scoreDetail.title"></h2>
+          <p id="scoreDetailSubtitle" class="muted" data-copy="scoreDetail.subtitle"></p>
+        </div>
+        <button id="closeScoreDetailBtn" class="button-secondary" type="button" data-copy="scoreDetail.close"></button>
+      </div>
+      <div id="scoreDetailSummary" class="score-detail-summary"></div>
+      <div id="scoreDetailList" class="score-detail-list"></div>
+      <p id="scoreDetailMessage" class="message"></p>
+    </div>
+  </div>
+
+  <div id="deleteMatchConfirmModal" class="hero-picker-modal" hidden>
+    <div id="deleteMatchConfirmBackdrop" class="hero-picker-backdrop"></div>
+    <div class="hero-picker-dialog access-dialog" role="dialog" aria-modal="true" aria-labelledby="deleteMatchConfirmTitle">
+      <div class="section-head">
+        <div>
+          <h2 id="deleteMatchConfirmTitle">确认删除比赛记录</h2>
+          <p id="deleteMatchConfirmHint" class="muted">删除后会按全部比赛记录重新计算积分。</p>
+        </div>
+      </div>
+      <div class="row">
+        <button id="cancelDeleteMatchBtn" class="button-secondary" type="button">取消</button>
+        <button id="confirmDeleteMatchBtn" class="button-danger" type="button">确认删除</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="adminExportSeasonModal" class="hero-picker-modal" hidden>
+    <div id="adminExportSeasonBackdrop" class="hero-picker-backdrop"></div>
+    <div class="hero-picker-dialog access-dialog" role="dialog" aria-modal="true" aria-labelledby="adminExportSeasonTitle">
+      <div class="section-head">
+        <div>
+          <h2 id="adminExportSeasonTitle">导出赛季到 GitHub</h2>
+          <p class="muted">导出成功后，会从 Supabase 删除该已完结赛季，仅保留 GitHub 归档。</p>
+        </div>
+        <button id="closeAdminExportSeasonBtn" class="button-secondary" type="button">关闭</button>
+      </div>
+      <div class="row">
+        <select id="adminExportSeasonSelect" aria-label="选择要导出的已完结赛季"></select>
+      </div>
+      <div class="row">
+        <button id="adminConfirmExportSeasonBtn" class="button-danger" type="button">导出并删除数据库记录</button>
+      </div>
+      <p id="adminExportSeasonMessage" class="message"></p>
+    </div>
+  </div>
+
+  <div id="adminPrizeDistributionModal" class="hero-picker-modal" hidden>
+    <div id="adminPrizeDistributionBackdrop" class="hero-picker-backdrop"></div>
+    <div class="hero-picker-dialog management-dialog management-dialog-wide prize-distribution-dialog" role="dialog" aria-modal="true" aria-labelledby="adminPrizeDistributionTitle">
+      <div class="section-head">
+        <div>
+          <h2 id="adminPrizeDistributionTitle">赛季奖金分配</h2>
+          <p class="muted">仅统计基础赞助已确认选手；排名按胜负分、加成分、场次分、人工积分合计重新排序。</p>
+        </div>
+        <button id="closeAdminPrizeDistributionBtn" class="button-secondary" type="button">关闭</button>
+      </div>
+      <div class="row prize-distribution-controls">
+        <input id="adminPrizeDistributionSeedInput" type="text" autocomplete="off" placeholder="随机数种子" aria-label="随机数种子" />
+        <button id="adminRunPrizeDistributionBtn" class="button-secondary" type="button">开始分配</button>
+        <button id="adminCopyPrizeDistributionBtn" class="button-secondary" type="button" disabled>复制微信文本</button>
+      </div>
+      <p id="adminPrizeDistributionMessage" class="message"></p>
+      <div id="adminPrizeDistributionResult" class="prize-distribution-result"></div>
+    </div>
+  </div>
+
+  <div id="adminParticipationRulesModal" class="hero-picker-modal" hidden>
+    <div id="adminParticipationRulesBackdrop" class="hero-picker-backdrop"></div>
+    <div class="hero-picker-dialog management-dialog participation-rules-dialog" role="dialog" aria-modal="true" aria-labelledby="adminParticipationRulesTitle">
+      <div class="section-head">
+        <div>
+          <h2 id="adminParticipationRulesTitle" data-copy="adminPanel.participationRulesTitle"></h2>
+          <p id="adminParticipationRulesSeasonLabel" class="muted"></p>
+        </div>
+        <button id="closeAdminParticipationRulesBtn" class="button-secondary" type="button" data-copy="adminPanel.participationRulesClose"></button>
+      </div>
+      <div class="management-dialog-body">
+        <textarea
+          id="adminParticipationRulesInput"
+          class="participation-rules-input"
+          rows="16"
+          spellcheck="false"
+          data-copy-placeholder="adminPanel.participationRulesPlaceholder"
+        ></textarea>
+        <p class="muted participation-rules-hint" data-copy="adminPanel.participationRulesHint"></p>
+        <div class="row participation-rules-actions">
+          <button id="adminSaveParticipationRulesBtn" class="button-secondary" type="button" data-copy="adminPanel.participationRulesSave"></button>
+        </div>
+        <p id="adminParticipationRulesMessage" class="message"></p>
+      </div>
+    </div>
+  </div>
+
+  <div id="adminBackgroundPickerModal" class="hero-picker-modal" hidden>
+    <div id="adminBackgroundPickerBackdrop" class="hero-picker-backdrop"></div>
+    <div class="hero-picker-dialog management-dialog management-dialog-wide admin-background-dialog" role="dialog" aria-modal="true" aria-labelledby="adminBackgroundPickerTitle">
+      <div class="section-head admin-background-head">
+        <div>
+          <h2 id="adminBackgroundPickerTitle" data-copy="adminPanel.backgroundPickerTitle"></h2>
+        </div>
+        <div class="row admin-background-actions admin-background-header-actions">
+          <label class="admin-background-upload-control">
+            <span data-copy="adminPanel.backgroundUploadLabel"></span>
+            <input id="adminBackgroundUploadInput" type="file" accept="image/jpeg,image/png,image/webp" />
+          </label>
+          <button id="adminApplyBackgroundBtn" class="button-secondary admin-background-header-control" type="button" data-copy="adminPanel.backgroundPickerApply"></button>
+          <button id="adminSetFinalDayBackgroundBtn" class="button-secondary admin-background-header-control" type="button" data-copy="adminPanel.backgroundPickerFinalDay"></button>
+          <button id="adminPlayerBackgroundSettingsBtn" class="button-secondary" type="button" aria-expanded="false" data-copy="adminPanel.backgroundPickerPlayerSettings"></button>
+          <button id="closeAdminBackgroundPickerBtn" class="button-secondary" type="button" data-copy="adminPanel.backgroundPickerClose"></button>
+        </div>
+      </div>
+      <div class="management-dialog-body">
+        <div class="admin-background-panel-layout">
+          <div class="admin-background-top-layout">
+            <aside class="admin-player-background-sidebar">
+              <div id="adminPlayerBackgroundList" class="admin-player-background-list"></div>
+              <div id="adminPlayerBackgroundSettings" class="admin-player-background-settings" hidden>
+                <div class="admin-player-background-form">
+                  <label>
+                    <span data-copy="adminPanel.backgroundPickerPlayerLabel"></span>
+                    <select id="adminPlayerBackgroundPlayerSelect"></select>
+                  </label>
+                  <div class="row admin-player-background-form-actions">
+                    <button id="adminSavePlayerBackgroundBtn" class="button-secondary" type="button" data-copy="adminPanel.backgroundPickerPlayerSave"></button>
+                    <button id="adminClearPlayerBackgroundBtn" class="button-secondary" type="button" data-copy="adminPanel.backgroundPickerPlayerClear"></button>
+                  </div>
+                </div>
+              </div>
+            </aside>
+            <div class="admin-background-preview-panel">
+              <img id="adminBackgroundPreviewImage" class="admin-background-preview-image" src="" alt="选中背景预览" loading="lazy" decoding="async" fetchpriority="low" />
+            </div>
+          </div>
+          <div id="adminBackgroundOptions" class="admin-background-options" aria-label="可选背景图片"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="scorerSeasonRuleModal" class="hero-picker-modal" hidden>
+    <div id="scorerSeasonRuleBackdrop" class="hero-picker-backdrop"></div>
+    <div class="hero-picker-dialog management-dialog" role="dialog" aria-modal="true" aria-labelledby="scorerSeasonRuleTitle">
+      <div class="section-head">
+        <div>
+          <h2 id="scorerSeasonRuleTitle" data-copy="scorerPanel.pointRuleButton"></h2>
+          <p class="muted" data-copy="scorerPanel.matchRuleDescription"></p>
+        </div>
+        <button id="closeScorerSeasonRuleBtn" class="button-secondary" type="button">关闭</button>
+      </div>
+      <div class="management-dialog-body">
+        <div class="row admin-panel-actions">
+          <input id="scorerSeasonInitialScoreInput" class="admin-panel-compact-input" type="number" step="0.5" inputmode="decimal" data-copy-placeholder="scorerPanel.seasonInitialScorePlaceholder" />
+          <button id="scorerSaveSeasonInitialScoreBtn" class="button-secondary admin-panel-compact-btn" type="button" data-copy="scorerPanel.seasonInitialScoreSave"></button>
+        </div>
+        <div class="row admin-panel-actions">
+          <input id="scorerSeasonWinPointsInput" class="admin-panel-compact-input" type="number" step="0.5" inputmode="decimal" data-copy-placeholder="scorerPanel.seasonWinPointsPlaceholder" />
+          <input id="scorerSeasonLossPointsInput" class="admin-panel-compact-input" type="number" step="0.5" inputmode="decimal" data-copy-placeholder="scorerPanel.seasonLossPointsPlaceholder" />
+        </div>
+        <div class="row admin-panel-actions">
+          <input id="scorerSeasonPowerGapStepInput" class="admin-panel-compact-input" type="number" min="0" step="1" inputmode="numeric" data-copy-placeholder="scorerPanel.powerGapStepPlaceholder" />
+          <input id="scorerSeasonPowerGapDeltaInput" class="admin-panel-compact-input" type="number" min="0" step="0.5" inputmode="decimal" data-copy-placeholder="scorerPanel.powerGapDeltaPlaceholder" />
+          <button id="scorerSaveSeasonMatchPointsBtn" class="button-secondary admin-panel-compact-btn" type="button" data-copy="scorerPanel.seasonMatchPointSave"></button>
+        </div>
+        <div class="row admin-panel-actions season-rule-mode-row">
+          <span class="season-rule-mode-label">娱乐赛</span>
+        </div>
+        <div class="row admin-panel-actions">
+          <input id="scorerSeasonExhibitionWinPointsInput" class="admin-panel-compact-input" type="number" step="0.5" inputmode="decimal" data-copy-placeholder="scorerPanel.seasonWinPointsPlaceholder" />
+          <input id="scorerSeasonExhibitionLossPointsInput" class="admin-panel-compact-input" type="number" step="0.5" inputmode="decimal" data-copy-placeholder="scorerPanel.seasonLossPointsPlaceholder" />
+        </div>
+        <div class="row admin-panel-actions">
+          <input id="scorerSeasonExhibitionPowerGapStepInput" class="admin-panel-compact-input" type="number" min="0" step="1" inputmode="numeric" data-copy-placeholder="scorerPanel.powerGapStepPlaceholder" />
+          <input id="scorerSeasonExhibitionPowerGapDeltaInput" class="admin-panel-compact-input" type="number" min="0" step="0.5" inputmode="decimal" data-copy-placeholder="scorerPanel.powerGapDeltaPlaceholder" />
+          <button id="scorerSaveSeasonExhibitionMatchPointsBtn" class="button-secondary admin-panel-compact-btn" type="button">保存娱乐赛规则</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="adminSeasonRuleModal" class="hero-picker-modal" hidden>
+    <div id="adminSeasonRuleBackdrop" class="hero-picker-backdrop"></div>
+    <div class="hero-picker-dialog management-dialog" role="dialog" aria-modal="true" aria-labelledby="adminSeasonRuleTitle">
+      <div class="section-head">
+        <div>
+          <h2 id="adminSeasonRuleTitle" data-copy="adminPanel.pointRuleButton"></h2>
+          <p class="muted" data-copy="adminPanel.matchRuleDescription"></p>
+        </div>
+        <button id="closeAdminSeasonRuleBtn" class="button-secondary" type="button">关闭</button>
+      </div>
+      <div class="management-dialog-body">
+        <div class="row admin-panel-actions">
+          <input id="adminSeasonInitialScoreInput" class="admin-panel-compact-input" type="number" step="0.5" inputmode="decimal" data-copy-placeholder="adminPanel.seasonInitialScorePlaceholder" />
+          <button id="adminSaveSeasonInitialScoreBtn" class="button-secondary admin-panel-compact-btn" type="button" data-copy="adminPanel.seasonInitialScoreSave"></button>
+        </div>
+        <div class="row admin-panel-actions">
+          <input id="adminSeasonWinPointsInput" class="admin-panel-compact-input" type="number" step="0.5" inputmode="decimal" data-copy-placeholder="adminPanel.seasonWinPointsPlaceholder" />
+          <input id="adminSeasonLossPointsInput" class="admin-panel-compact-input" type="number" step="0.5" inputmode="decimal" data-copy-placeholder="adminPanel.seasonLossPointsPlaceholder" />
+        </div>
+        <div class="row admin-panel-actions">
+          <input id="adminSeasonPowerGapStepInput" class="admin-panel-compact-input" type="number" min="0" step="1" inputmode="numeric" data-copy-placeholder="adminPanel.powerGapStepPlaceholder" />
+          <input id="adminSeasonPowerGapDeltaInput" class="admin-panel-compact-input" type="number" min="0" step="0.5" inputmode="decimal" data-copy-placeholder="adminPanel.powerGapDeltaPlaceholder" />
+          <button id="adminSaveSeasonMatchPointsBtn" class="button-secondary admin-panel-compact-btn" type="button" data-copy="adminPanel.seasonMatchPointSave"></button>
+        </div>
+        <div class="row admin-panel-actions season-rule-mode-row">
+          <span class="season-rule-mode-label">娱乐赛</span>
+        </div>
+        <div class="row admin-panel-actions">
+          <input id="adminSeasonExhibitionWinPointsInput" class="admin-panel-compact-input" type="number" step="0.5" inputmode="decimal" data-copy-placeholder="adminPanel.seasonWinPointsPlaceholder" />
+          <input id="adminSeasonExhibitionLossPointsInput" class="admin-panel-compact-input" type="number" step="0.5" inputmode="decimal" data-copy-placeholder="adminPanel.seasonLossPointsPlaceholder" />
+        </div>
+        <div class="row admin-panel-actions">
+          <input id="adminSeasonExhibitionPowerGapStepInput" class="admin-panel-compact-input" type="number" min="0" step="1" inputmode="numeric" data-copy-placeholder="adminPanel.powerGapStepPlaceholder" />
+          <input id="adminSeasonExhibitionPowerGapDeltaInput" class="admin-panel-compact-input" type="number" min="0" step="0.5" inputmode="decimal" data-copy-placeholder="adminPanel.powerGapDeltaPlaceholder" />
+          <button id="adminSaveSeasonExhibitionMatchPointsBtn" class="button-secondary admin-panel-compact-btn" type="button">保存娱乐赛规则</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="scorerPowerModal" class="hero-picker-modal" hidden>
+    <div id="scorerPowerBackdrop" class="hero-picker-backdrop"></div>
+    <div class="hero-picker-dialog management-dialog management-dialog-wide" role="dialog" aria-modal="true" aria-labelledby="scorerPowerTitle">
+      <div class="section-head">
+        <div>
+          <h2 id="scorerPowerTitle" data-copy="scorerPanel.powerManageButton"></h2>
+        </div>
+        <div class="row">
+          <button id="scorerSaveRankLabelsBtn" class="button-secondary admin-panel-compact-btn" type="button" data-copy="scorerPanel.rankLabelSave"></button>
+          <button id="closeScorerPowerBtn" class="button-secondary" type="button">关闭</button>
+        </div>
+      </div>
+      <div id="scorerRankLabelEditors" class="season-rank-settings"></div>
+    </div>
+  </div>
+
+  <div id="adminPowerModal" class="hero-picker-modal" hidden>
+    <div id="adminPowerBackdrop" class="hero-picker-backdrop"></div>
+    <div class="hero-picker-dialog management-dialog management-dialog-wide" role="dialog" aria-modal="true" aria-labelledby="adminPowerTitle">
+      <div class="section-head">
+        <div>
+          <h2 id="adminPowerTitle" data-copy="adminPanel.powerManageButton"></h2>
+        </div>
+        <div class="row">
+          <button id="adminSaveRankLabelsBtn" class="button-secondary admin-panel-compact-btn" type="button" data-copy="adminPanel.rankLabelSave"></button>
+          <button id="closeAdminPowerBtn" class="button-secondary" type="button">关闭</button>
+        </div>
+      </div>
+      <div id="adminRankLabelEditors" class="season-rank-settings"></div>
+    </div>
+  </div>
+
+  <div id="scorerPlayerManagementModal" class="hero-picker-modal" hidden>
+    <div id="scorerPlayerManagementBackdrop" class="hero-picker-backdrop"></div>
+    <div class="hero-picker-dialog management-dialog" role="dialog" aria-modal="true" aria-labelledby="scorerPlayerManagementTitle">
+      <div class="section-head">
+        <div>
+          <h2 id="scorerPlayerManagementTitle" data-copy="scorerPanel.playerManageButton"></h2>
+        </div>
+        <button id="closeScorerPlayerManagementBtn" class="button-secondary" type="button">关闭</button>
+      </div>
+      <div class="management-dialog-body">
+        <div class="row admin-panel-actions">
+          <input id="scorerQuickAddPlayerInput" type="text" maxlength="32" data-copy-placeholder="scorerPanel.quickAddPlaceholder" />
+          <button id="scorerQuickAddPlayerBtn" type="button" data-copy="scorerPanel.quickAddAction"></button>
+        </div>
+        <div class="row admin-panel-actions">
+          <div id="scorerRenamePlayerChips" class="access-scorer-chips player-rename-chips"></div>
+        </div>
+        <div class="row admin-panel-actions">
+          <input id="scorerRenamePlayerInput" type="text" maxlength="32" data-copy-placeholder="scorerPanel.renamePlayerPlaceholder" />
+          <button id="scorerRenamePlayerBtn" type="button" data-copy="scorerPanel.renamePlayerAction"></button>
+          <button id="scorerDeactivatePlayerBtn" class="button-danger" type="button" data-copy="scorerPanel.hidePlayerAction"></button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="adminPlayerManagementModal" class="hero-picker-modal" hidden>
+    <div id="adminPlayerManagementBackdrop" class="hero-picker-backdrop"></div>
+    <div class="hero-picker-dialog management-dialog" role="dialog" aria-modal="true" aria-labelledby="adminPlayerManagementTitle">
+      <div class="section-head">
+        <div>
+          <h2 id="adminPlayerManagementTitle" data-copy="adminPanel.playerManageButton"></h2>
+        </div>
+        <button id="closeAdminPlayerManagementBtn" class="button-secondary" type="button">关闭</button>
+      </div>
+      <div class="management-dialog-body">
+        <div class="row admin-panel-actions">
+          <input id="adminQuickAddPlayerInput" type="text" maxlength="32" data-copy-placeholder="adminPanel.quickAddPlaceholder" />
+          <button id="adminQuickAddPlayerBtn" type="button" data-copy="adminPanel.quickAddAction"></button>
+        </div>
+        <div class="row admin-panel-actions">
+          <div id="adminRenamePlayerChips" class="access-scorer-chips player-rename-chips"></div>
+        </div>
+        <div class="row admin-panel-actions">
+          <input id="adminRenamePlayerInput" type="text" maxlength="32" data-copy-placeholder="adminPanel.renamePlayerPlaceholder" />
+          <button id="adminRenamePlayerBtn" type="button" data-copy="adminPanel.renamePlayerAction"></button>
+          <button id="adminDeactivatePlayerBtn" class="button-danger" type="button" data-copy="adminPanel.hidePlayerAction"></button>
+        </div>
+        <div id="adminInactivePlayersBlock" class="player-management-archive">
+          <div class="section-head admin-toolbar-subhead">
+            <div>
+              <h3 data-copy="adminPanel.hiddenPlayersTitle"></h3>
+              <p id="adminInactivePlayersHint" class="muted" data-copy="adminPanel.hiddenPlayersHint"></p>
+            </div>
+          </div>
+          <div id="adminInactivePlayerChips" class="access-scorer-chips player-rename-chips player-inactive-chips"></div>
+          <div class="row admin-panel-actions player-management-danger-actions">
+            <button id="adminRestorePlayerBtn" class="button-secondary" type="button" data-copy="adminPanel.restorePlayerAction"></button>
+            <button id="adminHardDeletePlayerBtn" class="button-danger" type="button" data-copy="adminPanel.hardDeletePlayerAction"></button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="scorerManualScoreModal" class="hero-picker-modal" hidden>
+    <div id="scorerManualScoreBackdrop" class="hero-picker-backdrop"></div>
+    <div class="hero-picker-dialog management-dialog manual-score-dialog" role="dialog" aria-modal="true" aria-labelledby="scorerManualScoreTitle">
+      <div class="section-head">
+        <div>
+          <h2 id="scorerManualScoreTitle" data-copy="scorerPanel.manualScoreTitle"></h2>
+          <p id="scorerManualScoreHint" class="muted manual-score-status" hidden></p>
+        </div>
+        <button id="closeScorerManualScoreBtn" class="button-secondary" type="button">关闭</button>
+      </div>
+      <div class="management-dialog-body manual-score-dialog-body">
+        <div id="scorerManualScoreChips" class="manual-score-player-chips"></div>
+        <div class="row manual-score-toolbar">
+          <input
+            id="scorerManualScoreAmountInput"
+            type="number"
+            min="0.1"
+            step="0.1"
+            data-copy-placeholder="scorerPanel.manualScoreAmountPlaceholder"
+          />
+          <button id="scorerDeathFingerBtn" class="button-secondary" type="button" data-copy="scorerPanel.manualScoreApplyLoss"></button>
+          <button id="scorerHealingHandBtn" type="button" data-copy="scorerPanel.manualScoreApplyGain"></button>
+        </div>
+        <input id="scorerManualScoreNoteInput" type="text" maxlength="120" data-copy-placeholder="scorerPanel.manualNotePlaceholder" />
+        <section class="manual-score-history-section">
+          <div class="section-head manual-score-history-head">
+            <div>
+              <h3>人工积分记录</h3>
+            </div>
+          </div>
+          <div id="scorerManualScoreHistoryList" class="manual-score-history-list"></div>
+          <p id="scorerManualScoreHistoryEmpty" class="muted manual-score-history-empty" hidden>当前赛季暂无人工积分记录</p>
+        </section>
+      </div>
+      <p id="scorerManualScoreMessage" class="message"></p>
+    </div>
+  </div>
+
+  <div id="adminManualScoreModal" class="hero-picker-modal" hidden>
+    <div id="adminManualScoreBackdrop" class="hero-picker-backdrop"></div>
+    <div class="hero-picker-dialog management-dialog manual-score-dialog" role="dialog" aria-modal="true" aria-labelledby="adminManualScoreTitle">
+      <div class="section-head">
+        <div>
+          <h2 id="adminManualScoreTitle" data-copy="adminPanel.manualScoreTitle"></h2>
+          <p id="adminManualScoreHint" class="muted manual-score-status" hidden></p>
+        </div>
+        <button id="closeAdminManualScoreBtn" class="button-secondary" type="button">关闭</button>
+      </div>
+      <div class="management-dialog-body manual-score-dialog-body">
+        <div id="adminManualScoreChips" class="manual-score-player-chips"></div>
+        <div class="row manual-score-toolbar">
+          <input
+            id="adminManualScoreAmountInput"
+            type="number"
+            min="0.1"
+            step="0.1"
+            data-copy-placeholder="adminPanel.manualScoreAmountPlaceholder"
+          />
+          <button id="adminDeathFingerBtn" class="button-secondary" type="button" data-copy="adminPanel.manualScoreApplyLoss"></button>
+          <button id="adminHealingHandBtn" type="button" data-copy="adminPanel.manualScoreApplyGain"></button>
+        </div>
+        <input id="adminManualScoreNoteInput" type="text" maxlength="120" data-copy-placeholder="adminPanel.manualNotePlaceholder" />
+        <section class="manual-score-history-section">
+          <div class="section-head manual-score-history-head">
+            <div>
+              <h3>人工积分记录</h3>
+            </div>
+          </div>
+          <div id="adminManualScoreHistoryList" class="manual-score-history-list"></div>
+          <p id="adminManualScoreHistoryEmpty" class="muted manual-score-history-empty" hidden>当前赛季暂无人工积分记录</p>
+        </section>
+      </div>
+      <p id="adminManualScoreMessage" class="message"></p>
+    </div>
+  </div>
+
+  <div id="scorerItemCatalogModal" class="hero-picker-modal" hidden>
+    <div id="scorerItemCatalogBackdrop" class="hero-picker-backdrop"></div>
+    <div class="hero-picker-dialog management-dialog management-dialog-wide" role="dialog" aria-modal="true" aria-labelledby="scorerItemCatalogTitle">
+      <div class="section-head">
+        <div>
+          <h2 id="scorerItemCatalogTitle"></h2>
+        </div>
+        <button id="closeScorerItemCatalogBtn" class="button-secondary" type="button">关闭</button>
+      </div>
+      <div id="scorerItemCatalogEditorPanel" class="item-management-editor" hidden>
+        <div class="row admin-panel-actions">
+          <input id="scorerItemNameInput" type="text" maxlength="32" placeholder="道具名称" />
+          <input id="scorerItemDonationInput" type="number" min="0" step="1" inputmode="decimal" placeholder="关联赞助额" />
+          <div class="item-target-field">
+            <span class="item-target-label">生效对象</span>
+            <div id="scorerItemMatchTargets" class="item-target-selector" aria-label="生效对象">
+              <button type="button" class="item-target-chip" data-role="item-target-toggle" data-mode="scorer" data-target="self">自己</button>
+              <button type="button" class="item-target-chip" data-role="item-target-toggle" data-mode="scorer" data-target="ally">队友(单人)</button>
+              <button type="button" class="item-target-chip" data-role="item-target-toggle" data-mode="scorer" data-target="opponent">对手(单人)</button>
+              <button type="button" class="item-target-chip" data-role="item-target-toggle" data-mode="scorer" data-target="own_team">己方团队</button>
+              <button type="button" class="item-target-chip" data-role="item-target-toggle" data-mode="scorer" data-target="enemy_team">对方团队</button>
+            </div>
+          </div>
+        </div>
+        <div class="row admin-panel-actions item-management-secondary-row">
+          <div class="item-target-field item-score-mode-field">
+            <select id="scorerItemResolutionModeSelect" aria-label="道具记录模式">
+              <option value="effect">积分生效</option>
+              <option value="record_only">仅记录</option>
+            </select>
+          </div>
+          <div class="item-target-field item-score-multiplier-field">
+            <input id="scorerItemScoreMultiplierInput" type="text" inputmode="text" placeholder="积分变动倍率或@" />
+          </div>
+          <input id="scorerItemInitialQuantityInput" type="number" min="0" step="1" inputmode="numeric" placeholder="赛季初始数量" />
+          <select id="scorerItemMatchIconSelect" aria-label="道具图标">
+            <option value="◉">◉</option>
+            <option value="⇄">⇄</option>
+            <option value="↻">↻</option>
+            <option value="●">●</option>
+            <option value="◆">◆</option>
+            <option value="✦">✦</option>
+          </select>
+          <button id="scorerSaveItemBtn" type="button">保存道具</button>
+          <button id="scorerResetItemBtn" class="button-secondary" type="button">清空</button>
+        </div>
+        <div class="item-target-field item-stack-field">
+          <span class="item-target-label">可叠加倍率效果</span>
+          <div id="scorerItemStackTargets" class="item-target-selector" aria-label="可叠加倍率效果"></div>
+          <div id="scorerItemStackMultiplierList" class="item-stack-multiplier-list"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="adminItemCatalogModal" class="hero-picker-modal" hidden>
+    <div id="adminItemCatalogBackdrop" class="hero-picker-backdrop"></div>
+    <div class="hero-picker-dialog management-dialog management-dialog-wide" role="dialog" aria-modal="true" aria-labelledby="adminItemCatalogTitle">
+      <div class="section-head">
+        <div>
+          <h2 id="adminItemCatalogTitle"></h2>
+        </div>
+        <button id="closeAdminItemCatalogBtn" class="button-secondary" type="button">关闭</button>
+      </div>
+      <div id="adminItemCatalogEditorPanel" class="item-management-editor" hidden>
+        <div class="row admin-panel-actions">
+          <input id="adminItemNameInput" type="text" maxlength="32" placeholder="道具名称" />
+          <input id="adminItemDonationInput" type="number" min="0" step="1" inputmode="decimal" placeholder="关联赞助额" />
+          <div class="item-target-field">
+            <span class="item-target-label">生效对象</span>
+            <div id="adminItemMatchTargets" class="item-target-selector" aria-label="生效对象">
+              <button type="button" class="item-target-chip" data-role="item-target-toggle" data-mode="admin" data-target="self">自己</button>
+              <button type="button" class="item-target-chip" data-role="item-target-toggle" data-mode="admin" data-target="ally">队友(单人)</button>
+              <button type="button" class="item-target-chip" data-role="item-target-toggle" data-mode="admin" data-target="opponent">对手(单人)</button>
+              <button type="button" class="item-target-chip" data-role="item-target-toggle" data-mode="admin" data-target="own_team">己方团队</button>
+              <button type="button" class="item-target-chip" data-role="item-target-toggle" data-mode="admin" data-target="enemy_team">对方团队</button>
+            </div>
+          </div>
+        </div>
+        <div class="row admin-panel-actions item-management-secondary-row">
+          <div class="item-target-field item-score-mode-field">
+            <select id="adminItemResolutionModeSelect" aria-label="道具记录模式">
+              <option value="effect">积分生效</option>
+              <option value="record_only">仅记录</option>
+            </select>
+          </div>
+          <div class="item-target-field item-score-multiplier-field">
+            <input id="adminItemScoreMultiplierInput" type="text" inputmode="text" placeholder="积分变动倍率或@" />
+          </div>
+          <input id="adminItemInitialQuantityInput" type="number" min="0" step="1" inputmode="numeric" placeholder="赛季初始数量" />
+          <select id="adminItemMatchIconSelect" aria-label="道具图标">
+            <option value="◉">◉</option>
+            <option value="⇄">⇄</option>
+            <option value="↻">↻</option>
+            <option value="●">●</option>
+            <option value="◆">◆</option>
+            <option value="✦">✦</option>
+          </select>
+          <button id="adminSaveItemBtn" type="button">保存道具</button>
+          <button id="adminResetItemBtn" class="button-secondary" type="button">清空</button>
+        </div>
+        <div class="item-target-field item-stack-field">
+          <span class="item-target-label">可叠加倍率效果</span>
+          <div id="adminItemStackTargets" class="item-target-selector" aria-label="可叠加倍率效果"></div>
+          <div id="adminItemStackMultiplierList" class="item-stack-multiplier-list"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="scorerActionLogsModal" class="hero-picker-modal" hidden>
+    <div id="scorerActionLogsBackdrop" class="hero-picker-backdrop"></div>
+    <div class="hero-picker-dialog management-dialog management-dialog-wide" role="dialog" aria-modal="true" aria-labelledby="scorerActionLogsTitle">
+      <div class="section-head">
+        <div>
+          <h2 id="scorerActionLogsTitle" data-copy="scorerPanel.logsTitle"></h2>
+        </div>
+        <button id="closeScorerActionLogsBtn" class="button-secondary" type="button">关闭</button>
+      </div>
+      <div class="management-dialog-scroll">
+        <div id="scorerActionLogsList" class="admin-action-logs admin-action-logs-compact"></div>
+        <p id="scorerActionLogsEmpty" class="muted" data-copy="scorerPanel.logsEmpty"></p>
+      </div>
+    </div>
+  </div>
+
+  <div id="adminActionLogsModal" class="hero-picker-modal" hidden>
+    <div id="adminActionLogsBackdrop" class="hero-picker-backdrop"></div>
+    <div class="hero-picker-dialog management-dialog management-dialog-wide" role="dialog" aria-modal="true" aria-labelledby="adminActionLogsTitle">
+      <div class="section-head">
+        <div>
+          <h2 id="adminActionLogsTitle" data-copy="adminPanel.logsTitle"></h2>
+        </div>
+        <button id="closeAdminActionLogsBtn" class="button-secondary" type="button">关闭</button>
+      </div>
+      <div class="management-dialog-scroll">
+        <div id="adminActionLogsList" class="admin-action-logs admin-action-logs-compact"></div>
+        <p id="adminActionLogsEmpty" class="muted" data-copy="adminPanel.logsEmpty"></p>
+      </div>
+    </div>
+  </div>
+
+  <div id="itemInventoryLogsModal" class="hero-picker-modal" hidden>
+    <div id="itemInventoryLogsBackdrop" class="hero-picker-backdrop"></div>
+    <div class="hero-picker-dialog management-dialog management-dialog-wide" role="dialog" aria-modal="true" aria-labelledby="itemInventoryLogsTitle">
+      <div class="section-head">
+        <div>
+          <h2 id="itemInventoryLogsTitle"></h2>
+        </div>
+        <button id="closeItemInventoryLogsBtn" class="button-secondary" type="button">关闭</button>
+      </div>
+      <div class="management-dialog-scroll">
+        <div id="itemInventoryLogsList" class="admin-action-logs item-history-log-list"></div>
+        <p id="itemInventoryLogsEmpty" class="muted"></p>
+      </div>
+    </div>
+  </div>
+
+  <div id="leaderboardPowerViewModal" class="hero-picker-modal" hidden>
+    <div id="leaderboardPowerViewBackdrop" class="hero-picker-backdrop"></div>
+    <div class="hero-picker-dialog management-dialog management-dialog-wide leaderboard-power-sheet" role="dialog" aria-modal="true" aria-labelledby="leaderboardPowerViewTitle">
+      <div class="section-head leaderboard-power-sheet-head">
+        <div class="leaderboard-power-sheet-title">
+          <h2 id="leaderboardPowerViewTitle">当前战力分配</h2>
+          <p id="leaderboardPowerViewCount" class="muted leaderboard-power-sheet-count"></p>
+        </div>
+        <button id="closeLeaderboardPowerViewBtn" class="button-secondary" type="button">关闭</button>
+      </div>
+      <div id="leaderboardPowerViewList" class="season-players-list leaderboard-power-sheet-list"></div>
+      <p id="leaderboardPowerViewEmpty" class="muted leaderboard-power-sheet-empty" hidden>当前赛季暂无选手</p>
+    </div>
+  </div>
+
+  <div id="leaderboardParticipationViewModal" class="hero-picker-modal" hidden>
+    <div id="leaderboardParticipationViewBackdrop" class="hero-picker-backdrop"></div>
+    <div class="hero-picker-dialog management-dialog management-dialog-wide leaderboard-power-sheet leaderboard-participation-sheet" role="dialog" aria-modal="true" aria-labelledby="leaderboardParticipationViewTitle">
+      <div class="section-head leaderboard-power-sheet-head">
+        <div class="leaderboard-power-sheet-title">
+          <h2 id="leaderboardParticipationViewTitle">场次分简表</h2>
+          <p id="leaderboardParticipationViewCount" class="muted leaderboard-power-sheet-count"></p>
+        </div>
+        <button id="closeLeaderboardParticipationViewBtn" class="button-secondary" type="button">关闭</button>
+      </div>
+      <div id="leaderboardParticipationViewList" class="leaderboard-participation-sheet-list"></div>
+      <p id="leaderboardParticipationViewEmpty" class="muted leaderboard-power-sheet-empty" hidden>当前暂无可显示的场次分规则</p>
+    </div>
+  </div>
+
+  <div id="leaderboardChampionsModal" class="hero-picker-modal" hidden>
+    <div id="leaderboardChampionsBackdrop" class="hero-picker-backdrop"></div>
+    <div class="hero-picker-dialog management-dialog leaderboard-champions-sheet" role="dialog" aria-modal="true" aria-labelledby="leaderboardChampionsTitle">
+      <div class="section-head leaderboard-champions-sheet-head">
+        <div>
+          <h2 id="leaderboardChampionsTitle" data-copy="leaderboard.championsTitle"></h2>
+        </div>
+        <button id="closeLeaderboardChampionsBtn" class="button-secondary" type="button" data-copy="leaderboard.championsClose"></button>
+      </div>
+      <div id="leaderboardChampionsList" class="leaderboard-champions-list"></div>
+      <p id="leaderboardChampionsEmpty" class="muted leaderboard-power-sheet-empty" hidden data-copy="leaderboard.championsEmpty"></p>
+    </div>
+  </div>
+
+  <div id="leaderboardLifetimeRewardsModal" class="hero-picker-modal" hidden>
+    <div id="leaderboardLifetimeRewardsBackdrop" class="hero-picker-backdrop"></div>
+    <div class="hero-picker-dialog management-dialog leaderboard-champions-sheet leaderboard-lifetime-rewards-sheet" role="dialog" aria-modal="true" aria-labelledby="leaderboardLifetimeRewardsTitle">
+      <div class="section-head leaderboard-champions-sheet-head">
+        <div>
+          <h2 id="leaderboardLifetimeRewardsTitle">历届赞助总额</h2>
+        </div>
+        <button id="closeLeaderboardLifetimeRewardsBtn" class="button-secondary" type="button">关闭</button>
+      </div>
+      <div id="leaderboardLifetimeRewardsList" class="leaderboard-champions-list leaderboard-lifetime-rewards-list"></div>
+      <p id="leaderboardLifetimeRewardsEmpty" class="muted leaderboard-power-sheet-empty" hidden>当前暂无历届赞助记录。</p>
+    </div>
+  </div>
+
+  <div id="playerRelationModal" class="hero-picker-modal" hidden>
+    <div id="playerRelationBackdrop" class="hero-picker-backdrop"></div>
+    <div class="hero-picker-dialog management-dialog management-dialog-wide relation-stats-dialog" role="dialog" aria-modal="true" aria-labelledby="playerRelationTitle">
+      <div class="section-head relation-stats-head">
+        <div class="relation-stats-title-wrap">
+          <h2 id="playerRelationTitle" data-copy="relationStats.title"></h2>
+        </div>
+        <div class="relation-stats-head-controls">
+          <div class="relation-inline-field relation-inline-field-no-label">
+            <select id="playerRelationSeasonSelect" aria-label="选择赛季"></select>
+          </div>
+          <div class="relation-inline-field relation-inline-field-compact relation-inline-field-no-label">
+            <input id="playerRelationMinGamesInput" type="number" min="1" step="1" inputmode="numeric" value="3" aria-label="设置最小样本场次" />
+          </div>
+        </div>
+        <div class="relation-stats-head-actions">
+          <button id="playerRelationViewToggleBtn" class="button-secondary relation-view-toggle-btn" type="button" aria-label="切换为关系明细" title="切换为关系明细">≣</button>
+          <button id="closePlayerRelationBtn" class="button-secondary" type="button" data-copy="relationStats.close"></button>
+        </div>
+      </div>
+      <div id="playerRelationOverviewSection" class="relation-stats-overview">
+        <div id="playerRelationSummary" class="relation-stats-summary"></div>
+        <div class="relation-stats-chart-grid">
+          <section class="relation-stats-panel relation-stats-panel-teammate">
+            <div class="section-head relation-stats-panel-head">
+              <div>
+                <h3 data-copy="relationStats.teammateChartTitle"></h3>
+                <p id="playerRelationTeammateMeta" class="muted"></p>
+              </div>
+            </div>
+            <div id="playerRelationTeammateChart" class="relation-chart-surface" aria-label="队友胜率关系网络"></div>
+          </section>
+          <section class="relation-stats-panel relation-stats-panel-opponent">
+            <div class="section-head relation-stats-panel-head">
+              <div>
+                <h3 data-copy="relationStats.opponentChartTitle"></h3>
+                <p id="playerRelationOpponentMeta" class="muted"></p>
+              </div>
+            </div>
+            <div id="playerRelationOpponentChart" class="relation-chart-surface" aria-label="对手胜率关系网络"></div>
+          </section>
+        </div>
+      </div>
+      <section id="playerRelationTablePanel" class="relation-stats-panel relation-stats-table-panel" hidden>
+        <div class="section-head relation-stats-panel-head">
+          <div>
+            <h3 data-copy="relationStats.tableTitle"></h3>
+            <p id="playerRelationTableHint" class="muted" data-copy="relationStats.tableSubtitle"></p>
+          </div>
+        </div>
+        <div class="relation-table-scroll">
+          <table class="relation-stats-table">
+            <thead>
+              <tr>
+                <th><button type="button" class="relation-sort-btn" data-role="player-relation-sort" data-sort-key="player_name">选手</button></th>
+                <th><button type="button" class="relation-sort-btn" data-role="player-relation-sort" data-sort-key="related_player_name">关联选手</button></th>
+                <th><button type="button" class="relation-sort-btn" data-role="player-relation-sort" data-sort-key="relation_type">关系</button></th>
+                <th><button type="button" class="relation-sort-btn" data-role="player-relation-sort" data-sort-key="games">场次</button></th>
+                <th><button type="button" class="relation-sort-btn" data-role="player-relation-sort" data-sort-key="wins">胜场</button></th>
+                <th><button type="button" class="relation-sort-btn" data-role="player-relation-sort" data-sort-key="win_rate">胜率</button></th>
+                <th><button type="button" class="relation-sort-btn" data-role="player-relation-sort" data-sort-key="sample_status">样本状态</button></th>
+              </tr>
+            </thead>
+            <tbody id="playerRelationTableBody"></tbody>
+          </table>
+        </div>
+      </section>
+      <p id="playerRelationMessage" class="message"></p>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="src/site-copy.js?v=20260608-realtime-rewards"></script>
+  <script type="module">
+    import { animate } from "https://cdn.jsdelivr.net/npm/motion@12.23.24/+esm";
+    window.Motion = { animate };
+  </script>
+  <script src="app.js?v=20260608-realtime-rewards"></script>
+</body>
+</html>

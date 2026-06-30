@@ -1,0 +1,53 @@
+# Version 1.0 workflow definition.
+name: Sync Background Assets
+
+on:
+  push:
+    branches:
+      - "**"
+    paths:
+      - "assets/background/*.jpg"
+      - "assets/background/*.jpeg"
+      - "assets/background/*.png"
+      - "assets/background/*.webp"
+      - "assets/background/manifest.json"
+      - "scripts/sync-background-assets.py"
+      - ".github/workflows/sync-background-assets.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: sync-background-assets-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  sync-background-assets:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: true
+
+      - name: Install ffmpeg
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ffmpeg
+
+      - name: Sync background manifest and previews
+        run: python3 scripts/sync-background-assets.py
+
+      - name: Commit generated background assets
+        run: |
+          if [ -z "$(git status --porcelain -- assets/background/manifest.json assets/background/preview)" ]; then
+            echo "Background manifest and previews are already up to date."
+            exit 0
+          fi
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add assets/background/manifest.json assets/background/preview
+          git commit -m "chore: sync background assets"
+          git push origin "HEAD:${GITHUB_REF_NAME}"

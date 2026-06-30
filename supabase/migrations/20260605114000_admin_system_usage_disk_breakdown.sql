@@ -1,0 +1,54 @@
+begin;
+
+create or replace function public.get_admin_system_usage()
+returns jsonb
+language plpgsql
+stable
+security definer
+set search_path = public, storage
+as $$
+declare
+  v_database_bytes bigint := 0;
+  v_wal_bytes bigint := 0;
+  v_storage_bytes bigint := 0;
+begin
+  if not public.is_admin() then
+    raise exception 'Forbidden.'
+      using errcode = '42501';
+  end if;
+
+  select pg_tablespace_size('pg_default')
+  into v_database_bytes;
+
+  select coalesce(sum(w.size), 0)::bigint
+  into v_wal_bytes
+  from pg_ls_waldir() w;
+
+  select
+    coalesce(sum(
+      case
+        when (o.metadata ->> 'size') ~ '^[0-9]+$'
+          then (o.metadata ->> 'size')::bigint
+        else 0
+      end
+    ), 0)::bigint
+  into v_storage_bytes
+  from storage.objects o;
+
+  return jsonb_build_object(
+    'databaseBytes', v_database_bytes,
+    'databaseQuotaBytes', 8 * 1024 * 1024 * 1024,
+    'walBytes', v_wal_bytes,
+    'storageBytes', v_storage_bytes,
+    'storageQuotaBytes', 1024 * 1024 * 1024
+  );
+end;
+$$;
+
+comment on function public.get_admin_system_usage() is 'Admin-only system usage snapshot for database disk footprint, WAL size, and Supabase Storage object size.';
+
+revoke all on function public.get_admin_system_usage() from public;
+revoke execute on function public.get_admin_system_usage() from anon;
+grant execute on function public.get_admin_system_usage() to authenticated;
+
+commit;
