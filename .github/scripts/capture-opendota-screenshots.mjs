@@ -128,20 +128,9 @@ async function getMatchesByIds(matchIds) {
   return supabaseRequest(`/rest/v1/v_match_detail?select=${MATCH_SELECT}&match_id=in.(${ids.join(",")})`);
 }
 
-async function getRecentMatches(limit) {
-  return supabaseRequest(`/rest/v1/v_match_detail?select=${MATCH_SELECT}&order=match_date.desc,match_no.desc&limit=${limit}`);
-}
-
 async function getAssetForMatchId(matchId) {
   const rows = await supabaseRequest(`/rest/v1/official_match_assets?select=${ASSET_SELECT}&match_id=eq.${matchId}&provider=eq.${PROVIDER}&asset_kind=eq.${ASSET_KIND}&limit=1`);
   return Array.isArray(rows) ? rows[0] || null : null;
-}
-
-async function getAssetsForMatchIds(matchIds) {
-  const ids = [...new Set(matchIds.filter(Boolean))];
-  if (!ids.length) return new Map();
-  const rows = await supabaseRequest(`/rest/v1/official_match_assets?select=${ASSET_SELECT}&match_id=in.(${ids.join(",")})&provider=eq.${PROVIDER}&asset_kind=eq.${ASSET_KIND}`);
-  return new Map((rows || []).map((row) => [row.match_id, row]));
 }
 
 async function getQueuedAssets(limit) {
@@ -187,6 +176,52 @@ function parseMatchPlayers(match) {
     }
   }
   return [];
+}
+
+function getLocalMatchRosterSignature(match) {
+  const teamAIds = [];
+  const teamBIds = [];
+
+  parseMatchPlayers(match).forEach((player) => {
+    const playerId = String(player.player_id || player.id || "").trim();
+    if (!playerId) return;
+    const side = String(player.team || player.side || "").trim().toLowerCase();
+    if (side === "a" || side === "radiant") {
+      teamAIds.push(playerId);
+    } else if (side === "b" || side === "dire") {
+      teamBIds.push(playerId);
+    }
+  });
+
+  if (!teamAIds.length || !teamBIds.length) return "";
+  return [
+    `A:${teamAIds.sort().join("|")}`,
+    `B:${teamBIds.sort().join("|")}`,
+  ].join("::");
+}
+
+async function getLocalMatchesForDate(match) {
+  const matchDate = String(match.match_date || "").trim();
+  const seasonId = String(match.season_id || "").trim();
+  if (!matchDate || !seasonId) return [];
+  return supabaseRequest(`/rest/v1/v_match_detail?select=${MATCH_SELECT}&season_id=eq.${seasonId}&match_date=eq.${matchDate}&order=match_no.asc`);
+}
+
+async function shouldRequireManualOfficialMatchAssociation(match, officialSameDayCount) {
+  const localMatches = await getLocalMatchesForDate(match);
+  if (localMatches.length === Number(officialSameDayCount)) return false;
+
+  const targetSignature = getLocalMatchRosterSignature(match);
+  if (!targetSignature) return false;
+
+  const signatureCounts = new Map();
+  localMatches.forEach((localMatch) => {
+    const signature = getLocalMatchRosterSignature(localMatch);
+    if (!signature) return;
+    signatureCounts.set(signature, (signatureCounts.get(signature) || 0) + 1);
+  });
+
+  return (signatureCounts.get(targetSignature) || 0) >= 2;
 }
 
 async function getLocalSteamAccountIds(match) {
@@ -359,6 +394,12 @@ async function findOfficialDotaMatchId(match) {
     throw new NoOfficialMatchRecordError("无比赛记录");
   }
 
+  if (await shouldRequireManualOfficialMatchAssociation(match, sameDayMatches.length)) {
+    throw new Error(
+      `Manual association required for ${matchDate}: official count ${sameDayMatches.length} differs from local count, and multiple local matches share the same two rosters.`,
+    );
+  }
+
   if (localAccountIds.size < 4 && sameDayMatches.length !== 1) {
     throw new Error(`Only ${localAccountIds.size} local Steam account mappings are available; at least 4 are required to disambiguate ${sameDayMatches.length} same-day matches.`);
   }
@@ -499,17 +540,6 @@ async function buildTargets(options) {
   for (const asset of queuedAssets) {
     const match = queuedMatches.get(asset.match_id);
     if (match) targets.push({ match, asset });
-    if (targets.length >= options.limit) return targets;
-  }
-
-  const recentMatches = await getRecentMatches(options.limit * 3);
-  const recentAssetMap = await getAssetsForMatchIds(recentMatches.map((match) => match.match_id));
-  for (const match of recentMatches) {
-    if (targets.some((target) => target.match.match_id === match.match_id)) continue;
-    const asset = recentAssetMap.get(match.match_id) || null;
-    if (!options.force && asset?.storage_path && asset.asset_status === "available") continue;
-    if (!options.force && asset?.asset_status === "error") continue;
-    targets.push({ match, asset });
     if (targets.length >= options.limit) return targets;
   }
 

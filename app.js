@@ -1442,6 +1442,7 @@ let officialMatchImportState = {
   savingMatchId: "",
   detailLoadToken: 0,
   isSaving: false,
+  assetLinksByDotaMatchId: new Map(),
 };
 let officialMatchMonthCache = new Map();
 let officialMatchSeasonPlayersBySeasonId = new Map();
@@ -11317,13 +11318,12 @@ function buildRecentMatchScreenshotButtonHtml(match, asset = getOfficialMatchScr
   if (!match?.match_id) return "";
   const hasImage = Boolean(asset?.url);
   const status = String(asset?.asset_status || "").trim();
-  const hasNoRecord = !hasImage && isOfficialMatchNoRecordAsset(asset);
   const isPending = !hasImage && (status === "requested" || status === "pending");
   const isError = !hasImage && status === "error";
   const stateClass = hasImage
     ? " recent-match-screenshot-btn-ready"
     : (isError ? " recent-match-screenshot-btn-error" : (isPending ? " recent-match-screenshot-btn-pending" : ""));
-  const title = hasNoRecord ? "无比赛记录" : "查看比赛详情";
+  const title = "查看比赛详情";
   return `
     <button
       type="button"
@@ -11385,46 +11385,28 @@ function applyOfficialMatchScreenshotAsset(assetRow) {
   return asset;
 }
 
-async function requestOpendotaScreenshot(matchId, triggerButton = null) {
+function openExistingOpendotaScreenshotOrStatus(matchId) {
   const normalizedMatchId = String(matchId || "").trim();
   if (!normalizedMatchId) return;
   const match = getSavedMatchById(normalizedMatchId);
-  const currentAsset = getOfficialMatchScreenshotAsset(match);
-  if (isOfficialMatchNoRecordAsset(currentAsset)) {
+  const asset = getOfficialMatchScreenshotAsset(match);
+
+  if (asset?.url) {
+    openOpendotaScreenshotModal(normalizedMatchId);
+    return;
+  }
+
+  if (isOfficialMatchNoRecordAsset(asset)) {
     setMessage("无比赛记录", true);
     return;
   }
-  if (!isCurrentRoleScorer()) {
-    setMessage("截图尚未生成；仅记分员或管理员可触发 OpenDota 截图生成。", true);
+
+  if (!asset?.dota_match_id) {
+    setMessage("未关联该比赛", true);
     return;
   }
 
-  if (triggerButton) {
-    triggerButton.disabled = true;
-    triggerButton.classList.add("recent-match-screenshot-btn-loading");
-  }
-
-  try {
-    const result = await invokeFunction("request-opendota-screenshot", {
-      matchId: normalizedMatchId,
-    });
-    const asset = applyOfficialMatchScreenshotAsset(result?.asset);
-    if (asset?.url) {
-      renderRecentMatches(recentMatchDayGroupsData);
-      openOpendotaScreenshotModal(normalizedMatchId);
-      return;
-    }
-    renderRecentMatches(recentMatchDayGroupsData);
-    setMessage(result?.message || "已提交 OpenDota 截图生成任务，稍后刷新后可查看。");
-  } catch (error) {
-    const message = error?.message || "未知错误";
-    setMessage(`OpenDota 截图生成请求失败：${message}`, true);
-  } finally {
-    if (triggerButton) {
-      triggerButton.disabled = false;
-      triggerButton.classList.remove("recent-match-screenshot-btn-loading");
-    }
-  }
+  setMessage(`OpenDota #${asset.dota_match_id} 尚未生成截图。`);
 }
 
 function getOrderedSavedMatchTeamPlayers(players, team) {
@@ -17557,6 +17539,13 @@ function renderRecentMatches(groups) {
         ? `
           <div class="recent-match-actions" aria-label="比赛记录操作">
             <button
+              class="button-secondary link-official-match-btn"
+              data-role="link-opendota-match"
+              data-match-id="${match.match_id}"
+              aria-label="关联 OpenDota 记录"
+              title="关联 OpenDota 记录"
+            ></button>
+            <button
               class="button-secondary edit-match-btn"
               data-match-id="${match.match_id}"
               aria-label="修改记录"
@@ -18120,6 +18109,107 @@ async function fetchOfficialMatchAssetsForMatchIds(matchIds = []) {
   }
 
   return assetMap;
+}
+
+function buildOfficialAssetMatchLinkLabel(match = null) {
+  if (!match?.match_id) return "本地比赛";
+  const dateText = getSavedMatchDateValue(match);
+  const shortDate = dateText && /^[0-9]{4}-[0-9]{2}-[0-9]{2}$/.test(dateText)
+    ? dateText.slice(5)
+    : dateText;
+  const matchNo = Number(match.match_no ?? NaN);
+  const matchNoText = Number.isFinite(matchNo) ? `第${matchNo}场` : "比赛记录";
+  return [shortDate, matchNoText].filter(Boolean).join(" ");
+}
+
+async function fetchRecentMatchRowsByIds(matchIds = []) {
+  const rows = [];
+  const normalizedIds = [...new Set((matchIds || []).filter(Boolean))];
+  const chunkSize = 150;
+
+  for (let index = 0; index < normalizedIds.length; index += chunkSize) {
+    const chunk = normalizedIds.slice(index, index + chunkSize);
+    const { data, error } = await db
+      .from("v_match_detail")
+      .select("match_id, season_id, match_no, match_date, status, winner_side, notes, metadata, created_at, submitted_at, approved_at, players")
+      .in("match_id", chunk);
+
+    if (error) throw error;
+    rows.push(...(data || []));
+  }
+
+  return rows;
+}
+
+function getOfficialAssetLinkForDotaMatchId(dotaMatchId = "") {
+  const normalizedDotaMatchId = normalizeDotaMatchIdInput(dotaMatchId);
+  if (!normalizedDotaMatchId) return null;
+  return officialMatchImportState.assetLinksByDotaMatchId.get(normalizedDotaMatchId) || null;
+}
+
+async function refreshOfficialAssetLinksForMatches(matches = []) {
+  const dotaMatchIds = [...new Set(
+    (matches || [])
+      .map((match) => normalizeDotaMatchIdInput(match?.matchId))
+      .filter(Boolean)
+  )];
+  const linkMap = new Map();
+  const chunkSize = 150;
+
+  for (let index = 0; index < dotaMatchIds.length; index += chunkSize) {
+    const chunk = dotaMatchIds.slice(index, index + chunkSize);
+    const { data, error } = await db
+      .from("official_match_assets")
+      .select("id, match_id, season_id, dota_match_id, asset_status, storage_path, source_url, captured_at, requested_at, last_requested_at, request_count, last_error, created_at, updated_at")
+      .in("dota_match_id", chunk)
+      .eq("provider", "opendota")
+      .eq("asset_kind", "overview_screenshot");
+
+    if (error) {
+      if (!isMissingPublicTableError(error, "official_match_assets")) {
+        console.error("加载 OpenDota 关联记录失败：", error);
+      }
+      officialMatchImportState.assetLinksByDotaMatchId = linkMap;
+      return linkMap;
+    }
+
+    (data || []).forEach((row) => {
+      const dotaMatchId = normalizeDotaMatchIdInput(row.dota_match_id);
+      if (dotaMatchId && !linkMap.has(dotaMatchId)) {
+        linkMap.set(dotaMatchId, {
+          asset: normalizeOfficialMatchAssetRow(row),
+          match: null,
+          label: "本地比赛",
+        });
+      }
+    });
+  }
+
+  const linkedMatchIds = [...new Set(
+    [...linkMap.values()]
+      .map((entry) => entry.asset?.match_id)
+      .filter(Boolean)
+  )];
+
+  if (linkedMatchIds.length) {
+    try {
+      const linkedMatches = await fetchRecentMatchRowsByIds(linkedMatchIds);
+      const matchById = new Map(linkedMatches.map((match) => [match.match_id, match]));
+      linkMap.forEach((entry, dotaMatchId) => {
+        const linkedMatch = matchById.get(entry.asset?.match_id) || getSavedMatchById(entry.asset?.match_id) || null;
+        linkMap.set(dotaMatchId, {
+          ...entry,
+          match: linkedMatch,
+          label: buildOfficialAssetMatchLinkLabel(linkedMatch),
+        });
+      });
+    } catch (error) {
+      console.error("加载 OpenDota 本地关联比赛失败：", error);
+    }
+  }
+
+  officialMatchImportState.assetLinksByDotaMatchId = linkMap;
+  return linkMap;
 }
 
 function attachOfficialMatchAssets(matches = [], assetMap = new Map()) {
@@ -20092,6 +20182,7 @@ function prepareOfficialMatchMonths() {
   officialMatchImportState.activeMappingKey = "";
   officialMatchImportState.mappingDrafts = new Map();
   officialMatchImportState.savingMatchId = "";
+  officialMatchImportState.assetLinksByDotaMatchId = new Map();
 }
 
 function getOfficialMonthEntry(monthCode = "") {
@@ -20378,12 +20469,15 @@ function renderOfficialMatchCard(match, matchIndex = 0) {
   const isSaving = officialMatchImportState.savingMatchId === matchId;
   const unresolvedCount = importedMatch ? getOfficialUnresolvedPlayers(importedMatch, matchId).length : 0;
   const isReady = Boolean(importedMatch);
-  const statusLabel = match.imported
+  const linkedAsset = getOfficialAssetLinkForDotaMatchId(matchId);
+  const statusLabel = linkedAsset
+    ? `已关联 ${linkedAsset.label}`
+    : (match.imported
     ? "已添加"
     : (match.detailStatus === "error"
     ? "读取失败"
-    : (isLoading ? "读取中" : (isReady ? (unresolvedCount ? `未关联 ${unresolvedCount}` : "已全部关联") : "等待读取")));
-  const statusClass = match.imported || (!unresolvedCount && match.detailStatus !== "error")
+    : (isLoading ? "读取中" : (isReady ? (unresolvedCount ? `未关联 ${unresolvedCount}` : "已全部关联") : "等待读取"))));
+  const statusClass = linkedAsset || match.imported || (!unresolvedCount && match.detailStatus !== "error")
     ? "official-match-card-status-ok"
     : "official-match-card-status-warn";
   const inlineMeta = formatOfficialMatchInlineMeta(displayData, matchIndex);
@@ -20402,7 +20496,7 @@ function renderOfficialMatchCard(match, matchIndex = 0) {
             type="button"
             data-role="save-official-match"
             data-match-id="${escapeHtml(matchId)}"
-            ${!matchId || !isReady || isLoading || match.imported || officialMatchImportState.isSaving ? "disabled" : ""}
+            ${!matchId || !isReady || isLoading || linkedAsset || match.imported || officialMatchImportState.isSaving ? "disabled" : ""}
           >${escapeHtml(isSaving ? "添加中" : copyText("officialMatches.add", "添加"))}</button>
         </div>
       </div>
@@ -20602,6 +20696,7 @@ async function loadOfficialMatchMonth(monthCode, options = {}) {
       monthEntry.error = "";
       officialMatchImportState.status = "ready";
       officialMatchImportState.matches = monthEntry.matches;
+      await refreshOfficialAssetLinksForMatches(getOfficialVisibleMatches());
       renderOfficialMatchesModal();
       setOfficialMatchesMessage(`已使用 ${targetMonthCode} 的页面缓存。`);
       return;
@@ -20651,6 +20746,7 @@ async function loadOfficialMatchMonth(monthCode, options = {}) {
     monthEntry.status = "ready";
     monthEntry.loaded = true;
     officialMatchImportState.matches = monthEntry.matches;
+    await refreshOfficialAssetLinksForMatches(getOfficialVisibleMatches());
     writeOfficialCachedMonth(monthEntry);
     renderOfficialMatchesModal();
     if (!monthEntry.matches.length) {
@@ -20988,20 +21084,159 @@ async function mergeOfficialImportedMatchIntoSavedMatch(existingMatch, importedM
   return loggedMatch;
 }
 
-async function linkOfficialMatchAsset(matchId = "", dotaMatchId = "") {
+function rememberOfficialAssetLink(assetRow) {
+  const asset = normalizeOfficialMatchAssetRow(assetRow);
+  if (!asset?.dota_match_id) return null;
+  const linkedMatch = getSavedMatchById(asset.match_id) || null;
+  officialMatchImportState.assetLinksByDotaMatchId.set(asset.dota_match_id, {
+    asset,
+    match: linkedMatch,
+    label: buildOfficialAssetMatchLinkLabel(linkedMatch),
+  });
+  return asset;
+}
+
+async function linkOfficialMatchAsset(matchId = "", dotaMatchId = "", options = {}) {
   const normalizedMatchId = String(matchId || "").trim();
   const normalizedDotaMatchId = normalizeDotaMatchIdInput(dotaMatchId);
-  if (!normalizedMatchId || !normalizedDotaMatchId) return;
+  if (!normalizedMatchId || !normalizedDotaMatchId) return null;
 
-  const { error } = await db.rpc("upsert_official_match_asset", {
+  const { data, error } = await db.rpc("upsert_official_match_asset", {
     p_match_id: normalizedMatchId,
     p_dota_match_id: normalizedDotaMatchId,
     p_storage_path: null,
     p_source_url: `https://www.opendota.com/matches/${normalizedDotaMatchId}`,
   });
 
-  if (error && !shouldRetryMissingRpc(error, "upsert_official_match_asset")) {
-    console.warn("记录 OpenDota 截图链接失败：", error);
+  if (error) {
+    if (options.throwOnError) {
+      throw new Error(error.message || "记录 OpenDota 关联失败。");
+    }
+    if (!shouldRetryMissingRpc(error, "upsert_official_match_asset")) {
+      console.warn("记录 OpenDota 截图链接失败：", error);
+    }
+    return null;
+  }
+
+  const asset = applyOfficialMatchScreenshotAsset(data);
+  rememberOfficialAssetLink(asset || data);
+  return asset || normalizeOfficialMatchAssetRow(data);
+}
+
+function getOfficialMatchCandidateMonthCode(match = null) {
+  const matchDate = getSavedMatchDateValue(match);
+  return /^[0-9]{4}-[0-9]{2}-[0-9]{2}$/.test(matchDate) ? matchDate.slice(0, 7) : "";
+}
+
+async function ensureOfficialMatchMonthPreparedForSavedMatch(match = null) {
+  if (!allSeasons.length) {
+    await loadSeasons();
+  }
+
+  const monthCode = getOfficialMatchCandidateMonthCode(match);
+  if (!monthCode) return "";
+  if (!officialMatchImportState.months.length || !getOfficialMonthEntry(monthCode)) {
+    prepareOfficialMatchMonths();
+  }
+  return getOfficialMonthEntry(monthCode) ? monthCode : "";
+}
+
+function getOfficialMatchCandidatesForSavedMatch(match = null) {
+  const matchDate = getSavedMatchDateValue(match);
+  const monthCode = getOfficialMatchCandidateMonthCode(match);
+  if (!matchDate || !monthCode) return [];
+  const monthEntry = getOfficialMonthEntry(monthCode);
+  return (monthEntry?.matches || [])
+    .filter((candidate) => getOfficialMatchDate(candidate) === matchDate)
+    .sort(compareOfficialMatchesByStartAsc);
+}
+
+async function loadOfficialMatchCandidatesForSavedMatch(match = null) {
+  const monthCode = await ensureOfficialMatchMonthPreparedForSavedMatch(match);
+  if (!monthCode) return [];
+
+  await loadOfficialMatchMonth(monthCode, { force: true });
+  const monthEntry = getOfficialMonthEntry(monthCode);
+  if (monthEntry?.status === "error") {
+    throw new Error(monthEntry.error || "读取官方比赛失败。");
+  }
+  return getOfficialMatchCandidatesForSavedMatch(match);
+}
+
+function resolveOfficialMatchCandidateInput(rawValue = "", candidates = []) {
+  const raw = String(rawValue || "").trim();
+  if (!raw) return null;
+  const normalizedMatchId = normalizeDotaMatchIdInput(raw);
+  const directMatch = normalizedMatchId
+    ? candidates.find((candidate) => normalizeDotaMatchIdInput(candidate.matchId) === normalizedMatchId)
+    : null;
+  if (directMatch) return directMatch;
+
+  const candidateIndex = Number(raw);
+  if (Number.isInteger(candidateIndex) && candidateIndex >= 1 && candidateIndex <= candidates.length) {
+    return candidates[candidateIndex - 1];
+  }
+  return null;
+}
+
+async function chooseOfficialMatchAssetForSavedMatch(matchId = "", triggerButton = null) {
+  if (!ensureScorerAccess("仅记分员或管理员可关联 OpenDota 记录。")) return;
+  if (!ensureMatchRecordEditable(matchId, "关联")) return;
+  const match = getSavedMatchById(matchId);
+  if (!match) return;
+
+  if (triggerButton) {
+    triggerButton.disabled = true;
+    triggerButton.classList.add("link-official-match-btn-loading");
+  }
+
+  try {
+    const candidates = await loadOfficialMatchCandidatesForSavedMatch(match);
+    if (!candidates.length) {
+      setMessage("该日期暂无可关联的 OpenDota 比赛记录。", true);
+      return;
+    }
+
+    const currentAsset = getOfficialMatchScreenshotAsset(match);
+    const optionLines = candidates.map((candidate, index) => (
+      `${index + 1}. #${normalizeDotaMatchIdInput(candidate.matchId)} ${formatOfficialMatchInlineMeta(candidate, index)}`
+    ));
+    const promptValue = await promptAction(
+      [
+        currentAsset?.dota_match_id ? `当前关联：#${currentAsset.dota_match_id}` : "",
+        "输入序号或 OpenDota Match ID：",
+        ...optionLines,
+      ].filter(Boolean).join("\n"),
+      currentAsset?.dota_match_id || "",
+      {
+        title: "关联 OpenDota 记录",
+        inputLabel: "序号或 Match ID",
+        confirmLabel: "关联",
+      }
+    );
+    if (promptValue === null) return;
+
+    const selectedCandidate = resolveOfficialMatchCandidateInput(promptValue, candidates);
+    const selectedDotaMatchId = normalizeDotaMatchIdInput(selectedCandidate?.matchId);
+    if (!selectedDotaMatchId) {
+      setMessage("请选择列表中的 OpenDota 比赛记录。", true);
+      return;
+    }
+
+    const asset = await linkOfficialMatchAsset(match.match_id, selectedDotaMatchId, { throwOnError: true });
+    if (asset) {
+      renderRecentMatches(recentMatchDayGroupsData);
+    }
+    await refreshOfficialAssetLinksForMatches(getOfficialVisibleMatches());
+    renderOfficialMatchesModal();
+    setMessage(`已关联 OpenDota #${selectedDotaMatchId}；截图生成后可通过比赛详情图标查看。`);
+  } catch (error) {
+    setMessage(`关联 OpenDota 记录失败：${error.message || "未知错误"}`, true);
+  } finally {
+    if (triggerButton) {
+      triggerButton.disabled = false;
+      triggerButton.classList.remove("link-official-match-btn-loading");
+    }
   }
 }
 
@@ -22986,14 +23221,7 @@ recentMatchesList.addEventListener("click", async (event) => {
   if (screenshotButton) {
     event.preventDefault();
     event.stopPropagation();
-    const matchId = screenshotButton.dataset.matchId || "";
-    const match = getSavedMatchById(matchId);
-    const asset = getOfficialMatchScreenshotAsset(match);
-    if (asset?.url) {
-      openOpendotaScreenshotModal(matchId);
-    } else {
-      await requestOpendotaScreenshot(matchId, screenshotButton);
-    }
+    openExistingOpendotaScreenshotOrStatus(screenshotButton.dataset.matchId || "");
     return;
   }
 
@@ -23061,6 +23289,17 @@ recentMatchesList.addEventListener("click", async (event) => {
   const editButton = event.target.closest(".edit-match-btn");
   if (editButton) {
     await startEditingMatch(editButton.dataset.matchId);
+    return;
+  }
+
+  const linkOfficialMatchButton = event.target.closest('[data-role="link-opendota-match"]');
+  if (linkOfficialMatchButton) {
+    event.preventDefault();
+    event.stopPropagation();
+    await chooseOfficialMatchAssetForSavedMatch(
+      linkOfficialMatchButton.dataset.matchId || "",
+      linkOfficialMatchButton
+    );
     return;
   }
 

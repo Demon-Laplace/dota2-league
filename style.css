@@ -2495,6 +2495,7 @@ button:disabled {
 }
 
 #openBackfillFormBtn,
+.link-official-match-btn,
 .edit-match-btn {
   background:
     linear-gradient(135deg, rgba(40, 61, 89, 0.97), rgba(19, 33, 56, 0.99)),
@@ -3762,6 +3763,7 @@ button:disabled {
 #addRewardBtn,
 #openMatchFormBtn,
 #openBackfillFormBtn,
+.link-official-match-btn,
 .edit-match-btn,
 .delete-match-btn,
 #startMatchDayBtn {
@@ -3775,6 +3777,7 @@ button:disabled {
 #addRewardBtn::before,
 #openMatchFormBtn::before,
 #openBackfillFormBtn::before,
+.link-official-match-btn::before,
 .edit-match-btn::before,
 .delete-match-btn::before,
 #startMatchDayBtn::before {
@@ -6053,6 +6056,7 @@ button:disabled {
   text-shadow: none;
 }
 
+.recent-match-actions .link-official-match-btn,
 .recent-match-actions .edit-match-btn,
 .recent-match-actions .delete-match-btn {
   width: 26px;
@@ -6066,6 +6070,7 @@ button:disabled {
   letter-spacing: 0;
 }
 
+.recent-match-actions .link-official-match-btn::before,
 .recent-match-actions .edit-match-btn::before,
 .recent-match-actions .delete-match-btn::before {
   border-radius: 8px 8px 6px 6px;
@@ -6515,6 +6520,7 @@ button:disabled {
     gap: 6px;
   }
 
+  .recent-match-actions .link-official-match-btn,
   .recent-match-actions .edit-match-btn,
   .recent-match-actions .delete-match-btn {
     min-width: 26px;
@@ -9333,6 +9339,7 @@ button.score-detail-summary-card {
   --icon-trash: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M3 6h18'/%3E%3Cpath d='M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2'/%3E%3Cpath d='M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6'/%3E%3Cpath d='M10 11v6'/%3E%3Cpath d='M14 11v6'/%3E%3C/svg%3E");
   --icon-rotate: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8'/%3E%3Cpath d='M3 3v5h5'/%3E%3C/svg%3E");
   --icon-pencil: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M21.17 6.17a2.83 2.83 0 0 0-4-4L3 16.34V21h4.66Z'/%3E%3Cpath d='m15 5 4 4'/%3E%3C/svg%3E");
+  --icon-link: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M10 13a5 5 0 0 0 7.07 0l2.83-2.83a5 5 0 0 0-7.07-7.07L11 4.93'/%3E%3Cpath d='M14 11a5 5 0 0 0-7.07 0L4.1 13.83a5 5 0 0 0 7.07 7.07L13 19.07'/%3E%3C/svg%3E");
   --icon-check: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M20 6 9 17l-5-5'/%3E%3C/svg%3E");
   --icon-x: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M18 6 6 18'/%3E%3Cpath d='m6 6 12 12'/%3E%3C/svg%3E");
   --icon-copy: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect width='14' height='14' x='8' y='8' rx='2' ry='2'/%3E%3Cpath d='M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2'/%3E%3C/svg%3E");
@@ -9739,6 +9746,7 @@ button:is(
   #adminRenamePlayerBtn,
   #confirmQueueBtn,
   #signupAllBtn,
+  .link-official-match-btn,
   .edit-match-btn,
   .delete-match-btn,
   .cancel-reward-log-btn,
@@ -9835,6 +9843,10 @@ button:is(
   --button-icon: var(--icon-check);
 }
 
+.link-official-match-btn::before {
+  --button-icon: var(--icon-link);
+}
+
 .edit-match-btn::before,
 .admin-reset-password-btn::before {
   --button-icon: var(--icon-pencil);
@@ -9870,6 +9882,7 @@ button:is(
   display: none !important;
 }
 
+.recent-match-actions .link-official-match-btn,
 .recent-match-actions .edit-match-btn,
 .recent-match-actions .delete-match-btn {
   width: 26px;
@@ -9892,6 +9905,7 @@ button:is(
   gap: 6px;
 }
 
+.recent-match-actions .link-official-match-btn::before,
 .recent-match-actions .edit-match-btn::before,
 .recent-match-actions .delete-match-btn::before {
   width: 12px;
@@ -10505,6 +10519,7 @@ button.score-detail-summary-filter-active:focus-visible {
 }
 
 #addRewardBtn::before,
+.link-official-match-btn::before,
 .edit-match-btn::before,
 .delete-match-btn::before {
   position: static;
