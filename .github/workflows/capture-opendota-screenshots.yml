@@ -2,6 +2,13 @@
 name: Capture OpenDota Screenshots
 
 on:
+  push:
+    branches:
+      - main
+      - auto-getresult
+    paths:
+      - ".github/workflows/capture-opendota-screenshots.yml"
+      - ".github/scripts/capture-opendota-screenshots.mjs"
   workflow_dispatch:
     inputs:
       match_id:
@@ -18,8 +25,24 @@ on:
         required: false
         default: false
         type: boolean
+      archive_date:
+        description: "Archive one Beijing business date of structured snapshots to GitHub, YYYY-MM-DD."
+        required: false
+        type: string
+      archive_month:
+        description: "Archive a month of structured snapshots to GitHub, YYYY-MM."
+        required: false
+        type: string
+      archive_only:
+        description: "Only archive structured snapshots; do not process screenshot queue."
+        required: false
+        default: false
+        type: boolean
   schedule:
-    - cron: "*/30 * * * *"
+    # Beijing time 20:30. The script runs an adaptive polling loop until midnight.
+    - cron: "30 12 * * *"
+    # Beijing time 02:00, aligned with the fixed settlement pass.
+    - cron: "0 18 * * *"
 
 concurrency:
   group: capture-opendota-screenshots
@@ -29,16 +52,23 @@ jobs:
   capture-opendota-screenshots:
     runs-on: ubuntu-latest
     permissions:
-      contents: read
+      contents: write
     env:
       SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
-      SUPABASE_PROJECT_ID: ${{ secrets.SUPABASE_PROJECT_ID }}
+      SUPABASE_PROJECT_ID: ${{ secrets.SUPABASE_PROJECT_ID || 'klxkkwwszqtgeuozwtkw' }}
       SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
       STEAM_WEB_API_KEY: ${{ secrets.STEAM_WEB_API_KEY }}
+      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      SNAPSHOT_ARCHIVE_BRANCH: ${{ vars.SNAPSHOT_ARCHIVE_BRANCH || 'main' }}
+      SNAPSHOT_ARCHIVE_PREFIX: ${{ vars.SNAPSHOT_ARCHIVE_PREFIX || 'data/opendota' }}
       DOTA_LEAGUE_ID: ${{ vars.DOTA_LEAGUE_ID || '19878' }}
       SCREENSHOT_MATCH_ID: ${{ github.event.inputs.match_id || '' }}
       SCREENSHOT_LIMIT: ${{ github.event.inputs.limit || '20' }}
       SCREENSHOT_FORCE: ${{ github.event.inputs.force || 'false' }}
+      SCREENSHOT_SCHEDULE_MODE: ${{ vars.SCREENSHOT_SCHEDULE_MODE || 'smart' }}
+      SNAPSHOT_ARCHIVE_DATE: ${{ github.event.inputs.archive_date || '' }}
+      SNAPSHOT_ARCHIVE_MONTH: ${{ github.event.inputs.archive_month || '' }}
+      SNAPSHOT_ARCHIVE_ONLY: ${{ github.event.inputs.archive_only || 'false' }}
 
     steps:
       - name: Checkout

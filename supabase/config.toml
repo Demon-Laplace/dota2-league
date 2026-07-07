@@ -59,3 +59,6 @@ verify_jwt = false
 
 [functions.rollback-match]
 verify_jwt = false
+
+[functions.trigger-opendota-archive-action]
+verify_jwt = false
