@@ -1,0 +1,58 @@
+# Version 1.0 workflow definition.
+name: Capture OpenDota Screenshots
+
+on:
+  workflow_dispatch:
+    inputs:
+      match_id:
+        description: "Local matches.id UUID. Leave empty to process queued/recent missing screenshots."
+        required: false
+        type: string
+      limit:
+        description: "Maximum matches to process."
+        required: false
+        default: "20"
+        type: string
+      force:
+        description: "Regenerate screenshots that already exist."
+        required: false
+        default: false
+        type: boolean
+  schedule:
+    - cron: "*/30 * * * *"
+
+concurrency:
+  group: capture-opendota-screenshots
+  cancel-in-progress: false
+
+jobs:
+  capture-opendota-screenshots:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    env:
+      SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+      SUPABASE_PROJECT_ID: ${{ secrets.SUPABASE_PROJECT_ID }}
+      SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+      STEAM_WEB_API_KEY: ${{ secrets.STEAM_WEB_API_KEY }}
+      DOTA_LEAGUE_ID: ${{ vars.DOTA_LEAGUE_ID || '19878' }}
+      SCREENSHOT_MATCH_ID: ${{ github.event.inputs.match_id || '' }}
+      SCREENSHOT_LIMIT: ${{ github.event.inputs.limit || '20' }}
+      SCREENSHOT_FORCE: ${{ github.event.inputs.force || 'false' }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Install Playwright
+        run: |
+          npm_config_package_lock=false npm install --no-save playwright
+          npx playwright install --with-deps chromium
+
+      - name: Capture and upload screenshots
+        run: node .github/scripts/capture-opendota-screenshots.mjs

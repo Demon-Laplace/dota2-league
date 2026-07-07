@@ -7,7 +7,7 @@
   <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin />
   <link rel="preconnect" href="https://klxkkwwszqtgeuozwtkw.supabase.co" crossorigin />
   <link rel="preload" as="image" href="./assets/Dota2_logo.png" fetchpriority="high" />
-  <link rel="stylesheet" href="style.css?v=20260608-realtime-rewards" />
+  <link rel="stylesheet" href="style.css?v=20260707-storage-opendota-detail" />
 </head>
   <body>
   <div id="loadingScreen" class="loading-screen" aria-live="polite">
@@ -94,6 +94,7 @@
             <button id="scorerOpenSeasonRulesBtn" class="button-secondary" type="button" data-copy="scorerPanel.pointRuleButton"></button>
             <button id="scorerOpenPowerManagementBtn" class="button-secondary" type="button" data-copy="scorerPanel.powerManageButton"></button>
             <button id="scorerOpenPlayerManagementBtn" class="button-secondary" type="button" data-copy="scorerPanel.playerManageButton"></button>
+            <button id="scorerOpenSteamMappingBtn" class="button-secondary" type="button" data-copy="scorerPanel.steamMappingButton"></button>
             <button
               id="scorerItemCatalogToggleBtn"
               class="button-secondary admin-panel-compact-btn item-management-toggle-btn"
@@ -148,6 +149,7 @@
             <button id="adminOpenSeasonRulesBtn" class="button-secondary" type="button" data-copy="adminPanel.pointRuleButton"></button>
             <button id="adminOpenPowerManagementBtn" class="button-secondary" type="button" data-copy="adminPanel.powerManageButton"></button>
             <button id="adminOpenPlayerManagementBtn" class="button-secondary" type="button" data-copy="adminPanel.playerManageButton"></button>
+            <button id="adminOpenSteamMappingBtn" class="button-secondary" type="button" data-copy="adminPanel.steamMappingButton"></button>
             <button
               id="adminItemCatalogToggleBtn"
               class="button-secondary admin-panel-compact-btn item-management-toggle-btn"
@@ -388,6 +390,7 @@
             <div class="recent-matches-toolbar">
               <button id="openMatchFormBtn" class="recent-match-tool recent-match-tool-primary" data-copy="recentMatches.addTodayMatch"></button>
               <button id="openBackfillFormBtn" class="button-secondary recent-match-tool recent-match-tool-secondary" data-copy="recentMatches.backfillMatch"></button>
+              <button id="openOfficialMatchesBtn" class="button-secondary recent-match-tool recent-match-tool-secondary" data-copy="recentMatches.officialMatches"></button>
             </div>
           </div>
           <div id="matchFormPanel" class="match-form-panel recent-match-form-panel" hidden>
@@ -946,6 +949,59 @@
     </div>
   </div>
 
+  <div id="steamMappingModal" class="hero-picker-modal" hidden>
+    <div id="steamMappingBackdrop" class="hero-picker-backdrop"></div>
+    <div class="hero-picker-dialog management-dialog management-dialog-wide steam-mapping-dialog" role="dialog" aria-modal="true" aria-labelledby="steamMappingTitle">
+      <div class="section-head">
+        <div>
+          <h2 id="steamMappingTitle" data-copy="steamMapping.title"></h2>
+          <p class="muted" data-copy="steamMapping.subtitle"></p>
+        </div>
+        <button id="closeSteamMappingBtn" class="button-secondary" type="button" data-copy="steamMapping.close"></button>
+      </div>
+      <div class="steam-mapping-toolbar">
+        <input id="steamMappingFilterInput" type="text" autocomplete="off" data-copy-placeholder="steamMapping.searchPlaceholder" />
+        <button id="refreshSteamMappingBtn" class="button-secondary" type="button" data-copy="steamMapping.refresh"></button>
+      </div>
+      <div id="steamMappingList" class="steam-mapping-list"></div>
+      <p id="steamMappingEmpty" class="muted steam-mapping-empty" data-copy="steamMapping.empty"></p>
+      <p id="steamMappingMessage" class="message"></p>
+    </div>
+  </div>
+
+  <div id="officialMatchesModal" class="hero-picker-modal" hidden>
+    <div id="officialMatchesBackdrop" class="hero-picker-backdrop"></div>
+    <div class="hero-picker-dialog management-dialog management-dialog-wide official-matches-dialog" role="dialog" aria-modal="true" aria-labelledby="officialMatchesTitle">
+      <div class="section-head">
+        <div>
+          <h2 id="officialMatchesTitle" data-copy="officialMatches.title"></h2>
+        </div>
+        <div class="official-matches-head-actions">
+          <button id="refreshOfficialMatchesBtn" class="button-secondary" type="button" data-copy="officialMatches.refresh"></button>
+          <button id="closeOfficialMatchesBtn" class="button-secondary" type="button" data-copy="officialMatches.close"></button>
+        </div>
+      </div>
+      <div id="officialMatchesList" class="official-matches-list"></div>
+      <p id="officialMatchesMessage" class="message"></p>
+    </div>
+  </div>
+
+  <div id="opendotaScreenshotModal" class="hero-picker-modal" hidden>
+    <div id="opendotaScreenshotBackdrop" class="hero-picker-backdrop"></div>
+    <div class="hero-picker-dialog management-dialog management-dialog-wide opendota-screenshot-dialog" role="dialog" aria-modal="true" aria-labelledby="opendotaScreenshotTitle">
+      <div class="section-head opendota-screenshot-head">
+        <div>
+          <h2 id="opendotaScreenshotTitle">OpenDota 比赛截图</h2>
+          <p id="opendotaScreenshotMeta" class="muted"></p>
+        </div>
+        <button id="closeOpendotaScreenshotBtn" class="button-secondary" type="button">关闭</button>
+      </div>
+      <div class="opendota-screenshot-frame">
+        <img id="opendotaScreenshotImage" alt="OpenDota 比赛截图" />
+      </div>
+    </div>
+  </div>
+
   <div id="scorerItemCatalogModal" class="hero-picker-modal" hidden>
     <div id="scorerItemCatalogBackdrop" class="hero-picker-backdrop"></div>
     <div class="hero-picker-dialog management-dialog management-dialog-wide" role="dialog" aria-modal="true" aria-labelledby="scorerItemCatalogTitle">
@@ -1234,11 +1290,11 @@
   </div>
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="src/site-copy.js?v=20260608-realtime-rewards"></script>
+  <script src="src/site-copy.js?v=20260706-official-grid"></script>
   <script type="module">
     import { animate } from "https://cdn.jsdelivr.net/npm/motion@12.23.24/+esm";
     window.Motion = { animate };
   </script>
-  <script src="app.js?v=20260608-realtime-rewards"></script>
+  <script src="app.js?v=20260707-storage-opendota-detail"></script>
 </body>
 </html>

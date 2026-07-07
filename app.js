@@ -16,6 +16,7 @@ const SITE_COPY = window.__DOTA2SYS_SITE_COPY__ || {};
 const BACKGROUND_IMAGE_STORAGE_KEY = "nd_dota_site_background_image_v1";
 const BACKGROUND_IMAGE_SETTINGS_STORAGE_KEY = "nd_dota_site_background_settings_v2";
 const BACKGROUND_IMAGE_STORAGE_BUCKET = "site-backgrounds";
+const OPENDOTA_MATCH_SCREENSHOT_STORAGE_BUCKET = "opendota-match-screenshots";
 const BACKGROUND_IMAGE_STORAGE_OBJECT_SEPARATOR = "__";
 const BACKGROUND_IMAGE_THUMBNAIL_PREFIX = "thumbnails/";
 const BACKGROUND_IMAGE_THUMBNAIL_WIDTH = 960;
@@ -29,6 +30,7 @@ const GITHUB_PAGES_REPOSITORY_RECOMMENDED_LIMIT_BYTES = 1024 * 1024 * 1024;
 const GITHUB_STORAGE_POST_PUSH_REFRESH_DELAYS_MS = [0, 4000, 15000];
 const GITHUB_STORAGE_AUTO_REFRESH_INTERVAL_MS = 5 * 60 * 1000;
 const SUPABASE_DATABASE_USAGE_QUOTA_BYTES = 500 * 1024 * 1024;
+const SUPABASE_STORAGE_USAGE_QUOTA_BYTES = 1024 * 1024 * 1024;
 const SUPABASE_SYSTEM_USAGE_DAILY_CACHE_STORAGE_KEY = "nd_dota_supabase_system_usage_daily_v3";
 const SEASON_BASE_SPONSOR_AMOUNT = 20;
 const LIFETIME_REWARD_EXTRA_DISPLAY_THRESHOLD = 100;
@@ -39,6 +41,7 @@ let githubRepositoryStorageDisplayText = "读取中";
 let githubRepositoryStorageRefreshTimer = null;
 let githubRepositoryStorageRefreshPromise = null;
 let supabaseSystemUsageDisplayText = "数据库：读取中";
+let supabaseStorageUsageDisplayText = "Storage：读取中";
 let supabaseSystemUsageRefreshKey = "";
 let supabaseSystemUsageRefreshPromise = null;
 
@@ -92,6 +95,19 @@ function getBackgroundStoragePublicUrl(objectName = "") {
   const normalizedName = normalizeBackgroundStorageObjectName(objectName) || normalizeBackgroundThumbnailObjectName(objectName);
   if (!normalizedName) return "";
   const { data } = db.storage.from(BACKGROUND_IMAGE_STORAGE_BUCKET).getPublicUrl(normalizedName);
+  return data?.publicUrl || "";
+}
+
+function normalizeOpendotaScreenshotStoragePath(path = "") {
+  const normalized = String(path || "").trim();
+  if (!normalized || normalized.includes("\\") || normalized.includes("..")) return "";
+  return /^[0-9]{4}-[0-9]{2}\/[0-9]+\.(?:jpe?g|png|webp)$/i.test(normalized) ? normalized : "";
+}
+
+function getOpendotaScreenshotPublicUrl(path = "") {
+  const normalizedPath = normalizeOpendotaScreenshotStoragePath(path);
+  if (!normalizedPath) return "";
+  const { data } = db.storage.from(OPENDOTA_MATCH_SCREENSHOT_STORAGE_BUCKET).getPublicUrl(normalizedPath);
   return data?.publicUrl || "";
 }
 
@@ -620,6 +636,7 @@ const PLAYER_RELATION_LADDER_ZONE_COLUMNS = 4;
 const PLAYER_RELATION_LADDER_NODE_WIDTH_PX = 152;
 const PLAYER_RELATION_LADDER_COLUMN_GAP_PX = 3;
 const PLAYER_RELATION_LADDER_EDGE_GAP_PX = 16;
+const DOTA_FIXED_LEAGUE_ID = "19878";
 const CHAMPION_BASE_SEASON_CODE = "2026-03";
 const FIXED_SEASON_CHAMPIONS = [
   { seasonCode: "2026-03", championName: "苏神" },
@@ -930,6 +947,7 @@ const adminSaveIdentityBtn = document.getElementById("adminSaveIdentityBtn");
 const scorerOpenSeasonRulesBtn = document.getElementById("scorerOpenSeasonRulesBtn");
 const scorerOpenPowerManagementBtn = document.getElementById("scorerOpenPowerManagementBtn");
 const scorerOpenPlayerManagementBtn = document.getElementById("scorerOpenPlayerManagementBtn");
+const scorerOpenSteamMappingBtn = document.getElementById("scorerOpenSteamMappingBtn");
 const scorerOpenLogsBtn = document.getElementById("scorerOpenLogsBtn");
 const scorerOpenItemHistoryBtn = document.getElementById("scorerOpenItemHistoryBtn");
 const scorerQuickAddPlayerInput = document.getElementById("scorerQuickAddPlayerInput");
@@ -955,6 +973,7 @@ const scorerItemCatalogList = document.getElementById("scorerItemCatalogList");
 const adminOpenSeasonRulesBtn = document.getElementById("adminOpenSeasonRulesBtn");
 const adminOpenPowerManagementBtn = document.getElementById("adminOpenPowerManagementBtn");
 const adminOpenPlayerManagementBtn = document.getElementById("adminOpenPlayerManagementBtn");
+const adminOpenSteamMappingBtn = document.getElementById("adminOpenSteamMappingBtn");
 const adminOpenLogsBtn = document.getElementById("adminOpenLogsBtn");
 const adminOpenItemHistoryBtn = document.getElementById("adminOpenItemHistoryBtn");
 const adminQuickAddPlayerInput = document.getElementById("adminQuickAddPlayerInput");
@@ -967,6 +986,26 @@ const adminInactivePlayersBlock = document.getElementById("adminInactivePlayersB
 const adminInactivePlayerChips = document.getElementById("adminInactivePlayerChips");
 const adminRestorePlayerBtn = document.getElementById("adminRestorePlayerBtn");
 const adminHardDeletePlayerBtn = document.getElementById("adminHardDeletePlayerBtn");
+const steamMappingModal = document.getElementById("steamMappingModal");
+const steamMappingBackdrop = document.getElementById("steamMappingBackdrop");
+const closeSteamMappingBtn = document.getElementById("closeSteamMappingBtn");
+const steamMappingFilterInput = document.getElementById("steamMappingFilterInput");
+const refreshSteamMappingBtn = document.getElementById("refreshSteamMappingBtn");
+const steamMappingList = document.getElementById("steamMappingList");
+const steamMappingEmpty = document.getElementById("steamMappingEmpty");
+const steamMappingMessage = document.getElementById("steamMappingMessage");
+const openOfficialMatchesBtn = document.getElementById("openOfficialMatchesBtn");
+const officialMatchesModal = document.getElementById("officialMatchesModal");
+const officialMatchesBackdrop = document.getElementById("officialMatchesBackdrop");
+const closeOfficialMatchesBtn = document.getElementById("closeOfficialMatchesBtn");
+const refreshOfficialMatchesBtn = document.getElementById("refreshOfficialMatchesBtn");
+const officialMatchesList = document.getElementById("officialMatchesList");
+const officialMatchesMessage = document.getElementById("officialMatchesMessage");
+const opendotaScreenshotModal = document.getElementById("opendotaScreenshotModal");
+const opendotaScreenshotBackdrop = document.getElementById("opendotaScreenshotBackdrop");
+const closeOpendotaScreenshotBtn = document.getElementById("closeOpendotaScreenshotBtn");
+const opendotaScreenshotImage = document.getElementById("opendotaScreenshotImage");
+const opendotaScreenshotMeta = document.getElementById("opendotaScreenshotMeta");
 const adminItemNameInput = document.getElementById("adminItemNameInput");
 const adminItemDonationInput = document.getElementById("adminItemDonationInput");
 const adminItemMatchIconSelect = document.getElementById("adminItemMatchIconSelect");
@@ -1388,6 +1427,27 @@ let matchHeroAssignments = {};
 let backfillHeroAssignments = {};
 let matchKdaAssignments = {};
 let backfillKdaAssignments = {};
+let officialMatchImportState = {
+  status: "idle",
+  matches: [],
+  months: [],
+  openMonthCodes: new Set(),
+  activeMonthCode: "",
+  loadingMonthCode: "",
+  selectedMatchId: "",
+  loadingMatchId: "",
+  importedMatch: null,
+  mappingDrafts: new Map(),
+  activeMappingKey: "",
+  savingMatchId: "",
+  detailLoadToken: 0,
+  isSaving: false,
+};
+let officialMatchMonthCache = new Map();
+let officialMatchSeasonPlayersBySeasonId = new Map();
+let steamAccountMappings = new Map();
+let steamMappingDrafts = new Map();
+let steamMappingStatus = "idle";
 const ITEM_MATCH_TARGET_DEFINITIONS = [
   { value: "self", label: "自己", group: "single" },
   { value: "ally", label: "队友(单人)", group: "single" },
@@ -5376,6 +5436,8 @@ const managedDialogEntries = [
   { modal: adminPowerModal, close: () => setManagedDialogOpen("adminPower", false) },
   { modal: scorerPlayerManagementModal, close: () => setManagedDialogOpen("scorerPlayerManagement", false) },
   { modal: adminPlayerManagementModal, close: () => setManagedDialogOpen("adminPlayerManagement", false) },
+  { modal: steamMappingModal, close: () => setManagedDialogOpen("steamMapping", false) },
+  { modal: officialMatchesModal, close: () => setManagedDialogOpen("officialMatches", false) },
   { modal: scorerManualScoreModal, close: () => setManagedDialogOpen("scorerManualScore", false) },
   { modal: adminManualScoreModal, close: () => setManagedDialogOpen("adminManualScore", false) },
   { modal: scorerItemCatalogModal, close: () => setManagedDialogOpen("scorerItemCatalog", false) },
@@ -5409,6 +5471,7 @@ function getOpenDialogModal() {
     heroPickerModal,
     scoreDetailModal,
     accessModal,
+    opendotaScreenshotModal,
     ...managedDialogEntries.map((entry) => entry.modal),
   ]
     .find((modal) => modal && !modal.hidden) || null;
@@ -5462,6 +5525,10 @@ function getManagedDialogModal(key = "") {
       return scorerPlayerManagementModal;
     case "adminPlayerManagement":
       return adminPlayerManagementModal;
+    case "steamMapping":
+      return steamMappingModal;
+    case "officialMatches":
+      return officialMatchesModal;
     case "scorerManualScore":
       return scorerManualScoreModal;
     case "adminManualScore":
@@ -7053,6 +7120,202 @@ function renderPlayerManagementOptions() {
   if (adminSaveIdentityBtn) {
     adminSaveIdentityBtn.disabled = !isCurrentRoleAdmin();
   }
+}
+
+function setSteamMappingMessage(message = "", isError = false) {
+  setMessageNode(steamMappingMessage, message, isError);
+}
+
+function parseSteamAccountInput(value) {
+  return [...new Set(
+    String(value || "")
+      .split(/[\s,，;；]+/)
+      .map((entry) => entry.trim())
+      .filter(Boolean)
+  )];
+}
+
+function formatSteamAccountIds(accountIds = []) {
+  return (accountIds || []).filter(Boolean).join(", ");
+}
+
+function getSteamMappingRows() {
+  const filterText = String(steamMappingFilterInput?.value || "").trim().toLowerCase();
+  return allPlayersDirectory
+    .filter((player) => {
+      const name = String(player.display_name || "").toLowerCase();
+      const mappedValue = String(
+        steamMappingDrafts.get(player.id) ?? formatSteamAccountIds(steamAccountMappings.get(player.id) || [])
+      ).toLowerCase();
+      return !filterText || name.includes(filterText) || mappedValue.includes(filterText);
+    })
+    .sort((a, b) => String(a.display_name || "").localeCompare(String(b.display_name || ""), "zh-CN"));
+}
+
+function renderSteamMappingList() {
+  if (!steamMappingList) return;
+  const canEdit = isCurrentRoleScorer();
+  const rows = getSteamMappingRows();
+  const isLoading = steamMappingStatus === "loading";
+
+  if (steamMappingEmpty) {
+    steamMappingEmpty.hidden = Boolean(rows.length) || isLoading;
+  }
+
+  if (isLoading) {
+    steamMappingList.innerHTML = '<p class="muted steam-mapping-loading">正在读取映射...</p>';
+    return;
+  }
+
+  steamMappingList.innerHTML = rows.map((player) => {
+    const currentValue = steamMappingDrafts.has(player.id)
+      ? steamMappingDrafts.get(player.id)
+      : formatSteamAccountIds(steamAccountMappings.get(player.id) || []);
+    const accountIds = steamAccountMappings.get(player.id) || [];
+    const hasMapping = accountIds.length > 0;
+    return `
+      <div class="steam-mapping-row" data-player-id="${escapeHtml(player.id)}">
+        <div class="steam-mapping-player">
+          <strong>${escapeHtml(player.display_name || copyText("runtime.players.unnamedPlayer", "未命名选手"))}</strong>
+          ${hasMapping ? `<span class="steam-mapping-status">已绑定 ${accountIds.length}</span>` : '<span class="steam-mapping-status steam-mapping-status-empty">未绑定</span>'}
+        </div>
+        <textarea
+          class="steam-mapping-account-input"
+          rows="2"
+          inputmode="numeric"
+          autocomplete="off"
+          data-player-id="${escapeHtml(player.id)}"
+          data-role="steam-account-input"
+          placeholder="${escapeHtml(copyText("steamMapping.accountPlaceholder", "Dota account_id 或 SteamID64"))}"
+          ${canEdit ? "" : "disabled"}
+        >${escapeHtml(currentValue || "")}</textarea>
+        <div class="steam-mapping-actions">
+          <button class="button-secondary admin-panel-compact-btn" type="button" data-role="save-steam-mapping" data-player-id="${escapeHtml(player.id)}" ${canEdit ? "" : "disabled"}>${escapeHtml(copyText("steamMapping.save", "保存"))}</button>
+          <button class="button-secondary admin-panel-compact-btn" type="button" data-role="clear-steam-mapping" data-player-id="${escapeHtml(player.id)}" ${canEdit && hasMapping ? "" : "disabled"}>${escapeHtml(copyText("steamMapping.clear", "清除"))}</button>
+        </div>
+      </div>
+    `;
+  }).join("");
+}
+
+async function loadSteamAccountMappings() {
+  if (!isCurrentRoleScorer()) return;
+  steamMappingStatus = "loading";
+  renderSteamMappingList();
+
+  const { data, error } = await db
+    .from("player_external_accounts")
+    .select("player_id, provider_account_id")
+    .eq("provider", "steam");
+
+  if (error) {
+    steamMappingStatus = "error";
+    steamAccountMappings = new Map();
+    renderSteamMappingList();
+    setSteamMappingMessage(`加载 Steam 映射失败：${error.message}`, true);
+    return;
+  }
+
+  steamAccountMappings = new Map();
+  (data || []).forEach((row) => {
+    if (!row.player_id || !row.provider_account_id) return;
+    const accountIds = steamAccountMappings.get(row.player_id) || [];
+    accountIds.push(row.provider_account_id);
+    steamAccountMappings.set(row.player_id, accountIds);
+  });
+  steamAccountMappings.forEach((accountIds, playerId) => {
+    steamAccountMappings.set(playerId, [...new Set(accountIds)].sort());
+  });
+  steamMappingDrafts = new Map(
+    [...steamAccountMappings.entries()].map(([playerId, accountIds]) => [playerId, formatSteamAccountIds(accountIds)])
+  );
+  steamMappingStatus = "ready";
+  renderSteamMappingList();
+  setSteamMappingMessage("");
+}
+
+async function openSteamMappingModal() {
+  if (!ensureScorerAccess("仅记分员或管理员可维护 Steam 映射。")) return;
+  if (!allPlayersDirectory.length) {
+    await loadSeasonPlayers();
+  }
+  if (steamMappingFilterInput) {
+    steamMappingFilterInput.value = "";
+  }
+  setManagedDialogOpen("steamMapping", true, { initialFocus: steamMappingFilterInput || closeSteamMappingBtn || undefined });
+  await loadSteamAccountMappings();
+}
+
+function getSteamMappingInputByPlayerId(playerId) {
+  return [...(steamMappingList?.querySelectorAll('[data-role="steam-account-input"]') || [])]
+    .find((input) => input.dataset.playerId === playerId) || null;
+}
+
+async function saveSteamAccountMapping(playerId) {
+  if (!ensureScorerAccess("仅记分员或管理员可维护 Steam 映射。")) return;
+  const input = getSteamMappingInputByPlayerId(playerId);
+  const rawAccountValue = input ? input.value : steamMappingDrafts.get(playerId) || "";
+  const accountIds = parseSteamAccountInput(rawAccountValue);
+  const player = allPlayersDirectory.find((entry) => entry.id === playerId) || null;
+
+  if (!player) {
+    setSteamMappingMessage("请选择有效选手。", true);
+    return;
+  }
+
+  if (!accountIds.length) {
+    setSteamMappingMessage("请至少填写一个 Steam/Dota 账号 ID。", true);
+    return;
+  }
+
+  if (accountIds.some((accountId) => !/^[0-9]+$/.test(accountId))) {
+    setSteamMappingMessage("Steam/Dota 账号 ID 只能包含数字；多个 ID 可用逗号、空格或换行分隔。", true);
+    return;
+  }
+
+  setSteamMappingMessage("正在保存映射...");
+  const { data, error } = await db.rpc("set_player_steam_accounts", {
+    p_player_id: playerId,
+    p_steam_account_ids: accountIds,
+  });
+
+  if (error) {
+    setSteamMappingMessage(`保存映射失败：${error.message}`, true);
+    return;
+  }
+
+  const savedAccountIds = (data || [])
+    .map((row) => row.provider_account_id)
+    .filter(Boolean)
+    .sort();
+  steamAccountMappings.set(playerId, savedAccountIds);
+  steamMappingDrafts.set(playerId, formatSteamAccountIds(savedAccountIds));
+  renderSteamMappingList();
+  setSteamMappingMessage(`已保存 ${player.display_name} 的 ${savedAccountIds.length} 个 Steam 映射。`);
+}
+
+async function clearSteamAccountMapping(playerId) {
+  if (!ensureScorerAccess("仅记分员或管理员可维护 Steam 映射。")) return;
+  const player = allPlayersDirectory.find((entry) => entry.id === playerId) || null;
+  if (!player) {
+    setSteamMappingMessage("请选择有效选手。", true);
+    return;
+  }
+
+  setSteamMappingMessage("正在清除映射...");
+  const { error } = await db.rpc("clear_player_steam_account", {
+    p_player_id: playerId,
+  });
+
+  if (error) {
+    setSteamMappingMessage(`清除映射失败：${error.message}`, true);
+    return;
+  }
+
+  steamAccountMappings.delete(playerId);
+  steamMappingDrafts.delete(playerId);
+  renderSteamMappingList();
+  setSteamMappingMessage(`已清除 ${player.display_name} 的 Steam 映射。`);
 }
 
 function getItemManagementRefs(mode = "scorer") {
@@ -9056,6 +9319,15 @@ function getSupabaseSystemUsageDisplayText() {
   return supabaseSystemUsageDisplayText || "未知";
 }
 
+function setSupabaseStorageUsageDisplayText(text = "未知") {
+  supabaseStorageUsageDisplayText = String(text || "未知");
+  renderRoleMembers();
+}
+
+function getSupabaseStorageUsageDisplayText() {
+  return supabaseStorageUsageDisplayText || "未知";
+}
+
 function getSupabaseSystemUsageBusinessDate() {
   return getBeijingBusinessDateString() || new Date().toISOString().slice(0, 10);
 }
@@ -9071,6 +9343,8 @@ function readSupabaseSystemUsageDailyCache() {
     snapshot?.businessDate === getSupabaseSystemUsageBusinessDate()
     && typeof snapshot.displayText === "string"
     && snapshot.displayText.trim()
+    && typeof snapshot.storageDisplayText === "string"
+    && snapshot.storageDisplayText.trim()
   ) {
     return snapshot;
   }
@@ -9081,6 +9355,7 @@ function writeSupabaseSystemUsageDailyCache(displayText, status = "success") {
   writeLocalJsonStorage(SUPABASE_SYSTEM_USAGE_DAILY_CACHE_STORAGE_KEY, {
     businessDate: getSupabaseSystemUsageBusinessDate(),
     displayText,
+    storageDisplayText: getSupabaseStorageUsageDisplayText(),
     status,
     cachedAt: new Date().toISOString(),
   });
@@ -9090,6 +9365,7 @@ function applySupabaseSystemUsageDailyCache() {
   const snapshot = readSupabaseSystemUsageDailyCache();
   if (!snapshot) return false;
   setSupabaseSystemUsageDisplayText(snapshot.displayText);
+  setSupabaseStorageUsageDisplayText(snapshot.storageDisplayText || "Storage：未知");
   return true;
 }
 
@@ -9097,6 +9373,7 @@ function resetSupabaseSystemUsageStatus(text = "仅管理员可见") {
   supabaseSystemUsageRefreshKey = "";
   supabaseSystemUsageRefreshPromise = null;
   setSupabaseSystemUsageDisplayText(text);
+  setSupabaseStorageUsageDisplayText(text);
 }
 
 function prepareSupabaseSystemUsageStatusForAdmin() {
@@ -9116,6 +9393,7 @@ function prepareSupabaseSystemUsageStatusForAdmin() {
     supabaseSystemUsageRefreshKey = refreshKey;
     supabaseSystemUsageRefreshPromise = null;
     setSupabaseSystemUsageDisplayText("数据库：读取中");
+    setSupabaseStorageUsageDisplayText("Storage：读取中");
   }
 
   return true;
@@ -9126,7 +9404,14 @@ function formatSupabaseSystemUsageDisplay(usage = {}) {
   const databaseQuotaBytes = Number(usage.databaseQuotaBytes) || SUPABASE_DATABASE_USAGE_QUOTA_BYTES;
   const usedDatabaseBytes = isFiniteStorageByteCount(databaseBytes) ? databaseBytes : Number.NaN;
 
-  return `数据库：${formatUsageWithQuota(usedDatabaseBytes, databaseQuotaBytes)}`;
+  const storageBytes = Number(usage.storageBytes);
+  const storageQuotaBytes = Number(usage.storageQuotaBytes) || SUPABASE_STORAGE_USAGE_QUOTA_BYTES;
+  const usedStorageBytes = isFiniteStorageByteCount(storageBytes) ? storageBytes : Number.NaN;
+
+  return {
+    database: `数据库：${formatUsageWithQuota(usedDatabaseBytes, databaseQuotaBytes)}`,
+    storage: `Storage：${formatUsageWithQuota(usedStorageBytes, storageQuotaBytes)}`,
+  };
 }
 
 async function refreshSupabaseSystemUsageStatus() {
@@ -9146,6 +9431,7 @@ async function refreshSupabaseSystemUsageStatus() {
     supabaseSystemUsageRefreshKey = refreshKey;
     supabaseSystemUsageRefreshPromise = null;
     setSupabaseSystemUsageDisplayText("数据库：读取中");
+    setSupabaseStorageUsageDisplayText("Storage：读取中");
   }
 
   if (supabaseSystemUsageRefreshPromise) return supabaseSystemUsageRefreshPromise;
@@ -9160,14 +9446,16 @@ async function refreshSupabaseSystemUsageStatus() {
 
       const usage = Array.isArray(data) ? data[0] : data;
       if (getSupabaseSystemUsageRefreshKey() === refreshKey) {
-        const displayText = formatSupabaseSystemUsageDisplay(usage || {});
-        writeSupabaseSystemUsageDailyCache(displayText, "success");
-        setSupabaseSystemUsageDisplayText(displayText);
+        const display = formatSupabaseSystemUsageDisplay(usage || {});
+        setSupabaseStorageUsageDisplayText(display.storage);
+        writeSupabaseSystemUsageDailyCache(display.database, "success");
+        setSupabaseSystemUsageDisplayText(display.database);
       }
     } catch (error) {
       console.warn("读取 Supabase 用量失败。", error);
       if (getSupabaseSystemUsageRefreshKey() === refreshKey) {
         const displayText = "数据库：读取失败";
+        setSupabaseStorageUsageDisplayText("Storage：读取失败");
         writeSupabaseSystemUsageDailyCache(displayText, "error");
         setSupabaseSystemUsageDisplayText(displayText);
       }
@@ -11009,6 +11297,134 @@ function updateRecentMatchHeroLocally(matchId, playerId, heroName) {
 
 function getSavedMatchById(matchId) {
   return recentMatchesData.find((match) => match.match_id === matchId) || null;
+}
+
+function getOfficialMatchScreenshotAsset(match) {
+  const asset = match?.official_match_asset || null;
+  return asset || null;
+}
+
+function isOfficialMatchNoRecordAsset(asset = null) {
+  const errorText = String(asset?.last_error || "").trim();
+  return Boolean(
+    errorText === "无比赛记录"
+    || errorText.includes("无比赛记录")
+    || errorText.includes("No official Dota matches found")
+  );
+}
+
+function buildRecentMatchScreenshotButtonHtml(match, asset = getOfficialMatchScreenshotAsset(match)) {
+  if (!match?.match_id) return "";
+  const hasImage = Boolean(asset?.url);
+  const status = String(asset?.asset_status || "").trim();
+  const hasNoRecord = !hasImage && isOfficialMatchNoRecordAsset(asset);
+  const isPending = !hasImage && (status === "requested" || status === "pending");
+  const isError = !hasImage && status === "error";
+  const stateClass = hasImage
+    ? " recent-match-screenshot-btn-ready"
+    : (isError ? " recent-match-screenshot-btn-error" : (isPending ? " recent-match-screenshot-btn-pending" : ""));
+  const title = hasNoRecord ? "无比赛记录" : "查看比赛详情";
+  return `
+    <button
+      type="button"
+      class="match-day-copy-btn recent-match-screenshot-btn${stateClass}"
+      data-role="open-opendota-screenshot"
+      data-match-id="${escapeHtml(match.match_id)}"
+      data-screenshot-status="${escapeHtml(status || (hasImage ? "available" : "missing"))}"
+      aria-label="${escapeHtml(title)}"
+      title="${escapeHtml(title)}"
+    >
+      <span class="match-day-action-icon match-day-action-icon-image" aria-hidden="true"></span>
+    </button>
+  `;
+}
+
+function closeOpendotaScreenshotModal() {
+  setDialogOpen(opendotaScreenshotModal, false);
+  if (opendotaScreenshotImage) {
+    opendotaScreenshotImage.removeAttribute("src");
+  }
+  if (opendotaScreenshotMeta) {
+    opendotaScreenshotMeta.textContent = "";
+  }
+}
+
+function openOpendotaScreenshotModal(matchId) {
+  const match = getSavedMatchById(matchId);
+  const asset = getOfficialMatchScreenshotAsset(match);
+  if (!asset?.url || !opendotaScreenshotModal || !opendotaScreenshotImage) return;
+
+  const dotaMatchLabel = asset.dota_match_id ? `OpenDota #${asset.dota_match_id}` : "OpenDota";
+  const matchDateLabel = match?.match_date || formatArchiveDate(match?.created_at) || "";
+  opendotaScreenshotImage.src = asset.url;
+  opendotaScreenshotImage.alt = `${dotaMatchLabel} 比赛截图`;
+  if (opendotaScreenshotMeta) {
+    opendotaScreenshotMeta.textContent = [dotaMatchLabel, matchDateLabel].filter(Boolean).join(" · ");
+  }
+  setDialogOpen(opendotaScreenshotModal, true, {
+    initialFocus: closeOpendotaScreenshotBtn || undefined,
+  });
+}
+
+function applyOfficialMatchScreenshotAsset(assetRow) {
+  const asset = normalizeOfficialMatchAssetRow(assetRow);
+  if (!asset?.match_id) return null;
+  recentMatchesData = recentMatchesData.map((match) => (
+    match.match_id === asset.match_id
+      ? { ...match, official_match_asset: asset }
+      : match
+  ));
+  recentMatchDayGroupsData = recentMatchDayGroupsData.map((group) => ({
+    ...group,
+    matches: (group.matches || []).map((match) => (
+      match.match_id === asset.match_id
+        ? { ...match, official_match_asset: asset }
+        : match
+    )),
+  }));
+  return asset;
+}
+
+async function requestOpendotaScreenshot(matchId, triggerButton = null) {
+  const normalizedMatchId = String(matchId || "").trim();
+  if (!normalizedMatchId) return;
+  const match = getSavedMatchById(normalizedMatchId);
+  const currentAsset = getOfficialMatchScreenshotAsset(match);
+  if (isOfficialMatchNoRecordAsset(currentAsset)) {
+    setMessage("无比赛记录", true);
+    return;
+  }
+  if (!isCurrentRoleScorer()) {
+    setMessage("截图尚未生成；仅记分员或管理员可触发 OpenDota 截图生成。", true);
+    return;
+  }
+
+  if (triggerButton) {
+    triggerButton.disabled = true;
+    triggerButton.classList.add("recent-match-screenshot-btn-loading");
+  }
+
+  try {
+    const result = await invokeFunction("request-opendota-screenshot", {
+      matchId: normalizedMatchId,
+    });
+    const asset = applyOfficialMatchScreenshotAsset(result?.asset);
+    if (asset?.url) {
+      renderRecentMatches(recentMatchDayGroupsData);
+      openOpendotaScreenshotModal(normalizedMatchId);
+      return;
+    }
+    renderRecentMatches(recentMatchDayGroupsData);
+    setMessage(result?.message || "已提交 OpenDota 截图生成任务，稍后刷新后可查看。");
+  } catch (error) {
+    const message = error?.message || "未知错误";
+    setMessage(`OpenDota 截图生成请求失败：${message}`, true);
+  } finally {
+    if (triggerButton) {
+      triggerButton.disabled = false;
+      triggerButton.classList.remove("recent-match-screenshot-btn-loading");
+    }
+  }
 }
 
 function getOrderedSavedMatchTeamPlayers(players, team) {
@@ -13110,6 +13526,24 @@ function buildMatchPlayerScoreDeltaHtml(entry = {}) {
     ? "match-player-score-delta-positive"
     : (delta < 0 ? "match-player-score-delta-negative" : "match-player-score-delta-neutral");
   return `<span class="match-player-score-delta-badge ${toneClass}">${escapeHtml(formatScore(Math.abs(delta)))}</span>`;
+}
+
+function buildImportedDotaSlotLabel(slot = {}) {
+  const accountId = slot.accountId ? `#${slot.accountId}` : "匿名账号";
+  const externalName = String(slot.externalDisplayName || slot.matchedDisplayName || "").trim();
+  return externalName ? `${externalName} · ${accountId}` : accountId;
+}
+
+function buildImportedDotaSlotMeta(slot = {}) {
+  const parts = [];
+  if (slot.heroName) {
+    parts.push(getHeroDisplayName(slot.heroName));
+  }
+  const kdaEntry = normalizeKdaEntry(slot);
+  if (hasKdaEntryValue(kdaEntry)) {
+    parts.push(`KDA ${kdaEntry.kills ?? "-"}/${kdaEntry.deaths ?? "-"}/${kdaEntry.assists ?? "-"}`);
+  }
+  return parts.join(" · ");
 }
 
 function buildSingleDoubleOptionsHtml(formType, player, allSelectedPlayers, itemEntry) {
@@ -16124,6 +16558,7 @@ function normalizeMatchRecordFromView(row) {
     double_downs: row.double_downs || metadata.double_downs || [],
     is_exhibition: normalizeMatchExhibitionFlag(metadata.is_exhibition),
     status: row.status || "",
+    official_match_asset: null,
   };
 }
 
@@ -17116,6 +17551,7 @@ function renderRecentMatches(groups) {
       const card = document.createElement("article");
       const matchTimeLabel = formatShortLocalTime(match.created_at);
       const matchMetaLabel = matchTimeLabel ? `${matchDateLabel} ${matchTimeLabel}` : matchDateLabel;
+      const screenshotButtonHtml = buildRecentMatchScreenshotButtonHtml(match);
       const canModifyMatch = canModifyMatchRecordsForSeason(match.season_id || group.season_id || seasonId || "");
       const actionButtonsHtml = canModifyMatch
         ? `
@@ -17149,7 +17585,10 @@ function renderRecentMatches(groups) {
           <span class="recent-match-round-text">${escapeHtml(roundBadgeLabel)}</span>
         </span>
         <div class="recent-match-meta${canModifyMatch ? " recent-match-meta-with-actions" : ""}">
-          <span class="muted recent-match-meta-time">${escapeHtml(matchMetaLabel)}</span>
+          <span class="recent-match-meta-main">
+            <span class="muted recent-match-meta-time">${escapeHtml(matchMetaLabel)}</span>
+            ${screenshotButtonHtml}
+          </span>
           ${actionButtonsHtml}
         </div>
         <div class="recent-match-teams">
@@ -17623,6 +18062,74 @@ async function fetchScoreLedgerRowsForMatchIds(matchIds = []) {
   return rows;
 }
 
+function normalizeOfficialMatchAssetRow(row) {
+  if (!row?.match_id) return null;
+  const storagePath = normalizeOpendotaScreenshotStoragePath(row.storage_path);
+  const url = storagePath
+    ? appendBackgroundUrlVersion(
+      getOpendotaScreenshotPublicUrl(storagePath),
+      String(row.updated_at || row.captured_at || row.created_at || "")
+    )
+    : "";
+  const dotaMatchId = normalizeDotaMatchIdInput(row.dota_match_id || "");
+  return {
+    id: row.id || "",
+    match_id: row.match_id,
+    dota_match_id: dotaMatchId,
+    asset_status: String(row.asset_status || "").trim() || (url ? "available" : "requested"),
+    storage_path: storagePath,
+    source_url: String(row.source_url || (dotaMatchId ? `https://www.opendota.com/matches/${dotaMatchId}` : "")).trim(),
+    captured_at: row.captured_at || "",
+    requested_at: row.requested_at || "",
+    last_requested_at: row.last_requested_at || "",
+    request_count: Number.isFinite(Number(row.request_count)) ? Number(row.request_count) : 0,
+    last_error: String(row.last_error || "").trim(),
+    url,
+  };
+}
+
+async function fetchOfficialMatchAssetsForMatchIds(matchIds = []) {
+  const assetMap = new Map();
+  const normalizedIds = [...new Set((matchIds || []).filter(Boolean))];
+  const chunkSize = 150;
+
+  for (let index = 0; index < normalizedIds.length; index += chunkSize) {
+    const chunk = normalizedIds.slice(index, index + chunkSize);
+    const { data, error } = await db
+      .from("official_match_assets")
+      .select("id, match_id, dota_match_id, asset_status, storage_path, source_url, captured_at, requested_at, last_requested_at, request_count, last_error, created_at, updated_at")
+      .in("match_id", chunk)
+      .eq("provider", "opendota")
+      .eq("asset_kind", "overview_screenshot");
+
+    if (error) {
+      if (!isMissingPublicTableError(error, "official_match_assets")) {
+        console.error("加载 OpenDota 比赛截图失败：", error);
+      }
+      return assetMap;
+    }
+
+    (data || [])
+      .map((row) => normalizeOfficialMatchAssetRow(row))
+      .filter(Boolean)
+      .forEach((asset) => {
+        if (!assetMap.has(asset.match_id)) {
+          assetMap.set(asset.match_id, asset);
+        }
+      });
+  }
+
+  return assetMap;
+}
+
+function attachOfficialMatchAssets(matches = [], assetMap = new Map()) {
+  if (!assetMap.size) return matches;
+  return (matches || []).map((match) => ({
+    ...match,
+    official_match_asset: assetMap.get(match.match_id) || null,
+  }));
+}
+
 function resolveAttendanceNotesWithMatchDays(attendanceRows = [], matchDays = []) {
   const matchDayById = new Map(
     matchDays
@@ -17709,6 +18216,13 @@ async function loadRecentMatchSeasonBundle(seasonId) {
       normalizedMatches = attachMatchPlayerLedgerDeltas(normalizedMatches, scoreRows);
     } catch (error) {
       console.error("加载比赛选手积分变动失败：", error);
+    }
+
+    try {
+      const officialAssetMap = await fetchOfficialMatchAssetsForMatchIds(matchIds);
+      normalizedMatches = attachOfficialMatchAssets(normalizedMatches, officialAssetMap);
+    } catch (error) {
+      console.error("加载 OpenDota 比赛截图失败：", error);
     }
   }
 
@@ -19484,9 +19998,1181 @@ function buildPlayerAssignmentsPayload(teamAIds, teamBIds, heroAssignments = {},
   );
 }
 
+function getOfficialCurrentCacheMonthCode() {
+  return (getBeijingBusinessDateString() || "").slice(0, 7);
+}
+
+function getOfficialDefaultMonthCode() {
+  return getSeasonMonthCode(activeSeason) || getOfficialCurrentCacheMonthCode();
+}
+
+function isOfficialCacheableMonth(monthCode = "") {
+  return Boolean(monthCode) && monthCode === getOfficialCurrentCacheMonthCode();
+}
+
+function pruneOfficialMatchMonthCache() {
+  const currentMonthCode = getOfficialCurrentCacheMonthCode();
+  [...officialMatchMonthCache.keys()].forEach((monthCode) => {
+    if (monthCode !== currentMonthCode) {
+      officialMatchMonthCache.delete(monthCode);
+    }
+  });
+}
+
+function getOfficialCachedMonth(monthCode = "") {
+  pruneOfficialMatchMonthCache();
+  if (!isOfficialCacheableMonth(monthCode)) return null;
+  const cached = officialMatchMonthCache.get(monthCode);
+  return cached ? clonePlainObject(cached) : null;
+}
+
+function writeOfficialCachedMonth(monthEntry = null) {
+  if (!monthEntry?.monthCode || !isOfficialCacheableMonth(monthEntry.monthCode)) return;
+  pruneOfficialMatchMonthCache();
+  officialMatchMonthCache.set(monthEntry.monthCode, {
+    monthCode: monthEntry.monthCode,
+    seasonId: monthEntry.seasonId || null,
+    seasonName: monthEntry.seasonName || monthEntry.monthCode,
+    matches: clonePlainObject(monthEntry.matches || []),
+    cachedAt: Date.now(),
+  });
+}
+
+function getOfficialSeasonEntries() {
+  const defaultMonthCode = getOfficialDefaultMonthCode();
+  const seen = new Set();
+  const entries = (allSeasons || [])
+    .map((season) => {
+      const monthCode = getSeasonMonthCode(season);
+      if (!monthCode || seen.has(monthCode)) return null;
+      seen.add(monthCode);
+      return {
+        monthCode,
+        seasonId: season.id || null,
+        seasonName: season.name || season.code || monthCode,
+        isCurrent: monthCode === defaultMonthCode,
+      };
+    })
+    .filter(Boolean);
+
+  if (defaultMonthCode && !seen.has(defaultMonthCode)) {
+    entries.unshift({
+      monthCode: defaultMonthCode,
+      seasonId: activeSeason?.id || null,
+      seasonName: activeSeason?.name || defaultMonthCode,
+      isCurrent: true,
+    });
+  }
+
+  return entries.sort((a, b) => String(b.monthCode).localeCompare(String(a.monthCode), "zh-CN"));
+}
+
+function prepareOfficialMatchMonths() {
+  const defaultMonthCode = getOfficialDefaultMonthCode();
+  const previousMonthsByCode = new Map(
+    (officialMatchImportState.months || []).map((entry) => [entry.monthCode, entry])
+  );
+
+  officialMatchImportState.months = getOfficialSeasonEntries().map((entry) => {
+    const previous = previousMonthsByCode.get(entry.monthCode) || {};
+    const isCurrent = entry.monthCode === defaultMonthCode;
+    return {
+      ...entry,
+      isCurrent,
+      status: previous.status || "idle",
+      matches: previous.matches || [],
+      error: previous.error || "",
+      loaded: Boolean(previous.loaded),
+    };
+  });
+  officialMatchImportState.activeMonthCode = defaultMonthCode;
+  officialMatchImportState.openMonthCodes = new Set(defaultMonthCode ? [defaultMonthCode] : []);
+  officialMatchImportState.matches = getOfficialMonthEntry(defaultMonthCode)?.matches || [];
+  officialMatchImportState.selectedMatchId = "";
+  officialMatchImportState.activeMappingKey = "";
+  officialMatchImportState.mappingDrafts = new Map();
+  officialMatchImportState.savingMatchId = "";
+}
+
+function getOfficialMonthEntry(monthCode = "") {
+  return (officialMatchImportState.months || [])
+    .find((entry) => entry.monthCode === monthCode) || null;
+}
+
+function getOfficialMonthEntryByMatchId(matchId = "") {
+  const normalizedMatchId = normalizeDotaMatchIdInput(matchId);
+  if (!normalizedMatchId) return null;
+  return (officialMatchImportState.months || []).find((monthEntry) => (
+    (monthEntry.matches || []).some((match) => normalizeDotaMatchIdInput(match.matchId) === normalizedMatchId)
+  )) || null;
+}
+
+function getOfficialVisibleMatches() {
+  return (officialMatchImportState.months || [])
+    .flatMap((monthEntry) => monthEntry.matches || []);
+}
+
+async function getOfficialEligiblePlayersForSeason(seasonId = "") {
+  const targetSeasonId = String(seasonId || activeSeason?.id || "").trim();
+  if (!targetSeasonId) return getOfficialEligiblePlayers();
+  if (targetSeasonId === activeSeason?.id) {
+    return getOfficialEligiblePlayers();
+  }
+  if (officialMatchSeasonPlayersBySeasonId.has(targetSeasonId)) {
+    return officialMatchSeasonPlayersBySeasonId.get(targetSeasonId) || [];
+  }
+
+  const { data, error } = await db
+    .from("season_memberships")
+    .select("player_id, rank_no, join_status, players ( display_name )")
+    .eq("season_id", targetSeasonId);
+
+  if (error) {
+    throw new Error(`加载赛季选手失败：${error.message}`);
+  }
+
+  const players = (data || [])
+    .filter((row) => row.join_status === "active" || row.join_status === "captain")
+    .map((row) => ({
+      id: row.player_id,
+      display_name: row.players?.display_name || "未知选手",
+      player_rank: normalizeSeasonRankNo(row.rank_no),
+      is_in_season: true,
+    }))
+    .sort((a, b) => String(a.display_name || "").localeCompare(String(b.display_name || ""), "zh-CN"));
+  officialMatchSeasonPlayersBySeasonId.set(targetSeasonId, players);
+  return players;
+}
+
+function getOfficialEligiblePlayersForMatch(matchId = "") {
+  const monthEntry = getOfficialMonthEntryByMatchId(matchId);
+  const targetSeasonId = monthEntry?.seasonId || activeSeason?.id || "";
+  if (!targetSeasonId || targetSeasonId === activeSeason?.id) {
+    return getOfficialEligiblePlayers();
+  }
+  return officialMatchSeasonPlayersBySeasonId.get(targetSeasonId) || [];
+}
+
+function normalizeDotaMatchIdInput(value) {
+  const normalized = String(value || "").trim();
+  return /^[0-9]+$/.test(normalized) ? normalized : "";
+}
+
+function getOfficialMatchPlayers(importedMatch, side = "") {
+  return (Array.isArray(importedMatch?.players) ? importedMatch.players : [])
+    .filter((player) => !side || player.side === side)
+    .sort((a, b) => Number(a.slotNo ?? 99) - Number(b.slotNo ?? 99));
+}
+
+function getOfficialMatchSlotKey(player = {}) {
+  return player.accountId
+    ? `account:${player.accountId}`
+    : `slot:${player.side || "unknown"}:${player.slotNo || ""}`;
+}
+
+function getOfficialEligiblePlayers() {
+  return getMatchRecordingPlayers()
+    .slice()
+    .sort((a, b) => String(a.display_name || "").localeCompare(String(b.display_name || ""), "zh-CN"));
+}
+
+function getOfficialMatchMappingKey(matchId, player = {}) {
+  const normalizedMatchId = normalizeDotaMatchIdInput(matchId) || String(matchId || "").trim();
+  return `${normalizedMatchId}:${getOfficialMatchSlotKey(player)}`;
+}
+
+function getOfficialMatchEntry(matchId) {
+  const normalizedMatchId = normalizeDotaMatchIdInput(matchId);
+  if (!normalizedMatchId) return null;
+  return getOfficialVisibleMatches()
+    .find((match) => normalizeDotaMatchIdInput(match.matchId) === normalizedMatchId) || null;
+}
+
+function getOfficialMatchDetail(match = {}) {
+  if (match?.detail && Array.isArray(match.detail.players)) return match.detail;
+  if (Array.isArray(match?.players)) return match;
+  return null;
+}
+
+function getOfficialMatchDisplayData(match = {}) {
+  return getOfficialMatchDetail(match) || match || {};
+}
+
+function getOfficialLocalPlayerName(playerId = "", matchId = "") {
+  if (!playerId) return "";
+  const player = (
+    getOfficialEligiblePlayersForMatch(matchId)
+      .concat(allPlayersDirectory || [])
+  ).find((entry) => entry.id === playerId);
+  return player?.display_name || "";
+}
+
+function getOfficialSelectedPlayerId(player = {}, matchId = "") {
+  if (player.matchedPlayerId) return player.matchedPlayerId;
+  const mappingKey = getOfficialMatchMappingKey(matchId, player);
+  return officialMatchImportState.mappingDrafts.get(mappingKey) || "";
+}
+
+function getOfficialResolvedTeamIds(importedMatch, side, matchId = importedMatch?.matchId || "") {
+  return getOfficialMatchPlayers(importedMatch, side)
+    .map((player) => getOfficialSelectedPlayerId(player, matchId))
+    .filter(Boolean);
+}
+
+function getOfficialUnresolvedPlayers(importedMatch, matchId = importedMatch?.matchId || "") {
+  return getOfficialMatchPlayers(importedMatch)
+    .filter((player) => !getOfficialSelectedPlayerId(player, matchId));
+}
+
+function getOfficialMatchDate(importedMatch = {}) {
+  const startTime = Number(importedMatch.startTime);
+  const sourceDate = importedMatch.startTimeIso
+    || (Number.isFinite(startTime) && startTime > 0 ? new Date(startTime * 1000).toISOString() : "");
+  return getBeijingBusinessDateString(sourceDate) || getBeijingBusinessDateString();
+}
+
+function getOfficialMatchSourceLabel(importedMatch = {}) {
+  return importedMatch.source === "opendota_public" ? "OpenDota 公开缓存" : "Valve 官方接口";
+}
+
+function formatOfficialMatchTime(match = {}) {
+  const startTime = Number(match.startTime);
+  const value = match.startTimeIso
+    || (Number.isFinite(startTime) && startTime > 0 ? new Date(startTime * 1000).toISOString() : "");
+  if (!value) return "时间未知";
+  const dateText = getBeijingBusinessDateString(value) || formatArchiveDate(value);
+  const timeText = formatShortLocalTime(value);
+  return [dateText, timeText].filter(Boolean).join(" ");
+}
+
+function formatOfficialMatchClock(match = {}) {
+  const startTime = Number(match.startTime);
+  const value = match.startTimeIso
+    || (Number.isFinite(startTime) && startTime > 0 ? new Date(startTime * 1000).toISOString() : "");
+  return value ? formatShortLocalTime(value) || "时间未知" : "时间未知";
+}
+
+function formatOfficialMatchInlineMeta(match = {}, matchIndex = 0) {
+  const dateText = getOfficialMatchDate(match);
+  const [, , month = "", day = ""] = String(dateText || "").match(/^(\d{4})-(\d{2})-(\d{2})$/) || [];
+  const dateLabel = month && day ? `${month}-${day}` : dateText || "日期未知";
+  const timeLabel = formatOfficialMatchClock(match);
+  const indexLabel = Number.isFinite(Number(matchIndex)) && Number(matchIndex) >= 0
+    ? `第${Number(matchIndex) + 1}场`
+    : "";
+  return [dateLabel, timeLabel, indexLabel].filter(Boolean).join(" · ");
+}
+
+function getOfficialMatchStartSortValue(match = {}) {
+  const displayData = getOfficialMatchDisplayData(match);
+  const startTime = Number(displayData.startTime);
+  if (Number.isFinite(startTime) && startTime > 0) return startTime * 1000;
+  const isoTime = Date.parse(displayData.startTimeIso || "");
+  return Number.isFinite(isoTime) ? isoTime : 0;
+}
+
+function compareOfficialMatchesByStartAsc(a = {}, b = {}) {
+  const aTime = getOfficialMatchStartSortValue(a);
+  const bTime = getOfficialMatchStartSortValue(b);
+  if (aTime !== bTime) return aTime - bTime;
+  return String(a.matchId || "").localeCompare(String(b.matchId || ""));
+}
+
+function setOfficialMatchesMessage(message = "", isError = false) {
+  setMessageNode(officialMatchesMessage, message, isError);
+}
+
+function buildOfficialPlayerPickerHtml(selectedPlayerId = "", matchId = "", importedMatch = null, slotKey = "") {
+  const selectedIds = new Set(
+    getOfficialMatchPlayers(importedMatch)
+      .map((player) => getOfficialSelectedPlayerId(player, matchId))
+      .filter(Boolean)
+  );
+  if (selectedPlayerId) {
+    selectedIds.delete(selectedPlayerId);
+  }
+
+  const players = getOfficialEligiblePlayersForMatch(matchId);
+  if (!players.length) {
+    return '<div class="official-player-picker"><p class="muted">该赛季暂无可关联选手</p></div>';
+  }
+
+  return `
+    <div class="official-player-picker">
+      ${players.map((player) => {
+        const isSelected = player.id === selectedPlayerId;
+        const isDisabled = selectedIds.has(player.id);
+        return `
+          <button
+            type="button"
+            class="access-scorer-chip official-player-option${isSelected ? " access-scorer-chip-active" : ""}"
+            data-role="official-player-option"
+            data-match-id="${escapeHtml(matchId)}"
+            data-slot-key="${escapeHtml(slotKey)}"
+            data-player-id="${escapeHtml(player.id)}"
+            ${isDisabled ? "disabled" : ""}
+          >${escapeHtml(stripPlayerNameMeta(player.display_name || "") || "未知选手")}</button>
+        `;
+      }).join("")}
+    </div>
+  `;
+}
+
+function renderOfficialMatchPlayerChip(matchId, importedMatch, player, index) {
+  const slotKey = getOfficialMatchSlotKey(player);
+  const mappingKey = getOfficialMatchMappingKey(matchId, player);
+  const selectedPlayerId = getOfficialSelectedPlayerId(player, matchId);
+  const selectedPlayerName = getOfficialLocalPlayerName(selectedPlayerId, matchId)
+    || player.matchedDisplayName
+    || "本地选手";
+  const sourceLabel = buildImportedDotaSlotLabel(player);
+  const meta = buildImportedDotaSlotMeta(player);
+  const slotNo = Number(player.slotNo || index + 1);
+  const isAssociated = Boolean(selectedPlayerId);
+  const isActiveMapping = officialMatchImportState.activeMappingKey === mappingKey;
+
+  return `
+    <div class="official-match-player-chip ${isAssociated ? "official-match-player-chip-mapped" : "official-match-player-chip-unmapped"}">
+      <span class="dota-import-slot-no">${slotNo}</span>
+      <div class="official-match-player-chip-main">
+        <div class="official-match-player-chip-line">
+          <button
+            class="official-match-player-link${isAssociated ? " official-match-player-link-mapped" : ""}"
+            type="button"
+            data-role="open-official-player-map"
+            data-match-id="${escapeHtml(matchId)}"
+            data-slot-key="${escapeHtml(slotKey)}"
+            title="${escapeHtml(isAssociated ? `${sourceLabel}，点击修改关联` : "关联本地选手")}"
+          >${escapeHtml(isAssociated ? selectedPlayerName : sourceLabel)}</button>
+          ${meta ? `<small>${escapeHtml(meta)}</small>` : ""}
+        </div>
+        ${isActiveMapping ? `
+          ${buildOfficialPlayerPickerHtml(selectedPlayerId, matchId, importedMatch, slotKey)}
+        ` : ""}
+      </div>
+    </div>
+  `;
+}
+
+function renderOfficialMatchCardTeam(matchId, importedMatch, side, title) {
+  const players = getOfficialMatchPlayers(importedMatch, side);
+  const sideWon = importedMatch.winnerSide === side;
+  return `
+    <section class="official-match-card-team">
+      <div class="official-match-card-team-head">
+        <strong>${escapeHtml(title)}</strong>
+        ${sideWon ? '<span class="official-match-winner-tag">胜</span>' : ""}
+      </div>
+      <div class="official-match-card-player-grid">
+        ${players.map((player, index) => renderOfficialMatchPlayerChip(matchId, importedMatch, player, index)).join("")}
+      </div>
+    </section>
+  `;
+}
+
+function renderOfficialMatchCard(match, matchIndex = 0) {
+  const matchId = normalizeDotaMatchIdInput(match.matchId);
+  const importedMatch = getOfficialMatchDetail(match);
+  const displayData = getOfficialMatchDisplayData(match);
+  const isLoading = officialMatchImportState.loadingMatchId === matchId || match.detailStatus === "loading";
+  const isSaving = officialMatchImportState.savingMatchId === matchId;
+  const unresolvedCount = importedMatch ? getOfficialUnresolvedPlayers(importedMatch, matchId).length : 0;
+  const isReady = Boolean(importedMatch);
+  const statusLabel = match.imported
+    ? "已添加"
+    : (match.detailStatus === "error"
+    ? "读取失败"
+    : (isLoading ? "读取中" : (isReady ? (unresolvedCount ? `未关联 ${unresolvedCount}` : "已全部关联") : "等待读取")));
+  const statusClass = match.imported || (!unresolvedCount && match.detailStatus !== "error")
+    ? "official-match-card-status-ok"
+    : "official-match-card-status-warn";
+  const inlineMeta = formatOfficialMatchInlineMeta(displayData, matchIndex);
+
+  return `
+    <article class="official-match-card${officialMatchImportState.selectedMatchId === matchId ? " official-match-card-active" : ""}">
+      <div class="official-match-card-head">
+        <div class="official-match-card-title">
+          <strong>#${escapeHtml(matchId || "未知比赛")}</strong>
+          <span class="muted">${escapeHtml(inlineMeta)}</span>
+        </div>
+        <div class="official-match-card-actions">
+          <span class="official-match-card-status ${statusClass}">${escapeHtml(statusLabel)}</span>
+          <button
+            class="button-secondary admin-panel-compact-btn"
+            type="button"
+            data-role="save-official-match"
+            data-match-id="${escapeHtml(matchId)}"
+            ${!matchId || !isReady || isLoading || match.imported || officialMatchImportState.isSaving ? "disabled" : ""}
+          >${escapeHtml(isSaving ? "添加中" : copyText("officialMatches.add", "添加"))}</button>
+        </div>
+      </div>
+      ${match.detailStatus === "error" ? `
+        <div class="official-match-card-error">
+          <span>${escapeHtml(match.detailError || "读取比赛详情失败。")}</span>
+          <button class="button-secondary admin-panel-compact-btn" type="button" data-role="reload-official-match" data-match-id="${escapeHtml(matchId)}">重读</button>
+        </div>
+      ` : ""}
+      ${!isReady && match.detailStatus !== "error" ? `
+        <p class="muted official-match-card-loading">正在读取双方选手...</p>
+      ` : ""}
+      ${isReady ? `
+        <div class="official-match-card-teams">
+          ${renderOfficialMatchCardTeam(matchId, importedMatch, "radiant", "天辉")}
+          ${renderOfficialMatchCardTeam(matchId, importedMatch, "dire", "夜魇")}
+        </div>
+      ` : ""}
+    </article>
+  `;
+}
+
+function renderOfficialMatchDateGroups(matches = []) {
+  const groups = new Map();
+  matches.forEach((match) => {
+    const groupDate = getOfficialMatchDate(getOfficialMatchDisplayData(match));
+    const entries = groups.get(groupDate) || [];
+    entries.push(match);
+    groups.set(groupDate, entries);
+  });
+
+  return [...groups.entries()].map(([dateText, entries]) => {
+    const sortedEntries = [...entries].sort(compareOfficialMatchesByStartAsc);
+    return `
+    <section class="official-match-date-group">
+      <div class="official-match-date-head">
+        <strong>${escapeHtml(dateText)}</strong>
+        <span>${entries.length} 场</span>
+      </div>
+      <div class="official-match-card-grid">
+        ${sortedEntries.map((match, index) => renderOfficialMatchCard(match, index)).join("")}
+      </div>
+    </section>
+  `;
+  }).join("");
+}
+
+function getOfficialMonthSummaryText(monthEntry) {
+  if (!monthEntry) return "";
+  if (monthEntry.status === "loading") return "正在读取官方比赛";
+  if (monthEntry.status === "error") return monthEntry.error || "读取失败，展开可重试";
+  if (!monthEntry.loaded) return "点击展开后读取官方比赛";
+  const matchCount = (monthEntry.matches || []).length;
+  return matchCount ? `${matchCount} 场比赛` : "暂无可导入比赛";
+}
+
+function renderOfficialMatchesList() {
+  if (!officialMatchesList) return;
+  const months = officialMatchImportState.months || [];
+
+  if (!months.length) {
+    officialMatchesList.innerHTML = `<p class="muted official-matches-empty">${escapeHtml(copyText("officialMatches.empty", "暂无可导入比赛"))}</p>`;
+    return;
+  }
+
+  officialMatchesList.innerHTML = months.map((monthEntry) => {
+    const isOpen = officialMatchImportState.openMonthCodes.has(monthEntry.monthCode);
+    const canRetry = monthEntry.status === "error";
+    const matches = monthEntry.matches || [];
+    const contentHtml = (() => {
+      if (!isOpen) return "";
+      if (monthEntry.status === "loading") {
+        return '<p class="muted official-matches-loading">正在读取官方比赛...</p>';
+      }
+      if (monthEntry.status === "error") {
+        return `
+          <div class="official-match-month-error">
+            <span>${escapeHtml(monthEntry.error || "读取官方比赛失败。")}</span>
+            <button class="button-secondary admin-panel-compact-btn" type="button" data-role="load-official-month" data-month-code="${escapeHtml(monthEntry.monthCode)}">重试</button>
+          </div>
+        `;
+      }
+      if (!monthEntry.loaded) {
+        return '<p class="muted official-matches-loading">展开后读取官方比赛...</p>';
+      }
+      if (!matches.length) {
+        return `<p class="muted official-matches-empty">${escapeHtml(copyText("officialMatches.empty", "暂无可导入比赛"))}</p>`;
+      }
+      return renderOfficialMatchDateGroups(matches);
+    })();
+
+    return `
+      <details class="official-match-month-group" data-month-code="${escapeHtml(monthEntry.monthCode)}" ${isOpen ? "open" : ""}>
+        <summary data-role="official-month-summary" data-month-code="${escapeHtml(monthEntry.monthCode)}">
+          <div class="official-match-month-title">
+            <strong>${escapeHtml(monthEntry.seasonName || monthEntry.monthCode)}</strong>
+            <span class="muted">${escapeHtml(getOfficialMonthSummaryText(monthEntry))}</span>
+          </div>
+          <span class="match-day-toggle">
+            <span class="match-day-toggle-icon" aria-hidden="true"></span>
+          </span>
+        </summary>
+        <div class="official-match-month-content">
+          ${contentHtml}
+        </div>
+      </details>
+    `;
+  }).join("");
+}
+
+function renderOfficialMatchesModal() {
+  renderOfficialMatchesList();
+}
+
+async function loadOfficialMatchDetail(matchId, options = {}) {
+  const normalizedMatchId = normalizeDotaMatchIdInput(matchId);
+  if (!normalizedMatchId) return null;
+  const match = getOfficialMatchEntry(normalizedMatchId);
+  const monthEntry = getOfficialMonthEntryByMatchId(normalizedMatchId);
+  if (!match) return null;
+  if (match.detailStatus === "ready" && match.detail && !options.force) {
+    return match.detail;
+  }
+
+  match.detailStatus = "loading";
+  match.detailError = "";
+  officialMatchImportState.loadingMatchId = normalizedMatchId;
+  renderOfficialMatchesModal();
+
+  try {
+    const importedMatch = await invokeFunction("fetch-dota-match", {
+      matchId: normalizedMatchId,
+      seasonId: monthEntry?.seasonId || activeSeason?.id || null,
+    });
+    match.detail = importedMatch;
+    match.detailStatus = "ready";
+    match.detailError = "";
+    match.startTime = importedMatch.startTime ?? match.startTime;
+    match.startTimeIso = importedMatch.startTimeIso || match.startTimeIso;
+    match.source = importedMatch.source || match.source;
+    if (monthEntry) {
+      writeOfficialCachedMonth(monthEntry);
+    }
+    return importedMatch;
+  } catch (error) {
+    match.detail = null;
+    match.detailStatus = "error";
+    match.detailError = error.message;
+    throw error;
+  } finally {
+    if (officialMatchImportState.loadingMatchId === normalizedMatchId) {
+      officialMatchImportState.loadingMatchId = "";
+    }
+    renderOfficialMatchesModal();
+  }
+}
+
+async function loadOfficialLeagueMatchDetails(loadToken, monthCode) {
+  let failedCount = 0;
+  const monthEntry = getOfficialMonthEntry(monthCode);
+  const matches = monthEntry?.matches || [];
+  for (const match of matches) {
+    if (loadToken !== officialMatchImportState.detailLoadToken) return;
+    try {
+      await loadOfficialMatchDetail(match.matchId);
+    } catch (_error) {
+      failedCount += 1;
+    }
+  }
+  if (loadToken !== officialMatchImportState.detailLoadToken) return;
+  if (failedCount) {
+    setOfficialMatchesMessage(`已读取 ${monthCode} 比赛列表，其中 ${failedCount} 场详情暂时读取失败。`, true);
+    return;
+  }
+  if (matches.length) {
+    setOfficialMatchesMessage(`已读取 ${monthCode} 的 ${matches.length} 场官方比赛。`);
+  }
+}
+
+async function loadOfficialMatchMonth(monthCode, options = {}) {
+  if (!ensureScorerAccess("仅记分员或管理员可读取官方比赛。")) return;
+  const targetMonthCode = String(monthCode || officialMatchImportState.activeMonthCode || getOfficialDefaultMonthCode()).trim();
+  const monthEntry = getOfficialMonthEntry(targetMonthCode);
+  if (!monthEntry) return;
+  if (!monthEntry.seasonId) {
+    setOfficialMatchesMessage("当前缺少可用赛季，暂时无法导入官方比赛。", true);
+    return;
+  }
+
+  officialMatchImportState.openMonthCodes.add(targetMonthCode);
+  if (!options.force) {
+    const cached = getOfficialCachedMonth(targetMonthCode);
+    if (cached) {
+      monthEntry.matches = cached.matches || [];
+      monthEntry.loaded = true;
+      monthEntry.status = "ready";
+      monthEntry.error = "";
+      officialMatchImportState.status = "ready";
+      officialMatchImportState.matches = monthEntry.matches;
+      renderOfficialMatchesModal();
+      setOfficialMatchesMessage(`已使用 ${targetMonthCode} 的页面缓存。`);
+      return;
+    }
+  }
+
+  const loadToken = officialMatchImportState.detailLoadToken + 1;
+  officialMatchImportState.status = "ready";
+  officialMatchImportState.selectedMatchId = "";
+  officialMatchImportState.loadingMatchId = "";
+  officialMatchImportState.importedMatch = null;
+  officialMatchImportState.activeMappingKey = "";
+  officialMatchImportState.savingMatchId = "";
+  officialMatchImportState.loadingMonthCode = targetMonthCode;
+  officialMatchImportState.detailLoadToken = loadToken;
+  monthEntry.status = "loading";
+  monthEntry.error = "";
+  monthEntry.matches = [];
+  monthEntry.loaded = false;
+  officialMatchImportState.matches = [];
+  renderOfficialMatchesModal();
+  setOfficialMatchesMessage("");
+
+  try {
+    await getOfficialEligiblePlayersForSeason(monthEntry.seasonId);
+    const result = await invokeFunction("fetch-dota-match", {
+      leagueId: DOTA_FIXED_LEAGUE_ID,
+      seasonId: monthEntry.seasonId,
+      monthCode: targetMonthCode,
+    });
+    if (loadToken !== officialMatchImportState.detailLoadToken) return;
+    monthEntry.matches = (Array.isArray(result?.matches) ? result.matches : [])
+      .filter((match) => normalizeDotaMatchIdInput(match.matchId))
+      .filter((match) => getOfficialMatchDate(match).slice(0, 7) === targetMonthCode)
+      .sort((a, b) => {
+        const aTime = Number(a.startTime || 0);
+        const bTime = Number(b.startTime || 0);
+        if (aTime !== bTime) return bTime - aTime;
+        return String(b.matchId || "").localeCompare(String(a.matchId || ""));
+      })
+      .map((match) => ({
+        ...match,
+        detail: null,
+        detailStatus: "idle",
+        detailError: "",
+      }));
+    monthEntry.status = "ready";
+    monthEntry.loaded = true;
+    officialMatchImportState.matches = monthEntry.matches;
+    writeOfficialCachedMonth(monthEntry);
+    renderOfficialMatchesModal();
+    if (!monthEntry.matches.length) {
+      setOfficialMatchesMessage(`${targetMonthCode} 暂未返回可导入比赛。`, true);
+      return;
+    }
+    setOfficialMatchesMessage("正在读取双方选手...");
+    await loadOfficialLeagueMatchDetails(loadToken, targetMonthCode);
+    writeOfficialCachedMonth(monthEntry);
+  } catch (error) {
+    if (loadToken !== officialMatchImportState.detailLoadToken) return;
+    monthEntry.status = "error";
+    monthEntry.error = error.message;
+    monthEntry.matches = [];
+    monthEntry.loaded = false;
+    officialMatchImportState.matches = [];
+    renderOfficialMatchesModal();
+    setOfficialMatchesMessage(`读取官方比赛失败：${error.message}`, true);
+  } finally {
+    if (officialMatchImportState.loadingMonthCode === targetMonthCode) {
+      officialMatchImportState.loadingMonthCode = "";
+    }
+  }
+}
+
+async function loadOfficialLeagueMatches() {
+  await loadOfficialMatchMonth(officialMatchImportState.activeMonthCode || getOfficialDefaultMonthCode(), { force: true });
+}
+
+async function openOfficialMatchesModal() {
+  if (!ensureScorerAccess("仅记分员或管理员可读取官方比赛。")) return;
+  if (!activeSeason?.id) {
+    setMessage("当前缺少可用赛季，暂时无法导入官方比赛。", true);
+    return;
+  }
+  if (!seasonPlayers.length) {
+    await loadSeasonPlayers();
+  }
+  if (!allSeasons.length) {
+    await loadSeasons();
+  }
+  prepareOfficialMatchMonths();
+  setManagedDialogOpen("officialMatches", true, {
+    initialFocus: refreshOfficialMatchesBtn || closeOfficialMatchesBtn || undefined,
+  });
+  await loadOfficialMatchMonth(officialMatchImportState.activeMonthCode || getOfficialDefaultMonthCode());
+}
+
+function buildOfficialMatchAssignments(importedMatch, matchId = importedMatch?.matchId || "") {
+  const heroAssignments = {};
+  const kdaAssignments = {};
+  getOfficialMatchPlayers(importedMatch).forEach((player) => {
+    const playerId = getOfficialSelectedPlayerId(player, matchId);
+    if (!playerId) return;
+    if (player.heroName && DOTA_HEROES.includes(player.heroName)) {
+      heroAssignments[playerId] = player.heroName;
+    }
+    const kdaEntry = normalizeKdaEntry(player);
+    if (hasKdaEntryValue(kdaEntry)) {
+      kdaAssignments[playerId] = kdaEntry;
+    }
+  });
+  return { heroAssignments, kdaAssignments };
+}
+
+function findOfficialMatchPlayerBySlotKey(importedMatch, slotKey = "") {
+  return getOfficialMatchPlayers(importedMatch)
+    .find((player) => getOfficialMatchSlotKey(player) === slotKey) || null;
+}
+
+function clearOfficialMatchDrafts(matchId = "") {
+  const normalizedMatchId = normalizeDotaMatchIdInput(matchId);
+  if (!normalizedMatchId) return;
+  const draftPrefix = `${normalizedMatchId}:`;
+  [...officialMatchImportState.mappingDrafts.keys()].forEach((key) => {
+    if (key.startsWith(draftPrefix)) {
+      officialMatchImportState.mappingDrafts.delete(key);
+    }
+  });
+}
+
+async function getSteamAccountMappingsByPlayerIds(playerIds = []) {
+  const uniquePlayerIds = [...new Set(playerIds.filter(Boolean))];
+  const mappingByPlayerId = new Map(uniquePlayerIds.map((playerId) => [playerId, []]));
+  if (!uniquePlayerIds.length) return mappingByPlayerId;
+
+  const { data, error } = await db
+    .from("player_external_accounts")
+    .select("player_id, provider_account_id")
+    .eq("provider", "steam")
+    .in("player_id", uniquePlayerIds);
+
+  if (error) {
+    throw new Error(`读取现有 Steam 映射失败：${error.message}`);
+  }
+
+  (data || []).forEach((row) => {
+    if (!row.player_id || !row.provider_account_id) return;
+    const accountIds = mappingByPlayerId.get(row.player_id) || [];
+    accountIds.push(row.provider_account_id);
+    mappingByPlayerId.set(row.player_id, accountIds);
+  });
+  return mappingByPlayerId;
+}
+
+function applyOfficialPlayerLocalMapping(importedMatch, slotKey, playerId) {
+  const player = findOfficialMatchPlayerBySlotKey(importedMatch, slotKey);
+  if (!player || !playerId) return;
+  player.matchedPlayerId = playerId;
+  player.matchedDisplayName = getOfficialLocalPlayerName(playerId, importedMatch.matchId) || player.matchedDisplayName || "本地选手";
+  officialMatchImportState.mappingDrafts.delete(getOfficialMatchMappingKey(importedMatch.matchId, player));
+}
+
+async function persistOfficialSinglePlayerMapping(matchId, slotKey, playerId) {
+  const normalizedMatchId = normalizeDotaMatchIdInput(matchId);
+  const match = getOfficialMatchEntry(normalizedMatchId);
+  const importedMatch = getOfficialMatchDetail(match);
+  if (!normalizedMatchId || !slotKey || !importedMatch) return;
+
+  const player = findOfficialMatchPlayerBySlotKey(importedMatch, slotKey);
+  if (!player) {
+    setOfficialMatchesMessage("未找到需要关联的官方账号。", true);
+    return;
+  }
+
+  const mappingKey = getOfficialMatchMappingKey(normalizedMatchId, player);
+  if (!playerId) {
+    officialMatchImportState.mappingDrafts.delete(mappingKey);
+    officialMatchImportState.activeMappingKey = "";
+    renderOfficialMatchesModal();
+    return;
+  }
+
+  const localName = getOfficialLocalPlayerName(playerId, normalizedMatchId);
+  if (!localName) {
+    setOfficialMatchesMessage("只能关联当前赛季的本地选手。", true);
+    return;
+  }
+
+  const isDuplicate = getOfficialMatchPlayers(importedMatch)
+    .some((entry) => entry !== player && getOfficialSelectedPlayerId(entry, normalizedMatchId) === playerId);
+  if (isDuplicate) {
+    setOfficialMatchesMessage("同一名本地选手不能在同一场官方比赛中重复出现。", true);
+    return;
+  }
+
+  officialMatchImportState.selectedMatchId = normalizedMatchId;
+  if (!player.accountId) {
+    officialMatchImportState.mappingDrafts.set(mappingKey, playerId);
+    officialMatchImportState.activeMappingKey = "";
+    renderOfficialMatchesModal();
+    setOfficialMatchesMessage(`${localName} 已临时关联到本场；该官方账号缺少可保存的 Steam account_id。`);
+    return;
+  }
+
+  setOfficialMatchesMessage(`正在保存 ${localName} 的 Steam 映射...`);
+  try {
+    let { data, error } = await db.rpc("assign_player_steam_account", {
+      p_player_id: playerId,
+      p_steam_account_id: String(player.accountId),
+    });
+    if (error && shouldRetryMissingRpc(error, "assign_player_steam_account")) {
+      const existingMappings = await getSteamAccountMappingsByPlayerIds([playerId]);
+      const mergedAccountIds = [...new Set([...(existingMappings.get(playerId) || []), String(player.accountId)])];
+      ({ data, error } = await db.rpc("set_player_steam_accounts", {
+        p_player_id: playerId,
+        p_steam_account_ids: mergedAccountIds,
+      }));
+    }
+    if (error) {
+      throw new Error(error.message);
+    }
+    steamAccountMappings.set(
+      playerId,
+      (data || []).map((row) => row.provider_account_id).filter(Boolean).sort()
+    );
+    applyOfficialPlayerLocalMapping(importedMatch, slotKey, playerId);
+    officialMatchImportState.activeMappingKey = "";
+    const monthEntry = getOfficialMonthEntryByMatchId(normalizedMatchId);
+    if (monthEntry) {
+      writeOfficialCachedMonth(monthEntry);
+    }
+    renderOfficialMatchesModal();
+    setOfficialMatchesMessage(`${localName} 已关联并写入映射列表。`);
+  } catch (error) {
+    setOfficialMatchesMessage(`保存 Steam 映射失败：${error.message}`, true);
+    renderOfficialMatchesModal();
+  }
+}
+
+async function persistOfficialPlayerMappings(importedMatch, matchId = importedMatch?.matchId || "") {
+  const mappingPairs = getOfficialMatchPlayers(importedMatch)
+    .filter((player) => !player.matchedPlayerId && player.accountId)
+    .map((player) => ({
+      accountId: String(player.accountId),
+      playerId: officialMatchImportState.mappingDrafts.get(getOfficialMatchMappingKey(matchId, player)) || "",
+    }))
+    .filter((entry) => entry.accountId && entry.playerId);
+
+  if (!mappingPairs.length) return;
+
+  const accountIdsByPlayer = new Map();
+  mappingPairs.forEach((entry) => {
+    const accountIds = accountIdsByPlayer.get(entry.playerId) || [];
+    accountIds.push(entry.accountId);
+    accountIdsByPlayer.set(entry.playerId, accountIds);
+  });
+
+  const existingMappings = await getSteamAccountMappingsByPlayerIds([...accountIdsByPlayer.keys()]);
+  for (const [playerId, accountIds] of accountIdsByPlayer.entries()) {
+    const mergedAccountIds = [...new Set([...(existingMappings.get(playerId) || []), ...accountIds])];
+    const { data, error } = await db.rpc("set_player_steam_accounts", {
+      p_player_id: playerId,
+      p_steam_account_ids: mergedAccountIds,
+    });
+    if (error) {
+      throw new Error(`保存 Steam 映射失败：${error.message}`);
+    }
+    steamAccountMappings.set(
+      playerId,
+      (data || []).map((row) => row.provider_account_id).filter(Boolean).sort()
+    );
+  }
+}
+
+function getSortedPlayerIdSignature(playerIds = []) {
+  return playerIds.filter(Boolean).slice().sort().join("|");
+}
+
+function getOfficialResolvedPlayerContext(importedMatch, matchId = importedMatch?.matchId || "") {
+  const radiantPlayerIds = getOfficialResolvedTeamIds(importedMatch, "radiant", matchId);
+  const direPlayerIds = getOfficialResolvedTeamIds(importedMatch, "dire", matchId);
+  return {
+    radiantPlayerIds,
+    direPlayerIds,
+    allPlayerIds: [...radiantPlayerIds, ...direPlayerIds],
+    radiantSignature: getSortedPlayerIdSignature(radiantPlayerIds),
+    direSignature: getSortedPlayerIdSignature(direPlayerIds),
+    allSignature: getSortedPlayerIdSignature([...radiantPlayerIds, ...direPlayerIds]),
+  };
+}
+
+function getSavedMatchPlayerContext(match) {
+  const players = parseRecentMatchPlayers(match?.players);
+  const teamAIds = getOrderedSavedMatchTeamPlayers(players, "A").map((player) => player.player_id).filter(Boolean);
+  const teamBIds = getOrderedSavedMatchTeamPlayers(players, "B").map((player) => player.player_id).filter(Boolean);
+  return {
+    players,
+    teamAIds,
+    teamBIds,
+    allPlayerIds: [...teamAIds, ...teamBIds],
+    teamASignature: getSortedPlayerIdSignature(teamAIds),
+    teamBSignature: getSortedPlayerIdSignature(teamBIds),
+    allSignature: getSortedPlayerIdSignature([...teamAIds, ...teamBIds]),
+  };
+}
+
+async function ensureRecentMatchesLoadedForOfficialSeason(seasonId = "") {
+  const targetSeasonId = String(seasonId || "").trim();
+  if (!targetSeasonId || recentMatchLoadedSeasonIds.has(targetSeasonId)) return;
+  await loadRecentMatchesForSeason(targetSeasonId, { keepOpen: activeSeason?.id === targetSeasonId });
+}
+
+function findOfficialDuplicateSavedMatch(seasonId, matchDate, officialContext) {
+  if (!seasonId || !matchDate || !officialContext?.allSignature) return null;
+  const candidates = (recentMatchesData || [])
+    .filter((match) => match?.season_id === seasonId && getSavedMatchDateValue(match) === matchDate)
+    .filter((match) => {
+      const savedContext = getSavedMatchPlayerContext(match);
+      return savedContext.allSignature === officialContext.allSignature;
+    })
+    .sort(compareRecentMatchesInGroup);
+
+  return candidates.find((match) => {
+    const savedContext = getSavedMatchPlayerContext(match);
+    return savedContext.teamASignature === officialContext.radiantSignature
+      && savedContext.teamBSignature === officialContext.direSignature;
+  }) || candidates[0] || null;
+}
+
+async function mergeOfficialImportedMatchIntoSavedMatch(existingMatch, importedMatch, context) {
+  if (!existingMatch?.match_id) {
+    throw new Error("未找到可合并的本地比赛记录。");
+  }
+  if (!ensureMatchRecordEditable(existingMatch.match_id, "合并")) {
+    throw new Error("该比赛记录当前不可修改。");
+  }
+
+  const savedContext = getSavedMatchPlayerContext(existingMatch);
+  const inheritedDoubleDowns = sanitizeSavedMatchDoubleDowns(existingMatch.double_downs, savedContext.players);
+  const winnerTeam = mapWinnerSideToTeam(importedMatch.winnerSide);
+  const { heroAssignments, kdaAssignments } = buildOfficialMatchAssignments(importedMatch, context.officialMatchId);
+  const updatePayload = {
+    p_match_id: existingMatch.match_id,
+    p_radiant_player_ids: context.radiantPlayerIds,
+    p_dire_player_ids: context.direPlayerIds,
+    p_winner_side: mapWinnerTeamToSide(winnerTeam),
+    p_note: String(existingMatch.note || "").trim() || null,
+    p_match_date: context.matchDate,
+    p_double_downs: inheritedDoubleDowns,
+    p_is_exhibition: Boolean(existingMatch.is_exhibition),
+  };
+
+  let matchId = null;
+  let error = null;
+  ({ data: matchId, error } = await db.rpc("update_match_result", updatePayload));
+  if (error && !existingMatch.is_exhibition && shouldRetryWithoutExhibitionFlag(error, "update_match_result")) {
+    const { p_is_exhibition: ignoredFlag, ...legacyPayload } = updatePayload;
+    ({ data: matchId, error } = await db.rpc("update_match_result", legacyPayload));
+  }
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  const loggedMatch = {
+    ...buildOptimisticMatchRecord(
+      matchId || existingMatch.match_id,
+      context.targetSeasonId,
+      existingMatch.match_day_id || null,
+      context.matchDate,
+      winnerTeam,
+      existingMatch.note || null,
+      context.radiantPlayerIds,
+      context.direPlayerIds,
+      heroAssignments,
+      kdaAssignments,
+      inheritedDoubleDowns,
+      existingMatch.created_at || new Date().toISOString(),
+      Boolean(existingMatch.is_exhibition)
+    ),
+    match_no: existingMatch.match_no,
+  };
+  removeRecentMatchLocally(existingMatch.match_id);
+  upsertRecentMatchLocally(loggedMatch);
+  return loggedMatch;
+}
+
+async function linkOfficialMatchAsset(matchId = "", dotaMatchId = "") {
+  const normalizedMatchId = String(matchId || "").trim();
+  const normalizedDotaMatchId = normalizeDotaMatchIdInput(dotaMatchId);
+  if (!normalizedMatchId || !normalizedDotaMatchId) return;
+
+  const { error } = await db.rpc("upsert_official_match_asset", {
+    p_match_id: normalizedMatchId,
+    p_dota_match_id: normalizedDotaMatchId,
+    p_storage_path: null,
+    p_source_url: `https://www.opendota.com/matches/${normalizedDotaMatchId}`,
+  });
+
+  if (error && !shouldRetryMissingRpc(error, "upsert_official_match_asset")) {
+    console.warn("记录 OpenDota 截图链接失败：", error);
+  }
+}
+
+async function saveOfficialImportedMatch(matchId) {
+  const normalizedMatchId = normalizeDotaMatchIdInput(matchId);
+  if (!normalizedMatchId || officialMatchImportState.isSaving) return;
+  if (!ensureScorerAccess("仅记分员或管理员可添加官方比赛。")) return;
+  const monthEntry = getOfficialMonthEntryByMatchId(normalizedMatchId);
+  const targetSeasonId = monthEntry?.seasonId || activeSeason?.id || "";
+  if (!targetSeasonId) {
+    setOfficialMatchesMessage("当前缺少可用赛季，暂时无法添加官方比赛。", true);
+    return;
+  }
+  if (!canModifyMatchRecordsForSeason(targetSeasonId)) {
+    setOfficialMatchesMessage(getSeasonReadOnlyReason(targetSeasonId), true);
+    return;
+  }
+
+  const matchEntry = getOfficialMatchEntry(normalizedMatchId);
+  let importedMatch = getOfficialMatchDetail(matchEntry);
+  if (!importedMatch) {
+    setOfficialMatchesMessage(`正在读取比赛 #${normalizedMatchId}...`);
+    try {
+      importedMatch = await loadOfficialMatchDetail(normalizedMatchId);
+    } catch (error) {
+      setOfficialMatchesMessage(`读取比赛失败：${error.message}`, true);
+      return;
+    }
+  }
+  if (!importedMatch) return;
+
+  const officialMatchId = normalizeDotaMatchIdInput(importedMatch.matchId) || normalizedMatchId;
+  const resolvedContext = getOfficialResolvedPlayerContext(importedMatch, officialMatchId);
+  const { radiantPlayerIds, direPlayerIds, allPlayerIds } = resolvedContext;
+  const eligiblePlayers = await getOfficialEligiblePlayersForSeason(targetSeasonId);
+  const eligiblePlayerIds = new Set(eligiblePlayers.map((player) => player.id));
+
+  if (radiantPlayerIds.length !== TEAM_SIZE || direPlayerIds.length !== TEAM_SIZE) {
+    setOfficialMatchesMessage("请先为双方各关联 5 名本赛季选手。", true);
+    return;
+  }
+  if (new Set(allPlayerIds).size !== TEAM_SIZE * 2) {
+    setOfficialMatchesMessage("同一名本地选手不能在同一场官方比赛中重复出现。", true);
+    return;
+  }
+  if (allPlayerIds.some((playerId) => !eligiblePlayerIds.has(playerId))) {
+    setOfficialMatchesMessage("官方比赛只能添加当前赛季的本地选手。", true);
+    return;
+  }
+
+  officialMatchImportState.isSaving = true;
+  officialMatchImportState.savingMatchId = normalizedMatchId;
+  officialMatchImportState.selectedMatchId = normalizedMatchId;
+  renderOfficialMatchesModal();
+  setOfficialMatchesMessage("正在关联选手并添加比赛记录...");
+
+  try {
+    await persistOfficialPlayerMappings(importedMatch, officialMatchId);
+    const winnerTeam = mapWinnerSideToTeam(importedMatch.winnerSide);
+    const matchDate = getOfficialMatchDate(importedMatch);
+    const { heroAssignments, kdaAssignments } = buildOfficialMatchAssignments(importedMatch, officialMatchId);
+    await ensureRecentMatchesLoadedForOfficialSeason(targetSeasonId);
+    const duplicateMatch = findOfficialDuplicateSavedMatch(targetSeasonId, matchDate, resolvedContext);
+    if (duplicateMatch) {
+      const mergedMatch = await mergeOfficialImportedMatchIntoSavedMatch(duplicateMatch, importedMatch, {
+        ...resolvedContext,
+        officialMatchId,
+        targetSeasonId,
+        matchDate,
+      });
+      await linkOfficialMatchAsset(mergedMatch.match_id, officialMatchId);
+      appendAdminActionLog(buildMatchActionLogText("合并", mergedMatch, matchDate));
+      recentMatchLoadedSeasonIds.delete(targetSeasonId);
+      void loadRecentMatchesForSeason(targetSeasonId, { keepOpen: activeSeason?.id === targetSeasonId });
+      requestImmediateRefresh({
+        playerDriven: true,
+        leaderboard: true,
+        rewardLogs: true,
+        recentMatches: true,
+      });
+      officialMatchImportState.importedMatch = null;
+      clearOfficialMatchDrafts(officialMatchId);
+      if (matchEntry) {
+        matchEntry.imported = true;
+      }
+      if (monthEntry) {
+        writeOfficialCachedMonth(monthEntry);
+      }
+      setOfficialMatchesMessage(`官方比赛 #${importedMatch.matchId} 已合并到已有比赛记录，并保留原道具使用。`);
+      return;
+    }
+
+    const payload = {
+      p_season_id: targetSeasonId,
+      p_radiant_player_ids: radiantPlayerIds,
+      p_dire_player_ids: direPlayerIds,
+      p_winner_side: mapWinnerTeamToSide(winnerTeam),
+      p_note: null,
+      p_match_date: matchDate,
+      p_double_downs: [],
+      p_is_exhibition: false,
+    };
+
+    let matchId = null;
+    let error = null;
+    ({ data: matchId, error } = await db.rpc("record_match_result_backfill", payload));
+    if (error && shouldRetryWithoutExhibitionFlag(error, "record_match_result_backfill")) {
+      const { p_is_exhibition: ignoredFlag, ...legacyPayload } = payload;
+      ({ data: matchId, error } = await db.rpc("record_match_result_backfill", legacyPayload));
+    }
+    if (error) {
+      throw new Error(error.message);
+    }
+    await linkOfficialMatchAsset(matchId, officialMatchId);
+
+    const loggedMatch = buildOptimisticMatchRecord(
+      matchId,
+      targetSeasonId,
+      null,
+      matchDate,
+      winnerTeam,
+      null,
+      radiantPlayerIds,
+      direPlayerIds,
+      heroAssignments,
+      kdaAssignments,
+      [],
+      new Date().toISOString(),
+      false
+    );
+    upsertRecentMatchLocally(loggedMatch);
+    appendAdminActionLog(buildMatchActionLogText("补录", loggedMatch, matchDate));
+    recentMatchLoadedSeasonIds.delete(targetSeasonId);
+    void loadRecentMatchesForSeason(targetSeasonId, { keepOpen: activeSeason?.id === targetSeasonId });
+    requestImmediateRefresh({
+      playerDriven: true,
+      leaderboard: true,
+      rewardLogs: true,
+      recentMatches: true,
+    });
+
+    officialMatchImportState.importedMatch = null;
+    clearOfficialMatchDrafts(officialMatchId);
+    if (matchEntry) {
+      matchEntry.imported = true;
+    }
+    if (monthEntry) {
+      writeOfficialCachedMonth(monthEntry);
+    }
+    setOfficialMatchesMessage(`官方比赛 #${importedMatch.matchId} 已添加到比赛记录。`);
+  } catch (error) {
+    setOfficialMatchesMessage(`添加官方比赛失败：${error.message}`, true);
+  } finally {
+    officialMatchImportState.isSaving = false;
+    officialMatchImportState.savingMatchId = "";
+    renderOfficialMatchesModal();
+  }
+}
+
 function shouldRetryWithoutExhibitionFlag(error, functionName) {
   const message = String(error?.message || "");
   return message.includes(functionName) && message.includes("p_is_exhibition");
+}
+
+function shouldRetryMissingRpc(error, functionName) {
+  const message = getErrorMessage(error);
+  return Boolean(
+    error?.code === "PGRST202"
+    || message.includes(functionName)
+    || message.includes("Could not find the function")
+  );
 }
 
 async function recordMatch() {
@@ -20031,6 +21717,15 @@ function subscribeRealtime() {
     )
     .on(
       "postgres_changes",
+      { event: "*", schema: "public", table: "official_match_assets" },
+      () => {
+        scheduleRefresh({
+          recentMatches: true,
+        });
+      }
+    )
+    .on(
+      "postgres_changes",
       { event: "*", schema: "public", table: "matches" },
       () => {
         scheduleRefresh({
@@ -20199,6 +21894,12 @@ if (adminOpenPlayerManagementBtn) {
     setManagedDialogOpen("adminPlayerManagement", true, { initialFocus: adminQuickAddPlayerInput || undefined });
     await loadInactivePlayersForAdmin({ force: true });
   });
+}
+if (scorerOpenSteamMappingBtn) {
+  scorerOpenSteamMappingBtn.addEventListener("click", openSteamMappingModal);
+}
+if (adminOpenSteamMappingBtn) {
+  adminOpenSteamMappingBtn.addEventListener("click", openSteamMappingModal);
 }
 if (scorerOpenLogsBtn) {
   scorerOpenLogsBtn.addEventListener("click", async () => {
@@ -20810,6 +22511,85 @@ if (adminRenamePlayerInput) {
 }
 recordMatchBtn.addEventListener("click", recordMatch);
 recordBackfillBtn.addEventListener("click", recordBackfillMatch);
+if (openOfficialMatchesBtn) {
+  openOfficialMatchesBtn.addEventListener("click", openOfficialMatchesModal);
+}
+if (refreshOfficialMatchesBtn) {
+  refreshOfficialMatchesBtn.addEventListener("click", loadOfficialLeagueMatches);
+}
+if (officialMatchesList) {
+  officialMatchesList.addEventListener("click", async (event) => {
+    const monthSummary = event.target.closest('[data-role="official-month-summary"]');
+    if (monthSummary) {
+      window.setTimeout(() => {
+        const monthCode = monthSummary.dataset.monthCode || "";
+        const details = monthSummary.closest(".official-match-month-group");
+        if (!monthCode || !details) return;
+        if (details.open) {
+          officialMatchImportState.openMonthCodes.add(monthCode);
+          const monthEntry = getOfficialMonthEntry(monthCode);
+          if (monthEntry && !monthEntry.loaded && monthEntry.status !== "loading") {
+            void loadOfficialMatchMonth(monthCode);
+          }
+        } else {
+          officialMatchImportState.openMonthCodes.delete(monthCode);
+          renderOfficialMatchesModal();
+        }
+      }, 0);
+      return;
+    }
+
+    const mapButton = event.target.closest('[data-role="open-official-player-map"]');
+    if (mapButton) {
+      const matchId = normalizeDotaMatchIdInput(mapButton.dataset.matchId || "");
+      const slotKey = mapButton.dataset.slotKey || "";
+      const match = getOfficialMatchEntry(matchId);
+      const importedMatch = getOfficialMatchDetail(match);
+      const player = findOfficialMatchPlayerBySlotKey(importedMatch, slotKey);
+      if (!matchId || !player) return;
+      officialMatchImportState.selectedMatchId = matchId;
+      const mappingKey = getOfficialMatchMappingKey(matchId, player);
+      officialMatchImportState.activeMappingKey = officialMatchImportState.activeMappingKey === mappingKey ? "" : mappingKey;
+      renderOfficialMatchesModal();
+      return;
+    }
+
+    const playerOption = event.target.closest('[data-role="official-player-option"]');
+    if (playerOption) {
+      await persistOfficialSinglePlayerMapping(
+        playerOption.dataset.matchId || "",
+        playerOption.dataset.slotKey || "",
+        playerOption.dataset.playerId || ""
+      );
+      return;
+    }
+
+    const saveButton = event.target.closest('[data-role="save-official-match"]');
+    if (saveButton) {
+      await saveOfficialImportedMatch(saveButton.dataset.matchId || "");
+      return;
+    }
+
+    const reloadButton = event.target.closest('[data-role="reload-official-match"]');
+    if (reloadButton) {
+      const matchId = normalizeDotaMatchIdInput(reloadButton.dataset.matchId || "");
+      if (!matchId) return;
+      setOfficialMatchesMessage(`正在重读比赛 #${matchId}...`);
+      try {
+        await loadOfficialMatchDetail(matchId, { force: true });
+        setOfficialMatchesMessage(`比赛 #${matchId} 已重读。`);
+      } catch (error) {
+        setOfficialMatchesMessage(`重读比赛失败：${error.message}`, true);
+      }
+      return;
+    }
+
+    const monthLoadButton = event.target.closest('[data-role="load-official-month"]');
+    if (monthLoadButton) {
+      await loadOfficialMatchMonth(monthLoadButton.dataset.monthCode || "", { force: true });
+    }
+  });
+}
 
 openMatchFormBtn.addEventListener("click", () => {
   if (!canUseMatchRecordingForm()) {
@@ -21202,6 +22982,21 @@ recentMatchesList.addEventListener("click", async (event) => {
     return;
   }
 
+  const screenshotButton = event.target.closest('[data-role="open-opendota-screenshot"]');
+  if (screenshotButton) {
+    event.preventDefault();
+    event.stopPropagation();
+    const matchId = screenshotButton.dataset.matchId || "";
+    const match = getSavedMatchById(matchId);
+    const asset = getOfficialMatchScreenshotAsset(match);
+    if (asset?.url) {
+      openOpendotaScreenshotModal(matchId);
+    } else {
+      await requestOpendotaScreenshot(matchId, screenshotButton);
+    }
+    return;
+  }
+
   const attendancePlayerChip = event.target.closest('[data-role="attendance-player-chip"]');
   if (attendancePlayerChip) {
     toggleMatchDayAttendanceSelection(
@@ -21474,6 +23269,35 @@ if (itemInventoryLogsList) {
   });
 }
 
+if (steamMappingFilterInput) {
+  steamMappingFilterInput.addEventListener("input", renderSteamMappingList);
+}
+
+if (refreshSteamMappingBtn) {
+  refreshSteamMappingBtn.addEventListener("click", loadSteamAccountMappings);
+}
+
+if (steamMappingList) {
+  steamMappingList.addEventListener("input", (event) => {
+    const input = event.target.closest('[data-role="steam-account-input"]');
+    if (!input) return;
+    steamMappingDrafts.set(input.dataset.playerId || "", input.value || "");
+  });
+
+  steamMappingList.addEventListener("click", async (event) => {
+    const saveButton = event.target.closest('[data-role="save-steam-mapping"]');
+    if (saveButton) {
+      await saveSteamAccountMapping(saveButton.dataset.playerId || "");
+      return;
+    }
+
+    const clearButton = event.target.closest('[data-role="clear-steam-mapping"]');
+    if (clearButton) {
+      await clearSteamAccountMapping(clearButton.dataset.playerId || "");
+    }
+  });
+}
+
 [
   [scorerSeasonRuleBackdrop, () => setManagedDialogOpen("scorerSeasonRule", false)],
   [adminSeasonRuleBackdrop, () => setManagedDialogOpen("adminSeasonRule", false)],
@@ -21481,6 +23305,8 @@ if (itemInventoryLogsList) {
   [adminPowerBackdrop, () => setManagedDialogOpen("adminPower", false)],
   [scorerPlayerManagementBackdrop, () => setManagedDialogOpen("scorerPlayerManagement", false)],
   [adminPlayerManagementBackdrop, () => setManagedDialogOpen("adminPlayerManagement", false)],
+  [steamMappingBackdrop, () => setManagedDialogOpen("steamMapping", false)],
+  [officialMatchesBackdrop, () => setManagedDialogOpen("officialMatches", false)],
   [scorerManualScoreBackdrop, () => setManagedDialogOpen("scorerManualScore", false)],
   [adminManualScoreBackdrop, () => setManagedDialogOpen("adminManualScore", false)],
   [scorerItemCatalogBackdrop, () => setManagedDialogOpen("scorerItemCatalog", false)],
@@ -21507,6 +23333,8 @@ if (itemInventoryLogsList) {
   [closeAdminPowerBtn, () => setManagedDialogOpen("adminPower", false)],
   [closeScorerPlayerManagementBtn, () => setManagedDialogOpen("scorerPlayerManagement", false)],
   [closeAdminPlayerManagementBtn, () => setManagedDialogOpen("adminPlayerManagement", false)],
+  [closeSteamMappingBtn, () => setManagedDialogOpen("steamMapping", false)],
+  [closeOfficialMatchesBtn, () => setManagedDialogOpen("officialMatches", false)],
   [closeScorerManualScoreBtn, () => setManagedDialogOpen("scorerManualScore", false)],
   [closeAdminManualScoreBtn, () => setManagedDialogOpen("adminManualScore", false)],
   [closeScorerItemCatalogBtn, () => setManagedDialogOpen("scorerItemCatalog", false)],
@@ -21822,6 +23650,14 @@ if (confirmDeleteMatchBtn) {
   confirmDeleteMatchBtn.addEventListener("click", () => settleDeleteMatchConfirmation(true));
 }
 
+if (opendotaScreenshotBackdrop) {
+  opendotaScreenshotBackdrop.addEventListener("click", closeOpendotaScreenshotModal);
+}
+
+if (closeOpendotaScreenshotBtn) {
+  closeOpendotaScreenshotBtn.addEventListener("click", closeOpendotaScreenshotModal);
+}
+
 if (scoreDetailSummary) {
   scoreDetailSummary.addEventListener("click", async (event) => {
     const card = event.target.closest("[data-filter-mode]");
@@ -21884,6 +23720,10 @@ document.addEventListener("keydown", (event) => {
   }
   if (event.key === "Escape" && scoreDetailModal && !scoreDetailModal.hidden) {
     closeScoreDetailModal();
+    return;
+  }
+  if (event.key === "Escape" && opendotaScreenshotModal && !opendotaScreenshotModal.hidden) {
+    closeOpendotaScreenshotModal();
     return;
   }
   if (event.key === "Escape") {
@@ -22086,8 +23926,9 @@ function getRolePanelSummaryText() {
       lastUpdated: getLastUpdatedDisplayText(),
       githubStorage: getGitHubRepositoryStorageDisplayText(),
       supabaseUsage: getSupabaseSystemUsageDisplayText(),
+      supabaseStorage: getSupabaseStorageUsageDisplayText(),
     },
-    `当前登录身份：${getAccessRoleLabel()};   最后更新于${getLastUpdatedDisplayText()};   GitHub：${getGitHubRepositoryStorageDisplayText()};   ${getSupabaseSystemUsageDisplayText()}`
+    `当前登录身份：${getAccessRoleLabel()};   最后更新于${getLastUpdatedDisplayText()};   GitHub：${getGitHubRepositoryStorageDisplayText()};   ${getSupabaseSystemUsageDisplayText()};   ${getSupabaseStorageUsageDisplayText()}`
   );
 }
 
@@ -22110,6 +23951,10 @@ function renderRolePanelSummary(node, hasVisibleSession) {
   const supabaseSeparatorIndex = supabaseUsage.indexOf("：");
   const supabaseLabel = supabaseSeparatorIndex >= 0 ? supabaseUsage.slice(0, supabaseSeparatorIndex + 1) : "";
   const supabaseValue = supabaseSeparatorIndex >= 0 ? supabaseUsage.slice(supabaseSeparatorIndex + 1) : supabaseUsage;
+  const supabaseStorage = getSupabaseStorageUsageDisplayText();
+  const storageSeparatorIndex = supabaseStorage.indexOf("：");
+  const storageLabel = storageSeparatorIndex >= 0 ? supabaseStorage.slice(0, storageSeparatorIndex + 1) : "";
+  const storageValue = storageSeparatorIndex >= 0 ? supabaseStorage.slice(storageSeparatorIndex + 1) : supabaseStorage;
 
   node.setAttribute("aria-label", getRolePanelSummaryText());
   node.innerHTML = [
@@ -22120,6 +23965,8 @@ function renderRolePanelSummary(node, hasVisibleSession) {
     buildRolePanelSummaryMetricHtml("GitHub：", githubStorage, "role-panel-summary-storage-github"),
     `<span class="role-panel-summary-separator">;</span>`,
     buildRolePanelSummaryMetricHtml(supabaseLabel || "数据库：", supabaseValue, "role-panel-summary-storage-database"),
+    `<span class="role-panel-summary-separator">;</span>`,
+    buildRolePanelSummaryMetricHtml(storageLabel || "Storage：", storageValue, "role-panel-summary-storage-supabase"),
   ].join("");
 }
 
@@ -22217,6 +24064,10 @@ function applyRolePermissions() {
     button.disabled = !canScore || !activeSeason?.id;
   });
   openBackfillFormBtn.hidden = !canScore;
+  if (openOfficialMatchesBtn) {
+    openOfficialMatchesBtn.hidden = !canScore;
+    openOfficialMatchesBtn.disabled = !canScore || !activeSeason?.id;
+  }
   recordMatchBtn.hidden = !canScore;
   recordBackfillBtn.hidden = !canScore;
   if (rewardEntryShell) {
@@ -22260,6 +24111,12 @@ function applyRolePermissions() {
   if (scorerRecalculateScoresBtn) {
     scorerRecalculateScoresBtn.disabled = !canScore || !activeSeason?.id;
   }
+  if (scorerOpenSteamMappingBtn) {
+    scorerOpenSteamMappingBtn.disabled = !canScore;
+  }
+  if (adminOpenSteamMappingBtn) {
+    adminOpenSteamMappingBtn.disabled = !canScore;
+  }
   if (scorerClearQueueBtn) {
     scorerClearQueueBtn.hidden = true;
     scorerClearQueueBtn.disabled = !canScore || !activeSeason?.id;
@@ -22291,6 +24148,8 @@ function applyRolePermissions() {
   }
   if (!canScore) {
     setManagedDialogOpen("itemInventoryLogs", false);
+    setManagedDialogOpen("steamMapping", false);
+    setManagedDialogOpen("officialMatches", false);
     setManagedDialogOpen("scorerSeasonRule", false);
     setManagedDialogOpen("scorerPower", false);
     setManagedDialogOpen("scorerPlayerManagement", false);
