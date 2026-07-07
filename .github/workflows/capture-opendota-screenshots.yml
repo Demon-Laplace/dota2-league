@@ -56,9 +56,9 @@ jobs:
     env:
       SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
       SUPABASE_PROJECT_ID: ${{ secrets.SUPABASE_PROJECT_ID || 'klxkkwwszqtgeuozwtkw' }}
-      SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+      SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY || secrets.SUPABASE_SERVICE_KEY || secrets.SUPABASE_SERVICE_ROLE }}
       STEAM_WEB_API_KEY: ${{ secrets.STEAM_WEB_API_KEY }}
-      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      GITHUB_TOKEN: ${{ github.token }}
       SNAPSHOT_ARCHIVE_BRANCH: ${{ vars.SNAPSHOT_ARCHIVE_BRANCH || 'main' }}
       SNAPSHOT_ARCHIVE_PREFIX: ${{ vars.SNAPSHOT_ARCHIVE_PREFIX || 'data/opendota' }}
       DOTA_LEAGUE_ID: ${{ vars.DOTA_LEAGUE_ID || '19878' }}
@@ -78,6 +78,23 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: "20"
+
+      - name: Check required secrets
+        shell: bash
+        run: |
+          missing=()
+          if [[ -z "${SUPABASE_SERVICE_ROLE_KEY:-}" ]]; then
+            missing+=("SUPABASE_SERVICE_ROLE_KEY")
+          fi
+          if [[ -z "${GITHUB_TOKEN:-}" ]]; then
+            missing+=("GITHUB_TOKEN")
+          fi
+          if (( ${#missing[@]} )); then
+            echo "Missing required GitHub Actions secret(s): ${missing[*]}" >&2
+            echo "Add SUPABASE_SERVICE_ROLE_KEY under repository Settings > Secrets and variables > Actions." >&2
+            echo "This must be the Supabase service_role key, not the anon/publishable key." >&2
+            exit 1
+          fi
 
       - name: Install Playwright
         run: |
