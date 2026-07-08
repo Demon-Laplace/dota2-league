@@ -94,7 +94,7 @@
       prizeDistributionAction: "分配赛季奖金",
       participationRulesAction: "修改场次分",
       backgroundPickerAction: "更换背景",
-      opendotaArchiveAction: "同步比赛记录",
+      opendotaArchiveAction: "强制同步比赛记录",
       backgroundPickerTitle: "网站背景",
       backgroundPickerClose: "关闭",
       backgroundPickerApply: "应用背景",

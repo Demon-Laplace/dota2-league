@@ -2886,13 +2886,13 @@ async function triggerOpendotaArchiveActionFromAdminPanel() {
 
   const confirmed = await confirmAction(
     [
-      `确认同步 ${archiveMonth} 的比赛记录吗？`,
-      "该操作会在后台补齐比赛详情并刷新截图；本次最多处理 50 个目标。",
+      `确认强制同步 ${archiveMonth} 的比赛记录吗？`,
+      "该操作会重新读取已有关联数据并刷新截图；本次最多处理 50 个目标。",
       "Action 会在后台运行，页面不会等待执行完成。",
     ].join("\n"),
     {
-      title: "同步比赛记录",
-      confirmLabel: "触发同步",
+      title: "强制同步比赛记录",
+      confirmLabel: "强制同步",
       cancelLabel: "取消",
       danger: true,
     }
@@ -2908,7 +2908,17 @@ async function triggerOpendotaArchiveActionFromAdminPanel() {
       archiveMonth,
       limit: 50,
       force: true,
+      refreshExisting: true,
     });
+    if (result?.queued && !result?.triggered) {
+      const queuedCount = Number(result.queuedCount || 0);
+      setAdminPanelMessage(
+        queuedCount
+          ? `已提交 ${archiveMonth} 强制刷新队列，共 ${queuedCount} 场；定时同步会重新读取并覆盖已有截图。`
+          : `未找到 ${archiveMonth} 可强制刷新的已有比赛详情。`
+      );
+      return;
+    }
     const actionUrl = result?.actionsUrl ? ` ${result.actionsUrl}` : "";
     setAdminPanelMessage(`已触发 ${archiveMonth} 比赛记录同步，请稍后在 GitHub Actions 查看进度。${actionUrl}`);
   } catch (error) {
@@ -11580,12 +11590,12 @@ function buildRecentMatchScreenshotButtonHtml(match, asset = getOfficialMatchScr
   if (!match?.match_id) return "";
   const hasImage = Boolean(asset?.url);
   const status = String(asset?.asset_status || "").trim();
-  const isPending = !hasImage && (status === "requested" || status === "pending");
+  const isPending = status === "requested" || status === "pending";
   const isError = !hasImage && status === "error";
-  const stateClass = hasImage
-    ? " recent-match-screenshot-btn-ready"
-    : (isError ? " recent-match-screenshot-btn-error" : (isPending ? " recent-match-screenshot-btn-pending" : ""));
-  const title = "查看比赛详情";
+  const stateClass = isPending
+    ? " recent-match-screenshot-btn-pending"
+    : (hasImage ? " recent-match-screenshot-btn-ready" : (isError ? " recent-match-screenshot-btn-error" : ""));
+  const title = isPending ? "比赛详情正在刷新" : "查看比赛详情";
   return `
     <button
       type="button"
@@ -11764,6 +11774,12 @@ function openExistingOpendotaScreenshotOrStatus(matchId) {
   if (!normalizedMatchId) return;
   const match = getSavedMatchById(normalizedMatchId);
   const asset = getOfficialMatchScreenshotAsset(match);
+
+  const status = String(asset?.asset_status || "").trim();
+  if (status === "requested" || status === "pending") {
+    setMessage("比赛详情正在刷新，请稍后再查看。");
+    return;
+  }
 
   if (asset?.url) {
     openOpendotaScreenshotModal(normalizedMatchId);

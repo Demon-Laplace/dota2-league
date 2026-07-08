@@ -1106,7 +1106,7 @@ async function uploadScreenshot(storagePath, filePath) {
       apikey: SUPABASE_SERVICE_ROLE_KEY,
       Authorization: `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
       "Content-Type": getScreenshotContentType(storagePath),
-      "Cache-Control": "3600",
+      "Cache-Control": "60",
       "x-upsert": "true",
     },
     body: bytes,
