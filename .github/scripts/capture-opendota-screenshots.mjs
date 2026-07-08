@@ -992,8 +992,8 @@ async function findOfficialDotaMatchId(match) {
 async function getOpenDotaOverviewScreenshotClip(page) {
   return page.evaluate(() => {
     const normalizeText = (value) => String(value || "").replace(/\s+/g, " ").trim();
-    const findTextElement = (label) => [...document.querySelectorAll("body *")]
-      .filter((node) => normalizeText(node.textContent) === label)
+    const findTextElement = (pattern) => [...document.querySelectorAll("body *")]
+      .filter((node) => pattern.test(normalizeText(node.textContent)))
       .sort((left, right) => {
         const leftRect = left.getBoundingClientRect();
         const rightRect = right.getBoundingClientRect();
@@ -1020,26 +1020,21 @@ async function getOpenDotaOverviewScreenshotClip(page) {
       return Math.max(bestRect.bottom, headingRect.bottom + 360);
     };
 
-    const radiantHeading = findTextElement("Radiant - Overview");
+    const radiantHeading = findTextElement(/^Radiant\s*-\s*Overview$/i);
     if (!radiantHeading) return null;
-    const direHeading = findTextElement("Dire - Overview");
+    const direHeading = findTextElement(/^Dire\s*-\s*Overview$/i);
+    const radiantAbilityHeading = findTextElement(/^Radiant\s*-\s*Ability Build/i);
     const radiantRect = radiantHeading.getBoundingClientRect();
-    const scrollY = window.scrollY || window.pageYOffset || 0;
     const viewportWidth = window.innerWidth || document.documentElement.clientWidth || 1440;
     const viewportHeight = window.innerHeight || document.documentElement.clientHeight || 1500;
-    const documentHeight = Math.max(
-      document.documentElement.scrollHeight || 0,
-      document.body?.scrollHeight || 0,
-      viewportHeight
-    );
-    const topInViewport = Math.max(0, radiantRect.top - 16);
-    const top = Math.max(0, scrollY + topInViewport);
-    const direBottom = direHeading
-      ? scrollY + getSectionBottom(direHeading) + 16
-      : top + 1500;
-    const maxVisibleHeight = Math.max(1, viewportHeight - topInViewport - 8);
-    const wantedHeight = Math.max(900, direBottom - top);
-    const height = Math.max(1, Math.min(maxVisibleHeight, documentHeight - top, wantedHeight));
+    const top = Math.max(0, radiantRect.top - 16);
+    const abilityTop = radiantAbilityHeading?.getBoundingClientRect?.().top;
+    const direBottom = direHeading ? getSectionBottom(direHeading) + 16 : top + 1500;
+    const bottom = Number.isFinite(Number(abilityTop)) && Number(abilityTop) > top + 120
+      ? Number(abilityTop) - 12
+      : direBottom;
+    const maxVisibleHeight = Math.max(1, viewportHeight - top - 8);
+    const height = Math.max(1, Math.min(maxVisibleHeight, bottom - top));
 
     return {
       x: 0,

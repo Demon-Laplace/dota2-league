@@ -11586,25 +11586,45 @@ function isOfficialMatchNoRecordAsset(asset = null) {
   );
 }
 
-function buildRecentMatchScreenshotButtonHtml(match, asset = getOfficialMatchScreenshotAsset(match)) {
-  if (!match?.match_id) return "";
+function getRecentMatchScreenshotButtonState(match, asset = getOfficialMatchScreenshotAsset(match)) {
   const hasImage = Boolean(asset?.url);
   const status = String(asset?.asset_status || "").trim();
   const isPending = status === "requested" || status === "pending";
   const isError = !hasImage && status === "error";
-  const stateClass = isPending
+  return {
+    status: status || (hasImage ? "available" : "missing"),
+    title: isPending ? "比赛详情正在刷新" : "查看比赛详情",
+    isPending,
+    isReady: !isPending && hasImage,
+    isError: !isPending && isError,
+  };
+}
+
+function applyRecentMatchScreenshotButtonState(button, state) {
+  if (!button || !state) return;
+  button.classList.toggle("recent-match-screenshot-btn-pending", state.isPending);
+  button.classList.toggle("recent-match-screenshot-btn-ready", state.isReady);
+  button.classList.toggle("recent-match-screenshot-btn-error", state.isError);
+  button.dataset.screenshotStatus = state.status;
+  button.setAttribute("aria-label", state.title);
+  button.setAttribute("title", state.title);
+}
+
+function buildRecentMatchScreenshotButtonHtml(match, asset = getOfficialMatchScreenshotAsset(match)) {
+  if (!match?.match_id) return "";
+  const state = getRecentMatchScreenshotButtonState(match, asset);
+  const stateClass = state.isPending
     ? " recent-match-screenshot-btn-pending"
-    : (hasImage ? " recent-match-screenshot-btn-ready" : (isError ? " recent-match-screenshot-btn-error" : ""));
-  const title = isPending ? "比赛详情正在刷新" : "查看比赛详情";
+    : (state.isReady ? " recent-match-screenshot-btn-ready" : (state.isError ? " recent-match-screenshot-btn-error" : ""));
   return `
     <button
       type="button"
       class="match-day-copy-btn recent-match-screenshot-btn${stateClass}"
       data-role="open-opendota-screenshot"
       data-match-id="${escapeHtml(match.match_id)}"
-      data-screenshot-status="${escapeHtml(status || (hasImage ? "available" : "missing"))}"
-      aria-label="${escapeHtml(title)}"
-      title="${escapeHtml(title)}"
+      data-screenshot-status="${escapeHtml(state.status)}"
+      aria-label="${escapeHtml(state.title)}"
+      title="${escapeHtml(state.title)}"
     >
       <span class="match-day-action-icon match-day-action-icon-image" aria-hidden="true"></span>
     </button>
@@ -11713,6 +11733,16 @@ function syncRecentMatchCardDisplayMode(matchId = "") {
   return true;
 }
 
+function syncRecentMatchScreenshotButtonState(matchId = "") {
+  const normalizedMatchId = String(matchId || "").trim();
+  const match = getRecentMatchById(normalizedMatchId);
+  const card = getRecentMatchCardElement(normalizedMatchId);
+  const button = card?.querySelector?.('[data-role="open-opendota-screenshot"]');
+  if (!match || !button) return false;
+  applyRecentMatchScreenshotButtonState(button, getRecentMatchScreenshotButtonState(match));
+  return true;
+}
+
 function closeOpendotaScreenshotModal() {
   setDialogOpen(opendotaScreenshotModal, false);
   if (opendotaScreenshotImage) {
@@ -11755,18 +11785,6 @@ function applyOfficialMatchScreenshotAsset(assetRow) {
     )),
   }));
   return asset;
-}
-
-function getOfficialMatchAssetRenderSignature(asset = null) {
-  if (!asset) return "";
-  return [
-    asset.match_id || "",
-    asset.dota_match_id || "",
-    asset.asset_status || "",
-    asset.storage_path || "",
-    asset.url || "",
-    isOfficialMatchNoRecordAsset(asset) ? "no-record" : "",
-  ].join("|");
 }
 
 function openExistingOpendotaScreenshotOrStatus(matchId) {
@@ -22329,18 +22347,14 @@ async function requestLinkedOpendotaScreenshotInBackground(matchId = "") {
   if (!normalizedMatchId || pendingOpendotaScreenshotRequestMatchIds.has(normalizedMatchId)) return;
   pendingOpendotaScreenshotRequestMatchIds.add(normalizedMatchId);
   try {
-    const previousSignature = getOfficialMatchAssetRenderSignature(
-      getOfficialMatchScreenshotAsset(getSavedMatchById(normalizedMatchId))
-    );
     markRefreshSuppression({ recentMatches: true }, 3500);
     const result = await invokeFunction("request-opendota-screenshot", {
       matchId: normalizedMatchId,
     });
     const asset = applyOfficialMatchScreenshotAsset(result?.asset);
-    const nextSignature = getOfficialMatchAssetRenderSignature(asset);
-    if (asset && nextSignature !== previousSignature) {
+    if (asset) {
       markRefreshSuppression({ recentMatches: true });
-      renderRecentMatches(recentMatchDayGroupsData);
+      syncRecentMatchScreenshotButtonState(asset.match_id);
     }
   } catch (error) {
     console.warn("后台请求 OpenDota 截图失败：", error);
@@ -23351,7 +23365,14 @@ function subscribeRealtime() {
     .on(
       "postgres_changes",
       { event: "*", schema: "public", table: "official_match_assets" },
-      () => {
+      (payload) => {
+        if (payload?.eventType !== "DELETE") {
+          const asset = applyOfficialMatchScreenshotAsset(payload?.new);
+          if (asset?.match_id) {
+            syncRecentMatchScreenshotButtonState(asset.match_id);
+            return;
+          }
+        }
         scheduleRefresh({
           recentMatches: true,
         });
