@@ -4663,9 +4663,10 @@ button:disabled {
 }
 
 .opendota-screenshot-dialog {
-  width: min(1240px, calc(100vw - 32px));
+  width: min(1460px, calc(100vw - 24px));
   max-width: none;
-  max-height: min(92vh, 980px);
+  height: min(96vh, 1120px);
+  max-height: min(96vh, 1120px);
   grid-template-rows: auto minmax(0, 1fr);
   overflow: hidden;
 }
@@ -4675,11 +4676,15 @@ button:disabled {
 }
 
 .opendota-screenshot-head h2 {
-  font-size: 16px;
+  font-size: 15px;
 }
 
 .opendota-screenshot-head p {
   margin: 3px 0 0;
+}
+
+.opendota-screenshot-head p:empty {
+  display: none;
 }
 
 .opendota-screenshot-frame {
@@ -5722,8 +5727,8 @@ button:disabled {
 }
 
 .match-day-action-icon-rotate {
-  -webkit-mask: var(--icon-rotate) center / contain no-repeat;
-  mask: var(--icon-rotate) center / contain no-repeat;
+  -webkit-mask: var(--icon-switch) center / contain no-repeat;
+  mask: var(--icon-switch) center / contain no-repeat;
 }
 
 .match-day-player-list {
@@ -6272,6 +6277,12 @@ button:disabled {
   box-shadow: inset 0 0 0 1px rgba(244, 191, 88, 0.06);
 }
 
+.recent-match-team-power-badge-score {
+  border-color: rgba(94, 234, 212, 0.22);
+  background: rgba(20, 83, 76, 0.22);
+  color: rgba(204, 251, 241, 0.96);
+}
+
 .recent-match-team ul {
   margin: 0;
   padding-left: 0;
@@ -6283,6 +6294,9 @@ button:disabled {
 .recent-match-team li {
   margin: 0;
   padding: 0;
+  min-height: 24px;
+  display: flex;
+  align-items: center;
 }
 
 .recent-match-meta {
@@ -6433,29 +6447,22 @@ button:disabled {
   background: transparent;
   border: 0;
   box-shadow: none;
+  min-height: 24px;
 }
 
 .recent-match-player-main {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   min-width: 0;
   flex: 1 1 auto;
-}
-
-.recent-match-card-detail-view .recent-match-player-main {
-  flex-wrap: nowrap;
   overflow: hidden;
 }
 
 .recent-match-player .player-name-display,
 .recent-match-player-name {
   font-size: 14px;
-}
-
-.recent-match-card-detail-view .recent-match-player-name,
-.recent-match-card-detail-view .recent-match-player .player-name-display {
   flex: 0 1 auto;
   min-width: 0;
   overflow: hidden;
@@ -6485,18 +6492,23 @@ button:disabled {
 .recent-match-player-detail {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
+  gap: 5px;
   min-width: 0;
   flex: 0 1 auto;
   color: rgba(191, 214, 236, 0.9);
   font-size: 10px;
-  line-height: 1.2;
+  line-height: 20px;
   white-space: nowrap;
+  max-width: 0;
+  opacity: 0;
+  overflow: hidden;
+  transform: translateX(-2px);
+  will-change: max-width, opacity, transform;
+  transition: max-width 0.18s ease, opacity 0.16s ease, transform 0.16s ease;
 }
 
 .recent-match-player-detail::before {
-  content: "·";
-  color: rgba(161, 161, 170, 0.5);
+  content: none;
 }
 
 .recent-match-player-hero,
@@ -6524,6 +6536,12 @@ button:disabled {
   font-variant-numeric: tabular-nums;
 }
 
+.recent-match-card-detail-view .recent-match-player-detail {
+  max-width: 132px;
+  opacity: 1;
+  transform: translateX(0);
+}
+
 .match-player-score-delta-badge {
   display: inline-flex;
   align-items: center;
@@ -6540,6 +6558,21 @@ button:disabled {
   flex: 0 0 auto;
   white-space: nowrap;
   font-variant-numeric: tabular-nums;
+  opacity: 1;
+  max-width: 72px;
+  overflow: hidden;
+  will-change: max-width, opacity, padding, border-width;
+  transition: max-width 0.18s ease, opacity 0.16s ease, padding 0.16s ease, border-width 0.16s ease;
+}
+
+.recent-match-card-detail-view .match-player-score-delta-badge {
+  max-width: 0;
+  min-width: 0;
+  margin-left: 0;
+  padding-left: 0;
+  padding-right: 0;
+  border-width: 0;
+  opacity: 0;
 }
 
 .match-player-score-delta-positive {
@@ -9440,6 +9473,7 @@ button.score-detail-summary-card {
   --icon-trophy: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 9H4.5a2.5 2.5 0 0 1 0-5H6'/%3E%3Cpath d='M18 9h1.5a2.5 2.5 0 0 0 0-5H18'/%3E%3Cpath d='M4 22h16'/%3E%3Cpath d='M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22'/%3E%3Cpath d='M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22'/%3E%3Cpath d='M18 2H6v7a6 6 0 0 0 12 0V2Z'/%3E%3C/svg%3E");
   --icon-chevron-up: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m18 15-6-6-6 6'/%3E%3C/svg%3E");
   --icon-refresh: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8'/%3E%3Cpath d='M21 3v5h-5'/%3E%3Cpath d='M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16'/%3E%3Cpath d='M8 16H3v5'/%3E%3C/svg%3E");
+  --icon-switch: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M8 3 4 7l4 4'/%3E%3Cpath d='M4 7h16'/%3E%3Cpath d='m16 21 4-4-4-4'/%3E%3Cpath d='M20 17H4'/%3E%3C/svg%3E");
   --icon-save: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M15.2 3a2 2 0 0 1 1.4.6l3.8 3.8a2 2 0 0 1 .6 1.4V19a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2z'/%3E%3Cpath d='M17 21v-7H7v7'/%3E%3Cpath d='M7 3v5h8'/%3E%3C/svg%3E");
   --icon-plus: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M5 12h14'/%3E%3Cpath d='M12 5v14'/%3E%3C/svg%3E");
   --icon-trash: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M3 6h18'/%3E%3Cpath d='M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2'/%3E%3Cpath d='M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6'/%3E%3Cpath d='M10 11v6'/%3E%3Cpath d='M14 11v6'/%3E%3C/svg%3E");

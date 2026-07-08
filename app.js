@@ -1562,6 +1562,134 @@ const DOTA_HEROES = [
   "Viper", "Visage", "Void Spirit", "Warlock", "Weaver", "Windranger", "Winter Wyvern",
   "Witch Doctor", "Wraith King", "Zeus"
 ];
+const DOTA_HERO_ID_TO_NAME = {
+  1: "Anti-Mage",
+  2: "Axe",
+  3: "Bane",
+  4: "Bloodseeker",
+  5: "Crystal Maiden",
+  6: "Drow Ranger",
+  7: "Earthshaker",
+  8: "Juggernaut",
+  9: "Mirana",
+  10: "Morphling",
+  11: "Shadow Fiend",
+  12: "Phantom Lancer",
+  13: "Puck",
+  14: "Pudge",
+  15: "Razor",
+  16: "Sand King",
+  17: "Storm Spirit",
+  18: "Sven",
+  19: "Tiny",
+  20: "Vengeful Spirit",
+  21: "Windranger",
+  22: "Zeus",
+  23: "Kunkka",
+  25: "Lina",
+  26: "Lion",
+  27: "Shadow Shaman",
+  28: "Slardar",
+  29: "Tidehunter",
+  30: "Witch Doctor",
+  31: "Lich",
+  32: "Riki",
+  33: "Enigma",
+  34: "Tinker",
+  35: "Sniper",
+  36: "Necrophos",
+  37: "Warlock",
+  38: "Beastmaster",
+  39: "Queen of Pain",
+  40: "Venomancer",
+  41: "Faceless Void",
+  42: "Wraith King",
+  43: "Death Prophet",
+  44: "Phantom Assassin",
+  45: "Pugna",
+  46: "Templar Assassin",
+  47: "Viper",
+  48: "Luna",
+  49: "Dragon Knight",
+  50: "Dazzle",
+  51: "Clockwerk",
+  52: "Leshrac",
+  53: "Nature's Prophet",
+  54: "Lifestealer",
+  55: "Dark Seer",
+  56: "Clinkz",
+  57: "Omniknight",
+  58: "Enchantress",
+  59: "Huskar",
+  60: "Night Stalker",
+  61: "Broodmother",
+  62: "Bounty Hunter",
+  63: "Weaver",
+  64: "Jakiro",
+  65: "Batrider",
+  66: "Chen",
+  67: "Spectre",
+  68: "Ancient Apparition",
+  69: "Doom",
+  70: "Ursa",
+  71: "Spirit Breaker",
+  72: "Gyrocopter",
+  73: "Alchemist",
+  74: "Invoker",
+  75: "Silencer",
+  76: "Outworld Destroyer",
+  77: "Lycan",
+  78: "Brewmaster",
+  79: "Shadow Demon",
+  80: "Lone Druid",
+  81: "Chaos Knight",
+  82: "Meepo",
+  83: "Treant Protector",
+  84: "Ogre Magi",
+  85: "Undying",
+  86: "Rubick",
+  87: "Disruptor",
+  88: "Nyx Assassin",
+  89: "Naga Siren",
+  90: "Keeper of the Light",
+  91: "Io",
+  92: "Visage",
+  93: "Slark",
+  94: "Medusa",
+  95: "Troll Warlord",
+  96: "Centaur Warrunner",
+  97: "Magnus",
+  98: "Timbersaw",
+  99: "Bristleback",
+  100: "Tusk",
+  101: "Skywrath Mage",
+  102: "Abaddon",
+  103: "Elder Titan",
+  104: "Legion Commander",
+  105: "Techies",
+  106: "Ember Spirit",
+  107: "Earth Spirit",
+  108: "Underlord",
+  109: "Terrorblade",
+  110: "Phoenix",
+  111: "Oracle",
+  112: "Winter Wyvern",
+  113: "Arc Warden",
+  114: "Monkey King",
+  119: "Dark Willow",
+  120: "Pangolier",
+  121: "Grimstroke",
+  123: "Hoodwink",
+  126: "Void Spirit",
+  128: "Snapfire",
+  129: "Mars",
+  131: "Ringmaster",
+  135: "Dawnbreaker",
+  136: "Marci",
+  137: "Primal Beast",
+  138: "Muerta",
+  145: "Kez",
+};
 const HERO_NAME_ZH = {
   "Abaddon": "亚巴顿",
   "Alchemist": "炼金术士",
@@ -2705,6 +2833,9 @@ async function invokeFunction(name, body = {}) {
         ? "账号映射保存接口返回非 2xx 响应。请先确认已部署 Edge Function：admin-save-user-mapping。"
         : `Edge Function ${name} 返回非 2xx 响应。请先确认该函数已部署到当前 Supabase 项目。`;
     }
+    if (message === "Failed to send a request to the Edge Function") {
+      message = `无法连接到后台函数 ${name}。请确认该函数已部署到当前 Supabase 项目，或稍后等待定时同步。`;
+    }
 
     throw new Error(message);
   }
@@ -2755,8 +2886,8 @@ async function triggerOpendotaArchiveActionFromAdminPanel() {
 
   const confirmed = await confirmAction(
     [
-      `确认触发 ${archiveMonth} 的 OpenDota 比赛记录同步吗？`,
-      "该操作会启动 GitHub Action，可能调用 Steam/OpenDota API 并生成截图；本次最多处理 50 个目标。",
+      `确认同步 ${archiveMonth} 的比赛记录吗？`,
+      "该操作会在后台补齐比赛详情并刷新截图；本次最多处理 50 个目标。",
       "Action 会在后台运行，页面不会等待执行完成。",
     ].join("\n"),
     {
@@ -2776,12 +2907,12 @@ async function triggerOpendotaArchiveActionFromAdminPanel() {
     const result = await invokeFunction("trigger-opendota-archive-action", {
       archiveMonth,
       limit: 50,
-      force: false,
+      force: true,
     });
     const actionUrl = result?.actionsUrl ? ` ${result.actionsUrl}` : "";
     setAdminPanelMessage(`已触发 ${archiveMonth} 比赛记录同步，请稍后在 GitHub Actions 查看进度。${actionUrl}`);
   } catch (error) {
-    setAdminPanelMessage(`触发比赛记录同步失败：${getErrorMessage(error)}`, true);
+    setAdminPanelMessage(`同步请求提交失败：${getErrorMessage(error)}`, true);
   } finally {
     syncAdminOpendotaArchiveActionState();
   }
@@ -5435,6 +5566,13 @@ async function copyMatchDayBattleReport(groupKey, buttonEl) {
 function getHeroDisplayName(heroName) {
   if (!heroName) return "";
   return HERO_NAME_ZH[heroName] || heroName;
+}
+
+function normalizeHeroName(value = "", heroId = null) {
+  const explicitName = String(value || "").trim();
+  if (explicitName) return explicitName;
+  const normalizedHeroId = Number(heroId);
+  return Number.isInteger(normalizedHeroId) ? (DOTA_HERO_ID_TO_NAME[normalizedHeroId] || "") : "";
 }
 
 function getEnglishInitials(heroName) {
@@ -11481,6 +11619,90 @@ function buildRecentMatchDisplayToggleButtonHtml(match, isDetailView = false) {
   `;
 }
 
+function getRecentMatchById(matchId = "") {
+  const normalizedMatchId = String(matchId || "").trim();
+  if (!normalizedMatchId) return null;
+  return recentMatchesData.find((match) => match.match_id === normalizedMatchId)
+    || recentMatchDayGroupsData
+      .flatMap((group) => group.matches || [])
+      .find((match) => match.match_id === normalizedMatchId)
+    || null;
+}
+
+function getRecentMatchTeamScore(match = null, team = "") {
+  const summary = normalizeOfficialMatchSummary(match?.official_match_summary);
+  if (!summary) return null;
+  return team === "A" ? summary.radiant_score : (team === "B" ? summary.dire_score : null);
+}
+
+function getRecentMatchTeamBadgeConfig(match = null, team = "", isDetailView = false, powerTotal = 0, isLeading = false) {
+  const teamScore = getRecentMatchTeamScore(match, team);
+  if (isDetailView && teamScore !== null) {
+    return {
+      label: String(teamScore),
+      className: " recent-match-team-power-badge-score",
+    };
+  }
+  return {
+    label: formatScore(powerTotal),
+    className: isLeading ? " recent-match-team-power-badge-leading" : "",
+  };
+}
+
+function getRecentMatchActiveSeasonRankMap() {
+  return new Map(
+    seasonPlayers
+      .filter((player) => player.is_in_season)
+      .map((player) => [player.id, normalizeSeasonRankNo(player.player_rank)])
+  );
+}
+
+function getRecentMatchCardElement(matchId = "") {
+  const normalizedMatchId = String(matchId || "").trim();
+  if (!normalizedMatchId || !recentMatchesList) return null;
+  return [...recentMatchesList.querySelectorAll(".recent-match-card")]
+    .find((card) => card.dataset.matchId === normalizedMatchId) || null;
+}
+
+function syncRecentMatchCardDisplayMode(matchId = "") {
+  const normalizedMatchId = String(matchId || "").trim();
+  const match = getRecentMatchById(normalizedMatchId);
+  const card = getRecentMatchCardElement(normalizedMatchId);
+  if (!match || !card) return false;
+
+  const players = parseRecentMatchPlayers(match.players);
+  const teamAPlayers = getOrderedSavedMatchTeamPlayers(players, "A");
+  const teamBPlayers = getOrderedSavedMatchTeamPlayers(players, "B");
+  const activeSeasonRankMap = getRecentMatchActiveSeasonRankMap();
+  const teamAPowerTotal = getMatchTeamPowerTotal(teamAPlayers, match.season_id || activeSeason?.id, activeSeasonRankMap);
+  const teamBPowerTotal = getMatchTeamPowerTotal(teamBPlayers, match.season_id || activeSeason?.id, activeSeasonRankMap);
+  const isDetailView = recentMatchDetailViewIds.has(normalizedMatchId);
+  const teamABadge = getRecentMatchTeamBadgeConfig(match, "A", isDetailView, teamAPowerTotal, teamAPowerTotal > teamBPowerTotal);
+  const teamBBadge = getRecentMatchTeamBadgeConfig(match, "B", isDetailView, teamBPowerTotal, teamBPowerTotal > teamAPowerTotal);
+
+  card.classList.toggle("recent-match-card-detail-view", isDetailView);
+  [
+    ["A", teamABadge],
+    ["B", teamBBadge],
+  ].forEach(([team, badge]) => {
+    const badgeEl = card.querySelector(`.recent-match-team-power-badge[data-team="${team}"]`);
+    if (!badgeEl) return;
+    badgeEl.textContent = badge.label;
+    badgeEl.className = `recent-match-team-power-badge${badge.className}`;
+    badgeEl.dataset.team = team;
+  });
+
+  const toggleButton = card.querySelector('[data-role="toggle-recent-match-display"]');
+  if (toggleButton) {
+    const title = isDetailView ? "显示积分变动" : "显示英雄与KDA";
+    toggleButton.classList.toggle("match-day-copy-btn-active", isDetailView);
+    toggleButton.setAttribute("aria-pressed", isDetailView ? "true" : "false");
+    toggleButton.setAttribute("aria-label", title);
+    toggleButton.setAttribute("title", title);
+  }
+  return true;
+}
+
 function closeOpendotaScreenshotModal() {
   setDialogOpen(opendotaScreenshotModal, false);
   if (opendotaScreenshotImage) {
@@ -11496,12 +11718,10 @@ function openOpendotaScreenshotModal(matchId) {
   const asset = getOfficialMatchScreenshotAsset(match);
   if (!asset?.url || !opendotaScreenshotModal || !opendotaScreenshotImage) return;
 
-  const dotaMatchLabel = asset.dota_match_id ? `OpenDota #${asset.dota_match_id}` : "OpenDota";
-  const matchDateLabel = match?.match_date || formatArchiveDate(match?.created_at) || "";
   opendotaScreenshotImage.src = asset.url;
-  opendotaScreenshotImage.alt = `${dotaMatchLabel} 比赛截图`;
+  opendotaScreenshotImage.alt = "比赛详情截图";
   if (opendotaScreenshotMeta) {
-    opendotaScreenshotMeta.textContent = [dotaMatchLabel, matchDateLabel].filter(Boolean).join(" · ");
+    opendotaScreenshotMeta.textContent = "";
   }
   setDialogOpen(opendotaScreenshotModal, true, {
     initialFocus: closeOpendotaScreenshotBtn || undefined,
@@ -16691,6 +16911,19 @@ function normalizeMatchExhibitionFlag(value) {
   return normalized === "true" || normalized === "1";
 }
 
+function normalizeOfficialMatchSummary(value = null) {
+  const source = value && typeof value === "object" ? value : {};
+  const radiantScore = Number(source.radiant_score ?? source.radiantScore);
+  const direScore = Number(source.dire_score ?? source.direScore);
+  const hasRadiantScore = Number.isInteger(radiantScore) && radiantScore >= 0;
+  const hasDireScore = Number.isInteger(direScore) && direScore >= 0;
+  if (!hasRadiantScore && !hasDireScore) return null;
+  return {
+    radiant_score: hasRadiantScore ? radiantScore : null,
+    dire_score: hasDireScore ? direScore : null,
+  };
+}
+
 function normalizeMatchRecordFromView(row) {
   if (!row) return null;
   const metadata = row.metadata && typeof row.metadata === "object" ? row.metadata : {};
@@ -16722,6 +16955,7 @@ function normalizeMatchRecordFromView(row) {
     is_exhibition: normalizeMatchExhibitionFlag(metadata.is_exhibition),
     status: row.status || "",
     official_match_asset: null,
+    official_match_summary: normalizeOfficialMatchSummary(metadata.official_match_summary),
   };
 }
 
@@ -17466,11 +17700,7 @@ function renderRecentMatches(groups) {
   recentMatchesList.innerHTML = "";
   const highestRewardIds = getHighestRewardPlayerIds(leaderboardPlayers);
   const hardcoreLoseIds = getHardcoreLoseTaggedPlayerIds(leaderboardPlayers);
-  const activeSeasonRankMap = new Map(
-    seasonPlayers
-      .filter((player) => player.is_in_season)
-      .map((player) => [player.id, normalizeSeasonRankNo(player.player_rank)])
-  );
+  const activeSeasonRankMap = getRecentMatchActiveSeasonRankMap();
   recentMatchDayGroupsData = groups || [];
   const seasonGroups = buildRecentMatchSeasonGroups(recentMatchDayGroupsData);
 
@@ -17673,8 +17903,6 @@ function renderRecentMatches(groups) {
       const teamBPlayers = getOrderedSavedMatchTeamPlayers(players, "B");
       const teamAPowerTotal = getMatchTeamPowerTotal(teamAPlayers, match.season_id || activeSeason?.id, activeSeasonRankMap);
       const teamBPowerTotal = getMatchTeamPowerTotal(teamBPlayers, match.season_id || activeSeason?.id, activeSeasonRankMap);
-      const teamAPowerBadgeClass = teamAPowerTotal > teamBPowerTotal ? " recent-match-team-power-badge-leading" : "";
-      const teamBPowerBadgeClass = teamBPowerTotal > teamAPowerTotal ? " recent-match-team-power-badge-leading" : "";
       const winnerLabel = getWinnerLabel(match.winner_team);
       const roundBadgeLabel = `第 ${matchIndex + 1} 场 · ${winnerLabel}`;
       const resultToneClass = match.winner_team === "A"
@@ -17695,6 +17923,8 @@ function renderRecentMatches(groups) {
         `).join("")}</div>`
         : "";
       const isDetailView = recentMatchDetailViewIds.has(match.match_id || "");
+      const teamABadge = getRecentMatchTeamBadgeConfig(match, "A", isDetailView, teamAPowerTotal, teamAPowerTotal > teamBPowerTotal);
+      const teamBBadge = getRecentMatchTeamBadgeConfig(match, "B", isDetailView, teamBPowerTotal, teamBPowerTotal > teamAPowerTotal);
       const renderPlayerList = (teamPlayers) => teamPlayers.map((player) => `
         <li>
           <span class="recent-match-player">
@@ -17706,9 +17936,9 @@ function renderRecentMatches(groups) {
                 rank: getLeaderboardRankByPlayerId(player.player_id, leaderboardPlayers),
                 wrapperClassName: "player-name-stack recent-match-player-name",
               })}
-              ${isDetailView ? buildRecentMatchPlayerDetailHtml(player) : buildPlayerKdaSummaryHtml(player)}
+              ${buildRecentMatchPlayerDetailHtml(player)}
             </span>
-            ${isDetailView ? "" : buildMatchPlayerScoreDeltaHtml(player)}
+            ${buildMatchPlayerScoreDeltaHtml(player)}
           </span>
         </li>
       `).join("");
@@ -17719,7 +17949,7 @@ function renderRecentMatches(groups) {
       const screenshotButtonHtml = buildRecentMatchScreenshotButtonHtml(match, officialMatchAsset);
       const displayToggleButtonHtml = buildRecentMatchDisplayToggleButtonHtml(match, isDetailView);
       const hasOfficialMatchLink = Boolean(officialMatchAsset?.dota_match_id);
-      const linkOfficialMatchLabel = hasOfficialMatchLink ? "修改 OpenDota 关联" : "关联 OpenDota 记录";
+      const linkOfficialMatchLabel = hasOfficialMatchLink ? "修改比赛详情关联" : "关联比赛详情";
       const canModifyMatch = canModifyMatchRecordsForSeason(match.season_id || group.season_id || seasonId || "");
       const actionButtonsHtml = canModifyMatch
         ? `
@@ -17771,7 +18001,7 @@ function renderRecentMatches(groups) {
           <div class="recent-match-team${match.winner_team === "A" ? " recent-match-team-winner" : ""}">
             <div class="recent-match-team-head">
               <h3>天辉方</h3>
-              <span class="recent-match-team-power-badge${teamAPowerBadgeClass}">${formatScore(teamAPowerTotal)}</span>
+              <span class="recent-match-team-power-badge${teamABadge.className}" data-team="A">${escapeHtml(teamABadge.label)}</span>
             </div>
             <ul>${renderPlayerList(teamAPlayers)}</ul>
             ${buildEffectLogHtml("A")}
@@ -17779,7 +18009,7 @@ function renderRecentMatches(groups) {
           <div class="recent-match-team${match.winner_team === "B" ? " recent-match-team-winner" : ""}">
             <div class="recent-match-team-head">
               <h3>夜魇方</h3>
-              <span class="recent-match-team-power-badge${teamBPowerBadgeClass}">${formatScore(teamBPowerTotal)}</span>
+              <span class="recent-match-team-power-badge${teamBBadge.className}" data-team="B">${escapeHtml(teamBBadge.label)}</span>
             </div>
             <ul>${renderPlayerList(teamBPlayers)}</ul>
             ${buildEffectLogHtml("B")}
@@ -18489,10 +18719,10 @@ function buildOpendotaSnapshotFromOfficialDetail(dotaMatchId = "") {
     });
   });
 
-  if (!playersById.size) return null;
   return {
     dota_match_id: normalizedDotaMatchId,
     playersById,
+    summary: normalizeOfficialMatchSummary(importedMatch),
   };
 }
 
@@ -18502,7 +18732,15 @@ function attachOfficialCachedOpendotaDetailsToMatches(matches = []) {
   let changed = false;
 
   const nextMatches = matches.map((match) => {
-    if (!match?.match_id || !doesRecentMatchNeedOpendotaArchive(match)) return match;
+    if (
+      !match?.match_id
+      || (
+        !doesRecentMatchNeedOpendotaArchive(match)
+        && normalizeOfficialMatchSummary(match.official_match_summary)
+      )
+    ) {
+      return match;
+    }
     const dotaMatchId = normalizeDotaMatchIdInput(match.official_match_asset?.dota_match_id || "");
     if (!dotaMatchId) return match;
     let snapshot = snapshotByDotaMatchId.get(dotaMatchId);
@@ -18699,12 +18937,38 @@ async function fetchOpendotaSnapshotArchivePayload(matchDate = "") {
 function normalizeOpendotaSnapshotPlayerEntry(entry = {}) {
   const playerId = String(entry.playerId || entry.player_id || entry.id || "").trim();
   if (!playerId) return null;
+  const heroId = Number(entry.heroId ?? entry.hero_id);
   return {
     player_id: playerId,
-    hero_name: String(entry.heroName || entry.hero_name || "").trim() || null,
+    hero_name: normalizeHeroName(entry.heroName || entry.hero_name || "", heroId) || null,
     kills: normalizeKdaValue(entry.kills),
     deaths: normalizeKdaValue(entry.deaths),
     assists: normalizeKdaValue(entry.assists),
+  };
+}
+
+function buildRecentMatchSnapshotFromOfficialSnapshotRow(row = {}) {
+  const normalizedMatch = normalizeOfficialSnapshotRow(row);
+  if (!row?.match_id || !normalizedMatch) return null;
+  const playersById = new Map();
+  (normalizedMatch?.detail?.players || []).forEach((player) => {
+    const playerId = String(player.matchedPlayerId || player.playerId || player.player_id || "").trim();
+    if (!playerId) return;
+    playersById.set(playerId, {
+      player_id: playerId,
+      hero_name: normalizeHeroName(player.heroName || player.hero_name || "", player.heroId ?? player.hero_id) || null,
+      kills: normalizeKdaValue(player.kills),
+      deaths: normalizeKdaValue(player.deaths),
+      assists: normalizeKdaValue(player.assists),
+    });
+  });
+  const summary = normalizedMatch?.summary || null;
+  if (!playersById.size && !summary) return null;
+  return {
+    match_id: row.match_id,
+    dota_match_id: normalizedMatch?.matchId || normalizeDotaMatchIdInput(row.dota_match_id || ""),
+    playersById,
+    summary,
   };
 }
 
@@ -18725,11 +18989,13 @@ function buildOpendotaSnapshotMapFromArchivePayload(payload = null) {
       .forEach((entry) => {
         playersById.set(entry.player_id, entry);
       });
-    if (!playersById.size) return;
+    const summary = normalizeOfficialMatchSummary(rowPayload?.match);
+    if (!playersById.size && !summary) return;
     snapshotMap.set(matchId, {
       match_id: matchId,
       dota_match_id: normalizeDotaMatchIdInput(row?.dotaMatchId || row?.dota_match_id || rowPayload?.match?.dotaMatchId || ""),
       playersById,
+      summary,
     });
   });
   return snapshotMap;
@@ -18748,11 +19014,12 @@ function doesRecentMatchNeedOpendotaArchive(match = null) {
 }
 
 function mergeOpendotaSnapshotIntoRecentMatch(match = null, snapshot = null) {
-  if (!match?.match_id || !snapshot?.playersById?.size) return { match, changed: false };
+  const nextSummary = normalizeOfficialMatchSummary(snapshot?.summary);
+  if (!match?.match_id || (!snapshot?.playersById?.size && !nextSummary)) return { match, changed: false };
   let changed = false;
   const players = parseRecentMatchPlayers(match.players).map((player) => {
     const playerId = String(player?.player_id || player?.id || "").trim();
-    const archived = playerId ? snapshot.playersById.get(playerId) : null;
+    const archived = playerId ? snapshot.playersById?.get(playerId) : null;
     if (!archived) return player;
 
     const nextPlayer = { ...player };
@@ -18774,16 +19041,89 @@ function mergeOpendotaSnapshotIntoRecentMatch(match = null, snapshot = null) {
     }
     return nextPlayer;
   });
+  const currentSummary = normalizeOfficialMatchSummary(match.official_match_summary);
+  const summaryChanged = Boolean(
+    nextSummary
+    && (
+      !currentSummary
+      || currentSummary.radiant_score !== nextSummary.radiant_score
+      || currentSummary.dire_score !== nextSummary.dire_score
+    )
+  );
+  if (summaryChanged) {
+    changed = true;
+  }
 
   return changed
-    ? { match: { ...match, players }, changed: true }
+    ? { match: { ...match, players, official_match_summary: summaryChanged ? nextSummary : match.official_match_summary }, changed: true }
     : { match, changed: false };
+}
+
+async function fetchOfficialSnapshotsForMatchIds(matchIds = []) {
+  const snapshotMap = new Map();
+  const normalizedIds = [...new Set((matchIds || []).filter(Boolean))];
+  const chunkSize = 150;
+
+  for (let index = 0; index < normalizedIds.length; index += chunkSize) {
+    const chunk = normalizedIds.slice(index, index + chunkSize);
+    const { data, error } = await db
+      .from("official_match_snapshots")
+      .select("id, match_id, season_id, match_date, match_no, dota_match_id, payload, source_url, screenshot_bucket, screenshot_path, captured_at, created_at, updated_at")
+      .in("match_id", chunk)
+      .eq("provider", "opendota");
+
+    if (error) {
+      if (!isMissingPublicTableError(error, "official_match_snapshots")) {
+        console.error("加载比赛快照失败：", error);
+      }
+      return snapshotMap;
+    }
+
+    (data || [])
+      .map((row) => buildRecentMatchSnapshotFromOfficialSnapshotRow(row))
+      .filter(Boolean)
+      .forEach((snapshot) => {
+        if (!snapshotMap.has(snapshot.match_id)) {
+          snapshotMap.set(snapshot.match_id, snapshot);
+        }
+      });
+  }
+
+  return snapshotMap;
+}
+
+async function attachSupabaseOpendotaSnapshotsToMatches(matches = []) {
+  const candidates = (matches || []).filter((match) => (
+    match?.match_id
+    && (
+      doesRecentMatchNeedOpendotaArchive(match)
+      || !normalizeOfficialMatchSummary(match.official_match_summary)
+    )
+  ));
+  if (!candidates.length) return matches;
+
+  const snapshotMap = await fetchOfficialSnapshotsForMatchIds(candidates.map((match) => match.match_id));
+  if (!snapshotMap.size) return matches;
+
+  let changed = false;
+  const nextMatches = (matches || []).map((match) => {
+    const snapshot = snapshotMap.get(match?.match_id || "");
+    if (!snapshot) return match;
+    const result = mergeOpendotaSnapshotIntoRecentMatch(match, snapshot);
+    if (result.changed) changed = true;
+    return result.match;
+  });
+
+  return changed ? nextMatches : matches;
 }
 
 async function attachArchivedOpendotaSnapshotsToMatches(matches = []) {
   const candidates = (matches || []).filter((match) => (
     match?.match_id
-    && doesRecentMatchNeedOpendotaArchive(match)
+    && (
+      doesRecentMatchNeedOpendotaArchive(match)
+      || !normalizeOfficialMatchSummary(match.official_match_summary)
+    )
   ));
   if (!candidates.length) return matches;
 
@@ -18916,6 +19256,12 @@ async function loadRecentMatchSeasonBundle(seasonId) {
       normalizedMatches = attachOfficialCachedOpendotaDetailsToMatches(normalizedMatches);
     } catch (error) {
       console.error("加载 OpenDota 比赛截图失败：", error);
+    }
+
+    try {
+      normalizedMatches = await attachSupabaseOpendotaSnapshotsToMatches(normalizedMatches);
+    } catch (error) {
+      console.error("加载比赛快照失败：", error);
     }
 
     try {
@@ -20737,6 +21083,135 @@ function writeOfficialCachedMonth(monthEntry = null) {
   });
 }
 
+function normalizeOfficialSnapshotPlayer(player = {}) {
+  const side = player.side === "dire" ? "dire" : (player.side === "radiant" ? "radiant" : "");
+  const slotNo = Number(player.slotNo ?? player.slot_no);
+  const heroId = Number(player.heroId ?? player.hero_id);
+  return {
+    accountId: String(player.accountId || player.account_id || "").trim() || null,
+    displayName: String(player.displayName || player.display_name || "").trim() || null,
+    name: String(player.displayName || player.display_name || "").trim() || null,
+    side,
+    slotNo: Number.isInteger(slotNo) && slotNo > 0 ? slotNo : null,
+    heroId: Number.isInteger(heroId) ? heroId : null,
+    heroName: normalizeHeroName(player.heroName || player.hero_name || "", heroId) || null,
+    kills: normalizeKdaValue(player.kills),
+    deaths: normalizeKdaValue(player.deaths),
+    assists: normalizeKdaValue(player.assists),
+    matchedPlayerId: String(player.playerId || player.player_id || "").trim() || null,
+    matchedDisplayName: String(player.displayName || player.display_name || "").trim() || null,
+  };
+}
+
+function normalizeOfficialSnapshotRow(row = {}) {
+  const payload = row?.payload && typeof row.payload === "object" ? row.payload : {};
+  const matchPayload = payload.match && typeof payload.match === "object" ? payload.match : {};
+  const dotaMatchId = normalizeDotaMatchIdInput(row.dota_match_id || matchPayload.dotaMatchId || "");
+  if (!dotaMatchId) return null;
+  const officialPlayers = Array.isArray(payload.officialPlayers) ? payload.officialPlayers : [];
+  const localPlayers = Array.isArray(payload.players) ? payload.players : [];
+  const localPlayersBySlot = new Map(
+    localPlayers
+      .map((player) => normalizeOfficialSnapshotPlayer(player))
+      .filter((player) => player.side && player.slotNo)
+      .map((player) => [`${player.side}:${player.slotNo}`, player])
+  );
+  const players = (officialPlayers.length ? officialPlayers : localPlayers)
+    .map((player) => normalizeOfficialSnapshotPlayer(player))
+    .map((player) => {
+      const localPlayer = localPlayersBySlot.get(`${player.side}:${player.slotNo}`);
+      return localPlayer ? {
+        ...player,
+        matchedPlayerId: player.matchedPlayerId || localPlayer.matchedPlayerId,
+        matchedDisplayName: player.matchedDisplayName || localPlayer.matchedDisplayName,
+        displayName: player.displayName || localPlayer.displayName,
+        name: player.name || localPlayer.name,
+      } : player;
+    })
+    .filter((player) => player.side && player.slotNo);
+  const capturedAt = row.captured_at || payload.capturedAt || "";
+  const startTime = Number(matchPayload.startTime);
+  const startTimeIso = Number.isFinite(startTime) && startTime > 0
+    ? new Date(startTime * 1000).toISOString()
+    : (row.match_date ? `${row.match_date}T12:00:00.000Z` : null);
+  const detail = {
+    matchId: dotaMatchId,
+    source: "snapshot",
+    sourceUrl: row.source_url || matchPayload.sourceUrl || `https://www.opendota.com/matches/${dotaMatchId}`,
+    startTime: Number.isFinite(startTime) ? startTime : null,
+    startTimeIso,
+    duration: Number.isFinite(Number(matchPayload.duration)) ? Number(matchPayload.duration) : null,
+    radiantWin: Boolean(matchPayload.radiantWin),
+    winnerSide: matchPayload.winnerSide === "dire" ? "dire" : (matchPayload.winnerSide === "radiant" ? "radiant" : null),
+    radiantScore: Number.isInteger(Number(matchPayload.radiantScore ?? matchPayload.radiant_score)) ? Number(matchPayload.radiantScore ?? matchPayload.radiant_score) : null,
+    direScore: Number.isInteger(Number(matchPayload.direScore ?? matchPayload.dire_score)) ? Number(matchPayload.direScore ?? matchPayload.dire_score) : null,
+    players,
+    matchedCount: players.filter((player) => player.matchedPlayerId).length,
+  };
+  const summary = normalizeOfficialMatchSummary(matchPayload);
+  return {
+    matchId: dotaMatchId,
+    startTime: detail.startTime,
+    startTimeIso: detail.startTimeIso,
+    source: "snapshot",
+    detail,
+    detailStatus: "ready",
+    detailError: "",
+    imported: false,
+    cachedAt: capturedAt,
+    summary,
+  };
+}
+
+async function fetchOfficialSnapshotMatchesForMonth(monthCode = "") {
+  const normalizedMonthCode = String(monthCode || "").trim();
+  if (!/^[0-9]{4}-[0-9]{2}$/.test(normalizedMonthCode)) return [];
+  const startDate = `${normalizedMonthCode}-01`;
+  const [yearText, monthText] = normalizedMonthCode.split("-");
+  const nextMonthDate = new Date(Date.UTC(Number(yearText), Number(monthText), 1));
+  const nextMonthCode = `${nextMonthDate.getUTCFullYear()}-${String(nextMonthDate.getUTCMonth() + 1).padStart(2, "0")}`;
+  const { data, error } = await db
+    .from("official_match_snapshots")
+    .select("id, match_id, season_id, match_date, match_no, dota_match_id, payload, source_url, screenshot_bucket, screenshot_path, captured_at, created_at, updated_at")
+    .gte("match_date", startDate)
+    .lt("match_date", `${nextMonthCode}-01`)
+    .eq("provider", "opendota")
+    .order("match_date", { ascending: false })
+    .order("match_no", { ascending: false });
+
+  if (error) {
+    if (!isMissingPublicTableError(error, "official_match_snapshots")) {
+      console.error("加载比赛快照失败：", error);
+    }
+    return [];
+  }
+
+  const seen = new Set();
+  return (data || [])
+    .map((row) => normalizeOfficialSnapshotRow(row))
+    .filter(Boolean)
+    .filter((match) => {
+      if (seen.has(match.matchId)) return false;
+      seen.add(match.matchId);
+      return true;
+    })
+    .sort(compareOfficialMatchesByStartAsc)
+    .reverse();
+}
+
+async function hydrateOfficialMonthFromSnapshotCache(monthEntry = null) {
+  if (!monthEntry?.monthCode) return false;
+  const matches = await fetchOfficialSnapshotMatchesForMonth(monthEntry.monthCode);
+  if (!matches.length) return false;
+  monthEntry.matches = matches;
+  monthEntry.loaded = true;
+  monthEntry.status = "ready";
+  monthEntry.error = "";
+  officialMatchImportState.status = "ready";
+  officialMatchImportState.matches = monthEntry.matches;
+  return true;
+}
+
 function getOfficialSeasonEntries() {
   const defaultMonthCode = getOfficialDefaultMonthCode();
   const seen = new Set();
@@ -20942,7 +21417,7 @@ function isOfficialMatchInAutoDetailWindow(match = {}) {
 }
 
 function getOfficialMatchSourceLabel(importedMatch = {}) {
-  return importedMatch.source === "opendota_public" ? "OpenDota 公开缓存" : "Valve 官方接口";
+  return importedMatch.source === "snapshot" || importedMatch.source === "opendota_public" ? "已缓存" : "已读取";
 }
 
 function formatOfficialMatchTime(match = {}) {
@@ -21096,7 +21571,7 @@ function renderOfficialMatchCard(match, matchIndex = 0) {
     ? "已添加"
     : (match.detailStatus === "error"
     ? "读取失败"
-    : (isLoading ? "读取中" : (isReady ? (unresolvedCount ? `未关联 ${unresolvedCount}` : "已全部关联") : (needsManualSync ? "待手动同步" : "等待读取")))));
+    : (isLoading ? "读取中" : (isReady ? (unresolvedCount ? `待关联 ${unresolvedCount}` : "已就绪") : (needsManualSync ? "可同步" : "等待读取")))));
   const statusClass = linkedAsset || match.imported || (!unresolvedCount && match.detailStatus !== "error")
     ? "official-match-card-status-ok"
     : "official-match-card-status-warn";
@@ -21126,11 +21601,11 @@ function renderOfficialMatchCard(match, matchIndex = 0) {
       ${match.detailStatus === "error" ? `
         <div class="official-match-card-error">
           <span>${escapeHtml(match.detailError || "读取比赛详情失败。")}</span>
-          <button class="button-secondary admin-panel-compact-btn" type="button" data-role="reload-official-match" data-match-id="${escapeHtml(matchId)}">重读</button>
+          <button class="button-secondary admin-panel-compact-btn" type="button" data-role="reload-official-match" data-match-id="${escapeHtml(matchId)}">同步</button>
         </div>
       ` : ""}
       ${!isReady && match.detailStatus !== "error" ? `
-        <p class="muted official-match-card-loading">${needsManualSync ? "超过最近三天，点击同步后读取双方选手。" : "正在读取双方选手..."}</p>
+        <p class="muted official-match-card-loading">${needsManualSync ? "点击同步读取比赛详情。" : "正在读取比赛详情..."}</p>
       ` : ""}
       ${isReady ? `
         <div class="official-match-card-teams">
@@ -21169,11 +21644,11 @@ function renderOfficialMatchDateGroups(matches = []) {
 
 function getOfficialMonthSummaryText(monthEntry) {
   if (!monthEntry) return "";
-  if (monthEntry.status === "loading") return "正在读取官方比赛";
+  if (monthEntry.status === "loading") return "正在读取比赛";
   if (monthEntry.status === "error") return monthEntry.error || "读取失败，展开可重试";
-  if (!monthEntry.loaded) return "点击展开后读取官方比赛";
+  if (!monthEntry.loaded) return "点击展开后读取比赛";
   const matchCount = (monthEntry.matches || []).length;
-  return matchCount ? `${matchCount} 场比赛` : "暂无可导入比赛";
+  return matchCount ? `${matchCount} 场比赛` : "暂无比赛";
 }
 
 function renderOfficialMatchesList() {
@@ -21181,7 +21656,7 @@ function renderOfficialMatchesList() {
   const months = officialMatchImportState.months || [];
 
   if (!months.length) {
-    officialMatchesList.innerHTML = `<p class="muted official-matches-empty">${escapeHtml(copyText("officialMatches.empty", "暂无可导入比赛"))}</p>`;
+    officialMatchesList.innerHTML = `<p class="muted official-matches-empty">${escapeHtml(copyText("officialMatches.empty", "暂无比赛"))}</p>`;
     return;
   }
 
@@ -21192,21 +21667,21 @@ function renderOfficialMatchesList() {
     const contentHtml = (() => {
       if (!isOpen) return "";
       if (monthEntry.status === "loading") {
-        return '<p class="muted official-matches-loading">正在读取官方比赛...</p>';
+        return '<p class="muted official-matches-loading">正在读取比赛...</p>';
       }
       if (monthEntry.status === "error") {
         return `
           <div class="official-match-month-error">
-            <span>${escapeHtml(monthEntry.error || "读取官方比赛失败。")}</span>
+            <span>${escapeHtml(monthEntry.error || "读取比赛失败。")}</span>
             <button class="button-secondary admin-panel-compact-btn" type="button" data-role="load-official-month" data-month-code="${escapeHtml(monthEntry.monthCode)}">重试</button>
           </div>
         `;
       }
       if (!monthEntry.loaded) {
-        return '<p class="muted official-matches-loading">展开后读取官方比赛...</p>';
+        return '<p class="muted official-matches-loading">展开后读取比赛...</p>';
       }
       if (!matches.length) {
-        return `<p class="muted official-matches-empty">${escapeHtml(copyText("officialMatches.empty", "暂无可导入比赛"))}</p>`;
+        return `<p class="muted official-matches-empty">${escapeHtml(copyText("officialMatches.empty", "暂无比赛"))}</p>`;
       }
       return renderOfficialMatchDateGroups(matches);
     })();
@@ -21302,19 +21777,19 @@ async function loadOfficialLeagueMatchDetails(loadToken, monthCode, options = {}
   if (matches.length) {
     setOfficialMatchesMessage(
       skippedCount > 0
-        ? `已读取 ${monthCode} 的 ${matches.length} 场官方比赛，自动同步最近 ${OFFICIAL_MATCH_AUTO_DETAIL_RECENT_DAYS} 天；更早记录请手动同步。`
-        : `已读取 ${monthCode} 的 ${matches.length} 场官方比赛。`
+        ? `已读取 ${monthCode} 的 ${matches.length} 场比赛，较早记录可点击同步补齐详情。`
+        : `已读取 ${monthCode} 的 ${matches.length} 场比赛。`
     );
   }
 }
 
 async function loadOfficialMatchMonth(monthCode, options = {}) {
-  if (!ensureScorerAccess("仅记分员或管理员可读取官方比赛。")) return;
+  if (!ensureScorerAccess("仅记分员或管理员可读取比赛记录。")) return;
   const targetMonthCode = String(monthCode || officialMatchImportState.activeMonthCode || getOfficialDefaultMonthCode()).trim();
   const monthEntry = getOfficialMonthEntry(targetMonthCode);
   if (!monthEntry) return;
   if (!monthEntry.seasonId) {
-    setOfficialMatchesMessage("当前缺少可用赛季，暂时无法导入官方比赛。", true);
+    setOfficialMatchesMessage("当前缺少可用赛季，暂时无法添加比赛。", true);
     return;
   }
 
@@ -21333,6 +21808,15 @@ async function loadOfficialMatchMonth(monthCode, options = {}) {
       applyOfficialCachedOpendotaDetailsToRecentMatches();
       renderOfficialMatchesModal();
       setOfficialMatchesMessage(`已使用 ${targetMonthCode} 的页面缓存。`);
+      return;
+    }
+    const hydrated = await hydrateOfficialMonthFromSnapshotCache(monthEntry);
+    if (hydrated) {
+      await refreshOfficialAssetLinksForMatches(getOfficialVisibleMatches());
+      queueOfficialVisibleScreenshotCaptures();
+      applyOfficialCachedOpendotaDetailsToRecentMatches();
+      renderOfficialMatchesModal();
+      setOfficialMatchesMessage(`已读取 ${targetMonthCode} 的缓存记录。`);
       return;
     }
   }
@@ -21385,10 +21869,10 @@ async function loadOfficialMatchMonth(monthCode, options = {}) {
     writeOfficialCachedMonth(monthEntry);
     renderOfficialMatchesModal();
     if (!monthEntry.matches.length) {
-      setOfficialMatchesMessage(`${targetMonthCode} 暂未返回可导入比赛。`, true);
+      setOfficialMatchesMessage(`${targetMonthCode} 暂无可添加比赛。`, true);
       return;
     }
-    setOfficialMatchesMessage(`正在读取最近 ${OFFICIAL_MATCH_AUTO_DETAIL_RECENT_DAYS} 天双方选手...`);
+    setOfficialMatchesMessage("正在读取近期比赛详情...");
     await loadOfficialLeagueMatchDetails(loadToken, targetMonthCode, {
       limitToRecentDays: options.limitToRecentDays !== false,
     });
@@ -21401,7 +21885,7 @@ async function loadOfficialMatchMonth(monthCode, options = {}) {
     monthEntry.loaded = false;
     officialMatchImportState.matches = [];
     renderOfficialMatchesModal();
-    setOfficialMatchesMessage(`读取官方比赛失败：${error.message}`, true);
+    setOfficialMatchesMessage(`读取比赛失败：${error.message}`, true);
   } finally {
     if (officialMatchImportState.loadingMonthCode === targetMonthCode) {
       officialMatchImportState.loadingMonthCode = "";
@@ -21414,9 +21898,9 @@ async function loadOfficialLeagueMatches() {
 }
 
 async function openOfficialMatchesModal() {
-  if (!ensureScorerAccess("仅记分员或管理员可读取官方比赛。")) return;
+  if (!ensureScorerAccess("仅记分员或管理员可读取比赛记录。")) return;
   if (!activeSeason?.id) {
-    setMessage("当前缺少可用赛季，暂时无法导入官方比赛。", true);
+    setMessage("当前缺少可用赛季，暂时无法添加比赛。", true);
     return;
   }
   if (!seasonPlayers.length) {
@@ -21438,8 +21922,9 @@ function buildOfficialMatchAssignments(importedMatch, matchId = importedMatch?.m
   getOfficialMatchPlayers(importedMatch).forEach((player) => {
     const playerId = getOfficialSelectedPlayerId(player, matchId);
     if (!playerId) return;
-    if (player.heroName && DOTA_HEROES.includes(player.heroName)) {
-      heroAssignments[playerId] = player.heroName;
+    const heroName = normalizeHeroName(player.heroName || player.hero_name || "", player.heroId ?? player.hero_id);
+    if (heroName && DOTA_HEROES.includes(heroName)) {
+      heroAssignments[playerId] = heroName;
     }
     const kdaEntry = normalizeKdaEntry(player);
     if (hasKdaEntryValue(kdaEntry)) {
@@ -21526,7 +22011,7 @@ async function persistOfficialSinglePlayerMapping(matchId, slotKey, playerId) {
   const isDuplicate = getOfficialMatchPlayers(importedMatch)
     .some((entry) => entry !== player && getOfficialSelectedPlayerId(entry, normalizedMatchId) === playerId);
   if (isDuplicate) {
-    setOfficialMatchesMessage("同一名本地选手不能在同一场官方比赛中重复出现。", true);
+    setOfficialMatchesMessage("同一名本地选手不能在同一场比赛中重复出现。", true);
     return;
   }
 
@@ -21721,8 +22206,8 @@ async function promptOfficialSavedMatchAssociationSelection(context = {}, offici
   }));
   const selectedMatchId = await chooseAction(
     [
-      `OpenDota #${officialMatchId}`,
-      `官方记录 ${context.officialCount || 0} 场，本地登记 ${context.localCount || 0} 场。`,
+      `待关联比赛`,
+      `外部记录 ${context.officialCount || 0} 场，本地登记 ${context.localCount || 0} 场。`,
       "同一天存在多场相同阵容的本地比赛，请选择要关联的本地场次：",
     ].join("\n"),
     choices,
@@ -21875,7 +22360,7 @@ async function linkOfficialMatchAsset(matchId = "", dotaMatchId = "", options = 
 
   if (error) {
     if (options.throwOnError) {
-      throw new Error(error.message || "记录 OpenDota 关联失败。");
+      throw new Error(error.message || "记录比赛详情关联失败。");
     }
     if (!shouldRetryMissingRpc(error, "upsert_official_match_asset")) {
       console.warn("记录 OpenDota 截图链接失败：", error);
@@ -21935,10 +22420,17 @@ async function loadOfficialMatchCandidatesForSavedMatch(match = null) {
       officialMatchImportState.status = "ready";
       officialMatchImportState.matches = monthEntry.matches;
       renderOfficialMatchesModal();
+    } else {
+      const hydrated = await hydrateOfficialMonthFromSnapshotCache(monthEntry);
+      if (hydrated) {
+        await refreshOfficialAssetLinksForMatches(getOfficialVisibleMatches());
+        applyOfficialCachedOpendotaDetailsToRecentMatches();
+        renderOfficialMatchesModal();
+      }
     }
   }
   if (monthEntry?.status === "error") {
-    throw new Error(monthEntry.error || "读取官方比赛失败。");
+    throw new Error(monthEntry.error || "读取比赛失败。");
   }
   return getOfficialMatchCandidatesForSavedMatch(match);
 }
@@ -22043,7 +22535,7 @@ async function chooseOfficialMatchCandidateByClick(message = "", candidates = []
 }
 
 async function chooseOfficialMatchAssetForSavedMatch(matchId = "", triggerButton = null) {
-  if (!ensureScorerAccess("仅记分员或管理员可关联 OpenDota 记录。")) return;
+  if (!ensureScorerAccess("仅记分员或管理员可关联比赛详情。")) return;
   if (!ensureMatchRecordEditable(matchId, "关联")) return;
   const match = getSavedMatchById(matchId);
   if (!match) return;
@@ -22059,8 +22551,8 @@ async function chooseOfficialMatchAssetForSavedMatch(matchId = "", triggerButton
       const monthEntry = getOfficialMonthEntry(getOfficialMatchCandidateMonthCode(match));
       setMessage(
         monthEntry?.loaded
-          ? "该日期暂无可关联的 OpenDota 比赛记录。"
-          : "该月份官方记录尚未缓存，请先在官方比赛记录面板读取该月份后再关联。",
+          ? "该日期暂无可关联的比赛详情。"
+          : "该月份尚未读取，请先在比赛记录面板读取该月份后再关联。",
         true
       );
       return;
@@ -22080,11 +22572,11 @@ async function chooseOfficialMatchAssetForSavedMatch(matchId = "", triggerButton
       );
     }
     if (selectedDotaMatchId === null) {
-      setMessage("已取消 OpenDota 关联。");
+      setMessage("已取消比赛详情关联。");
       return;
     }
     if (!selectedDotaMatchId) {
-      setMessage("该日期存在多场 OpenDota 记录，但本地尚未缓存双方选手信息。请先在官方比赛记录面板读取该月份后再关联。", true);
+      setMessage("该日期存在多场记录，但本地尚未缓存双方选手信息。请先在比赛记录面板读取该月份后再关联。", true);
       return;
     }
 
@@ -22100,9 +22592,9 @@ async function chooseOfficialMatchAssetForSavedMatch(matchId = "", triggerButton
     void refreshOfficialAssetLinksForMatches(getOfficialVisibleMatches())
       .then(() => renderOfficialMatchesModal())
       .catch((error) => console.error("刷新 OpenDota 关联状态失败：", error));
-    setMessage(`已关联 OpenDota #${selectedDotaMatchId}；截图生成后可通过比赛详情图标查看。`);
+    setMessage("已关联比赛详情；截图生成后可通过比赛详情图标查看。");
   } catch (error) {
-    setMessage(`关联 OpenDota 记录失败：${error.message || "未知错误"}`, true);
+    setMessage(`关联比赛详情失败：${error.message || "未知错误"}`, true);
   } finally {
     if (triggerButton) {
       triggerButton.disabled = false;
@@ -22114,11 +22606,11 @@ async function chooseOfficialMatchAssetForSavedMatch(matchId = "", triggerButton
 async function saveOfficialImportedMatch(matchId) {
   const normalizedMatchId = normalizeDotaMatchIdInput(matchId);
   if (!normalizedMatchId || officialMatchImportState.isSaving) return;
-  if (!ensureScorerAccess("仅记分员或管理员可添加官方比赛。")) return;
+  if (!ensureScorerAccess("仅记分员或管理员可添加比赛。")) return;
   const monthEntry = getOfficialMonthEntryByMatchId(normalizedMatchId);
   const targetSeasonId = monthEntry?.seasonId || activeSeason?.id || "";
   if (!targetSeasonId) {
-    setOfficialMatchesMessage("当前缺少可用赛季，暂时无法添加官方比赛。", true);
+    setOfficialMatchesMessage("当前缺少可用赛季，暂时无法添加比赛。", true);
     return;
   }
   if (!canModifyMatchRecordsForSeason(targetSeasonId)) {
@@ -22129,7 +22621,7 @@ async function saveOfficialImportedMatch(matchId) {
   const matchEntry = getOfficialMatchEntry(normalizedMatchId);
   let importedMatch = getOfficialMatchDetail(matchEntry);
   if (!importedMatch) {
-    setOfficialMatchesMessage(`正在读取比赛 #${normalizedMatchId}...`);
+    setOfficialMatchesMessage("正在读取比赛详情...");
     try {
       importedMatch = await loadOfficialMatchDetail(normalizedMatchId);
     } catch (error) {
@@ -22150,11 +22642,11 @@ async function saveOfficialImportedMatch(matchId) {
     return;
   }
   if (new Set(allPlayerIds).size !== TEAM_SIZE * 2) {
-    setOfficialMatchesMessage("同一名本地选手不能在同一场官方比赛中重复出现。", true);
+    setOfficialMatchesMessage("同一名本地选手不能在同一场比赛中重复出现。", true);
     return;
   }
   if (allPlayerIds.some((playerId) => !eligiblePlayerIds.has(playerId))) {
-    setOfficialMatchesMessage("官方比赛只能添加当前赛季的本地选手。", true);
+    setOfficialMatchesMessage("只能添加当前赛季的本地选手。", true);
     return;
   }
 
@@ -22178,12 +22670,12 @@ async function saveOfficialImportedMatch(matchId) {
     );
     let duplicateMatch = null;
     if (manualAssociationContext.requiresManualSelection) {
-      setOfficialMatchesMessage("该日期官方记录数量与本地登记数量不一致，且存在多场相同阵容，请选择关联场次。");
+      setOfficialMatchesMessage("该日期存在多场相同阵容，请选择要关联的本地场次。");
       const selection = await promptOfficialSavedMatchAssociationSelection(manualAssociationContext, officialMatchId);
       duplicateMatch = selection?.match || null;
       if (!duplicateMatch) {
         if (selection?.status === "cancelled") {
-          setOfficialMatchesMessage("已取消官方比赛关联。");
+          setOfficialMatchesMessage("已取消比赛关联。");
         }
         return;
       }
@@ -22215,7 +22707,7 @@ async function saveOfficialImportedMatch(matchId) {
       if (monthEntry) {
         writeOfficialCachedMonth(monthEntry);
       }
-      setOfficialMatchesMessage(`官方比赛 #${importedMatch.matchId} 已合并到已有比赛记录，并保留原道具使用。`);
+      setOfficialMatchesMessage("已合并到已有比赛记录，并保留原道具使用。");
       return;
     }
 
@@ -22276,9 +22768,9 @@ async function saveOfficialImportedMatch(matchId) {
     if (monthEntry) {
       writeOfficialCachedMonth(monthEntry);
     }
-    setOfficialMatchesMessage(`官方比赛 #${importedMatch.matchId} 已添加到比赛记录。`);
+    setOfficialMatchesMessage("已添加到比赛记录。");
   } catch (error) {
-    setOfficialMatchesMessage(`添加官方比赛失败：${error.message}`, true);
+    setOfficialMatchesMessage(`添加比赛失败：${error.message}`, true);
   } finally {
     officialMatchImportState.isSaving = false;
     officialMatchImportState.savingMatchId = "";
@@ -23702,13 +24194,13 @@ if (officialMatchesList) {
     if (reloadButton) {
       const matchId = normalizeDotaMatchIdInput(reloadButton.dataset.matchId || "");
       if (!matchId) return;
-      setOfficialMatchesMessage(`正在重读比赛 #${matchId}...`);
+      setOfficialMatchesMessage("正在同步比赛详情...");
       try {
         await loadOfficialMatchDetail(matchId, { force: true });
         queueOfficialVisibleScreenshotCaptures();
-        setOfficialMatchesMessage(`比赛 #${matchId} 已重读。`);
+        setOfficialMatchesMessage("比赛详情已同步。");
       } catch (error) {
-        setOfficialMatchesMessage(`重读比赛失败：${error.message}`, true);
+        setOfficialMatchesMessage(`同步比赛详情失败：${error.message}`, true);
       }
       return;
     }
@@ -24130,7 +24622,9 @@ recentMatchesList.addEventListener("click", async (event) => {
     } else {
       recentMatchDetailViewIds.add(matchId);
     }
-    renderRecentMatches(recentMatchDayGroupsData);
+    if (!syncRecentMatchCardDisplayMode(matchId)) {
+      renderRecentMatches(recentMatchDayGroupsData);
+    }
     return;
   }
 

@@ -209,7 +209,7 @@
       backfillMatch: "比赛补录",
       matchFormTitle: "当日比赛登记",
       liveSaveBadge: "即时保存",
-      officialMatches: "官方比赛",
+      officialMatches: "比赛详情",
       radiantTeam: "天辉方",
       direTeam: "夜魇方",
       winnerToggleHint: "",
@@ -267,7 +267,7 @@
     },
     steamMapping: {
       title: "Steam账号映射",
-      subtitle: "用于官方比赛导入时把 Dota 2 账号匹配到本地选手。",
+      subtitle: "用于把外部比赛记录匹配到本地选手。",
       close: "关闭",
       refresh: "刷新",
       searchPlaceholder: "搜索选手",
@@ -277,12 +277,12 @@
       empty: "暂无可管理选手",
     },
     officialMatches: {
-      title: "官方比赛记录",
+      title: "比赛记录",
       close: "关闭",
       refresh: "刷新",
       add: "添加",
       addWithMapping: "关联并添加",
-      empty: "暂无可导入比赛",
+      empty: "暂无比赛",
     },
     runtime: {
       accessRoleLabels: {

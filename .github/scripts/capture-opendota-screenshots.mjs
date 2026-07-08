@@ -519,11 +519,18 @@ function normalizeMatchDuration(value) {
   return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
 }
 
+function normalizeMatchScore(value) {
+  const parsed = Number(value);
+  return Number.isInteger(parsed) && parsed >= 0 ? parsed : null;
+}
+
 async function fetchOpenDotaDetails(matchId) {
   const payload = await fetchJson(new URL(`https://api.opendota.com/api/matches/${matchId}`), "OpenDota match details");
   return {
     matchId,
     radiantWin: Boolean(payload?.radiant_win),
+    radiantScore: normalizeMatchScore(payload?.radiant_score),
+    direScore: normalizeMatchScore(payload?.dire_score),
     players: Array.isArray(payload?.players) ? payload.players : [],
     startTime: Number.isFinite(Number(payload?.start_time)) ? Number(payload.start_time) : null,
     duration: normalizeMatchDuration(payload?.duration),
@@ -540,6 +547,8 @@ async function fetchMatchDetails(matchId) {
           return {
             matchId: normalizeDotaMatchId(result.match_id) || matchId,
             radiantWin: Boolean(result.radiant_win),
+            radiantScore: normalizeMatchScore(result.radiant_score),
+            direScore: normalizeMatchScore(result.dire_score),
             players: result.players,
             startTime: Number.isFinite(Number(result.start_time)) ? Number(result.start_time) : null,
             duration: normalizeMatchDuration(result.duration),
@@ -698,6 +707,8 @@ async function buildOfficialMatchSnapshotPayload(match, dotaMatchId, details, as
       duration: details.duration ?? null,
       radiantWin: Boolean(details.radiantWin),
       winnerSide: getWinnerSideFromDetails(details),
+      radiantScore: details.radiantScore ?? null,
+      direScore: details.direScore ?? null,
     },
     screenshot: {
       bucket: asset.storage_bucket || BUCKET,
@@ -978,10 +989,71 @@ async function findOfficialDotaMatchId(match) {
   return best.matchId;
 }
 
+async function getOpenDotaOverviewScreenshotClip(page) {
+  return page.evaluate(() => {
+    const normalizeText = (value) => String(value || "").replace(/\s+/g, " ").trim();
+    const findTextElement = (label) => [...document.querySelectorAll("body *")]
+      .filter((node) => normalizeText(node.textContent) === label)
+      .sort((left, right) => {
+        const leftRect = left.getBoundingClientRect();
+        const rightRect = right.getBoundingClientRect();
+        return (leftRect.height * leftRect.width) - (rightRect.height * rightRect.width);
+      })[0] || null;
+    const getSectionBottom = (heading) => {
+      if (!heading) return 0;
+      const headingText = normalizeText(heading.textContent);
+      const viewportWidth = window.innerWidth || document.documentElement.clientWidth || 0;
+      const headingRect = heading.getBoundingClientRect();
+      let bestRect = headingRect;
+
+      for (let node = heading; node && node !== document.body; node = node.parentElement) {
+        const rect = node.getBoundingClientRect();
+        if (!rect.width || !rect.height) continue;
+        if (rect.width < viewportWidth * 0.42) continue;
+        if (rect.height < 120 || rect.height > 1200) continue;
+        if (!normalizeText(node.textContent).includes(headingText)) continue;
+        if (!bestRect.height || rect.height < bestRect.height || bestRect.height < 120) {
+          bestRect = rect;
+        }
+      }
+
+      return Math.max(bestRect.bottom, headingRect.bottom + 360);
+    };
+
+    const radiantHeading = findTextElement("Radiant - Overview");
+    if (!radiantHeading) return null;
+    const direHeading = findTextElement("Dire - Overview");
+    const radiantRect = radiantHeading.getBoundingClientRect();
+    const scrollY = window.scrollY || window.pageYOffset || 0;
+    const viewportWidth = window.innerWidth || document.documentElement.clientWidth || 1440;
+    const viewportHeight = window.innerHeight || document.documentElement.clientHeight || 1500;
+    const documentHeight = Math.max(
+      document.documentElement.scrollHeight || 0,
+      document.body?.scrollHeight || 0,
+      viewportHeight
+    );
+    const topInViewport = Math.max(0, radiantRect.top - 16);
+    const top = Math.max(0, scrollY + topInViewport);
+    const direBottom = direHeading
+      ? scrollY + getSectionBottom(direHeading) + 16
+      : top + 1500;
+    const maxVisibleHeight = Math.max(1, viewportHeight - topInViewport - 8);
+    const wantedHeight = Math.max(900, direBottom - top);
+    const height = Math.max(1, Math.min(maxVisibleHeight, documentHeight - top, wantedHeight));
+
+    return {
+      x: 0,
+      y: Math.round(top),
+      width: Math.round(viewportWidth),
+      height: Math.round(height),
+    };
+  }).catch(() => null);
+}
+
 async function captureOpenDotaScreenshot(browser, dotaMatchId, outputPath) {
   const page = await browser.newPage({
-    viewport: { width: 1280, height: 960 },
-    deviceScaleFactor: 1,
+    viewport: { width: 1500, height: 2200 },
+    deviceScaleFactor: 2,
   });
 
   try {
@@ -992,14 +1064,22 @@ async function captureOpenDotaScreenshot(browser, dotaMatchId, outputPath) {
     await page.waitForLoadState("networkidle", { timeout: 30000 }).catch(() => {});
     const overviewHeading = page.getByText("Radiant - Overview").first();
     await overviewHeading.waitFor({ timeout: 45000 }).catch(() => {});
-    await overviewHeading.scrollIntoViewIfNeeded({ timeout: 5000 }).catch(() => {});
+    await overviewHeading.evaluate((node) => {
+      const rect = node.getBoundingClientRect();
+      window.scrollTo(0, Math.max(0, window.scrollY + rect.top - 16));
+    }).catch(() => overviewHeading.scrollIntoViewIfNeeded({ timeout: 5000 }).catch(() => {}));
     await page.waitForTimeout(2500);
-    await page.screenshot({
+    const clip = await getOpenDotaOverviewScreenshotClip(page);
+    const screenshotOptions = {
       path: outputPath,
       fullPage: false,
       type: "jpeg",
-      quality: 86,
-    });
+      quality: 94,
+    };
+    if (clip) {
+      screenshotOptions.clip = clip;
+    }
+    await page.screenshot(screenshotOptions);
   } finally {
     await page.close();
   }
@@ -1136,11 +1216,10 @@ function getSnapshotArchiveIndexPath(matchDate, options = {}) {
   return `${prefix}/${monthCode}/${matchDate}.index.json`;
 }
 
-function getSnapshotArchiveBlobPath(matchDate, sha256, options = {}) {
+function getSnapshotArchiveBlobPath(matchDate, _sha256, options = {}) {
   const prefix = getSnapshotArchivePrefix(options);
   const monthCode = String(matchDate || "").slice(0, 7);
-  const digest = String(sha256 || "").trim();
-  return `${prefix}/${monthCode}/snapshots/${matchDate}.${digest}.json.gz`;
+  return `${prefix}/${monthCode}/snapshots/${matchDate}.json.gz`;
 }
 
 function getSnapshotArchivePath(matchDate, options = {}) {
@@ -1191,7 +1270,7 @@ function createSnapshotArchiveBundle(matchDate, rows, options = {}) {
     version: 1,
     matchDate,
     provider: PROVIDER,
-    immutable: true,
+    immutable: false,
     encoding: "json+gzip",
     compression: "gzip",
     sha256,
@@ -1295,8 +1374,8 @@ async function archiveSnapshotDate(matchDate, options = {}) {
   await putGithubContentFile(
     bundle.blobPath,
     bundle.gzipBuffer,
-    `archive: immutable OpenDota snapshots ${matchDate}`,
-    { ...options, skipExisting: true }
+    `archive: OpenDota snapshots ${matchDate}`,
+    options
   );
   await putGithubJsonFile(
     bundle.indexPath,
