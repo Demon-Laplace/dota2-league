@@ -412,6 +412,31 @@ async function getLocalSteamAccountRows(match) {
     .filter((row) => row.player_id && row.account_id);
 }
 
+async function getMappedPlayersBySteamAccountIds(accountIds = []) {
+  const normalizedAccountIds = [
+    ...new Set(
+      (accountIds || [])
+        .map((accountId) => normalizeDotaMatchId(accountId))
+        .filter(Boolean),
+    ),
+  ];
+
+  if (!normalizedAccountIds.length) return new Map();
+
+  const rows = await supabaseRequest(`/rest/v1/player_external_accounts?select=player_id,provider_account_id,players(display_name)&provider=eq.steam&provider_account_id=in.(${normalizedAccountIds.join(",")})`);
+  const mappedPlayers = new Map();
+  (Array.isArray(rows) ? rows : []).forEach((row) => {
+    const accountId = normalizeDotaMatchId(row.provider_account_id);
+    const playerId = String(row.player_id || "").trim();
+    if (!accountId || !playerId) return;
+    mappedPlayers.set(accountId, {
+      playerId,
+      displayName: String(row.players?.display_name || "").trim() || null,
+    });
+  });
+  return mappedPlayers;
+}
+
 async function fetchJson(url, label) {
   const response = await fetch(url);
   const payload = await response.json().catch(() => null);
@@ -631,6 +656,7 @@ function normalizeOfficialPlayer(player, heroNameMap) {
   const slotNo = getSlotNo(playerSlot);
   return {
     accountId: normalizeAccountId(player?.account_id),
+    externalDisplayName: String(player?.personaname || player?.name || "").trim() || null,
     playerSlot: Number.isInteger(playerSlot) ? playerSlot : null,
     side,
     slotNo,
@@ -642,22 +668,8 @@ function normalizeOfficialPlayer(player, heroNameMap) {
   };
 }
 
-function getLocalPlayerSide(player) {
-  const side = String(player?.side || player?.team || "").trim().toLowerCase();
-  if (side === "a" || side === "radiant") return "radiant";
-  if (side === "b" || side === "dire") return "dire";
-  return "";
-}
-
-function getLocalPlayerSlotNo(player, fallbackIndex) {
-  const explicitSlot = Number(player?.slot_no ?? player?.team_slot);
-  return Number.isInteger(explicitSlot) && explicitSlot > 0 ? explicitSlot : fallbackIndex + 1;
-}
-
 async function buildOfficialMatchSnapshotPayload(match, dotaMatchId, details, asset = {}) {
   const heroNameMap = await getHeroNameMap();
-  const localAccountRows = await getLocalSteamAccountRows(match);
-  const accountByPlayerId = new Map(localAccountRows.map((row) => [row.player_id, row.account_id]));
   const officialPlayers = (details.players || [])
     .map((player) => normalizeOfficialPlayer(player, heroNameMap))
     .sort((a, b) => {
@@ -665,34 +677,35 @@ async function buildOfficialMatchSnapshotPayload(match, dotaMatchId, details, as
       if (sideOrder !== 0) return sideOrder;
       return Number(a.slotNo ?? 99) - Number(b.slotNo ?? 99);
     });
-  const officialByAccountId = new Map(officialPlayers.map((player) => [player.accountId, player]).filter(([accountId]) => Boolean(accountId)));
-  const officialBySideSlot = new Map(officialPlayers.map((player) => [`${player.side}:${player.slotNo}`, player]).filter(([, player]) => player.side && player.slotNo));
-  const localPlayers = parseMatchPlayers(match);
-  const players = localPlayers.map((player, index) => {
-    const playerId = String(player.player_id || player.id || "").trim();
-    const side = getLocalPlayerSide(player);
-    const slotNo = getLocalPlayerSlotNo(player, index);
-    const accountId = accountByPlayerId.get(playerId) || "";
-    const officialPlayer = (accountId ? officialByAccountId.get(accountId) : null)
-      || officialBySideSlot.get(`${side}:${slotNo}`)
-      || null;
+  const mappedPlayersByAccountId = await getMappedPlayersBySteamAccountIds(
+    officialPlayers.map((player) => player.accountId),
+  );
+  const players = officialPlayers.map((officialPlayer) => {
+    const mappedPlayer = officialPlayer.accountId
+      ? mappedPlayersByAccountId.get(officialPlayer.accountId)
+      : null;
 
     return {
-      playerId,
-      displayName: String(player.display_name || "").trim() || null,
-      side,
-      slotNo,
-      accountId: accountId || officialPlayer?.accountId || null,
-      heroId: officialPlayer?.heroId ?? null,
-      heroName: officialPlayer?.heroName ?? null,
-      kills: officialPlayer?.kills ?? null,
-      deaths: officialPlayer?.deaths ?? null,
-      assists: officialPlayer?.assists ?? null,
+      provider: "steam",
+      accountId: officialPlayer.accountId || null,
+      steamAccountId: officialPlayer.accountId || null,
+      externalDisplayName: officialPlayer.externalDisplayName || null,
+      matchedPlayerId: mappedPlayer?.playerId || null,
+      matchedDisplayName: mappedPlayer?.displayName || null,
+      playerId: mappedPlayer?.playerId || null,
+      displayName: mappedPlayer?.displayName || officialPlayer.externalDisplayName || null,
+      side: officialPlayer.side,
+      slotNo: officialPlayer.slotNo,
+      heroId: officialPlayer.heroId ?? null,
+      heroName: officialPlayer.heroName ?? null,
+      kills: officialPlayer.kills ?? null,
+      deaths: officialPlayer.deaths ?? null,
+      assists: officialPlayer.assists ?? null,
     };
   });
 
   return {
-    version: 1,
+    version: 2,
     provider: PROVIDER,
     assetKind: ASSET_KIND,
     capturedAt: asset.captured_at || new Date().toISOString(),

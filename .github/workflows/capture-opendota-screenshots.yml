@@ -2,13 +2,8 @@
 name: Capture OpenDota Screenshots
 
 on:
-  push:
-    branches:
-      - main
-      - auto-getresult
-    paths:
-      - ".github/workflows/capture-opendota-screenshots.yml"
-      - ".github/scripts/capture-opendota-screenshots.mjs"
+  # Automatic capture is paused. Run this workflow only through the admin-triggered
+  # workflow_dispatch path.
   workflow_dispatch:
     inputs:
       match_id:
@@ -38,11 +33,6 @@ on:
         required: false
         default: false
         type: boolean
-  schedule:
-    # Beijing time 20:30. The script runs an adaptive polling loop until midnight.
-    - cron: "30 12 * * *"
-    # Beijing time 02:00, aligned with the fixed settlement pass.
-    - cron: "0 18 * * *"
 
 concurrency:
   group: capture-opendota-screenshots

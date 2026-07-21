@@ -2834,7 +2834,7 @@ async function invokeFunction(name, body = {}) {
         : `Edge Function ${name} 返回非 2xx 响应。请先确认该函数已部署到当前 Supabase 项目。`;
     }
     if (message === "Failed to send a request to the Edge Function") {
-      message = `无法连接到后台函数 ${name}。请确认该函数已部署到当前 Supabase 项目，或稍后等待定时同步。`;
+      message = `无法连接到后台函数 ${name}。请确认该函数已部署到当前 Supabase 项目，或稍后重试。`;
     }
 
     throw new Error(message);
@@ -2914,7 +2914,7 @@ async function triggerOpendotaArchiveActionFromAdminPanel() {
       const queuedCount = Number(result.queuedCount || 0);
       setAdminPanelMessage(
         queuedCount
-          ? `已提交 ${archiveMonth} 强制刷新队列，共 ${queuedCount} 场；定时同步会重新读取并覆盖已有截图。`
+          ? `已提交 ${archiveMonth} 强制刷新队列，共 ${queuedCount} 场；当前未触发 GitHub Action，请配置触发令牌后由管理员再次手动同步。`
           : `未找到 ${archiveMonth} 可强制刷新的已有比赛详情。`
       );
       return;
@@ -18969,7 +18969,14 @@ async function fetchOpendotaSnapshotArchivePayload(matchDate = "") {
 }
 
 function normalizeOpendotaSnapshotPlayerEntry(entry = {}) {
-  const playerId = String(entry.playerId || entry.player_id || entry.id || "").trim();
+  const playerId = String(
+    entry.matchedPlayerId
+    || entry.matched_player_id
+    || entry.playerId
+    || entry.player_id
+    || entry.id
+    || ""
+  ).trim();
   if (!playerId) return null;
   const heroId = Number(entry.heroId ?? entry.hero_id);
   return {
@@ -21121,10 +21128,46 @@ function normalizeOfficialSnapshotPlayer(player = {}) {
   const side = player.side === "dire" ? "dire" : (player.side === "radiant" ? "radiant" : "");
   const slotNo = Number(player.slotNo ?? player.slot_no);
   const heroId = Number(player.heroId ?? player.hero_id);
+  const accountId = String(
+    player.accountId
+    || player.account_id
+    || player.steamAccountId
+    || player.steam_account_id
+    || ""
+  ).trim() || null;
+  const externalDisplayName = String(
+    player.externalDisplayName
+    || player.external_display_name
+    || player.personaname
+    || player.name
+    || ""
+  ).trim() || null;
+  const matchedPlayerId = String(
+    player.matchedPlayerId
+    || player.matched_player_id
+    || player.playerId
+    || player.player_id
+    || ""
+  ).trim() || null;
+  const matchedDisplayName = String(
+    player.matchedDisplayName
+    || player.matched_display_name
+    || player.localDisplayName
+    || player.local_display_name
+    || ""
+  ).trim() || null;
+  const displayName = String(
+    player.displayName
+    || player.display_name
+    || matchedDisplayName
+    || externalDisplayName
+    || ""
+  ).trim() || null;
   return {
-    accountId: String(player.accountId || player.account_id || "").trim() || null,
-    displayName: String(player.displayName || player.display_name || "").trim() || null,
-    name: String(player.displayName || player.display_name || "").trim() || null,
+    accountId,
+    externalDisplayName,
+    displayName,
+    name: displayName,
     side,
     slotNo: Number.isInteger(slotNo) && slotNo > 0 ? slotNo : null,
     heroId: Number.isInteger(heroId) ? heroId : null,
@@ -21132,8 +21175,8 @@ function normalizeOfficialSnapshotPlayer(player = {}) {
     kills: normalizeKdaValue(player.kills),
     deaths: normalizeKdaValue(player.deaths),
     assists: normalizeKdaValue(player.assists),
-    matchedPlayerId: String(player.playerId || player.player_id || "").trim() || null,
-    matchedDisplayName: String(player.displayName || player.display_name || "").trim() || null,
+    matchedPlayerId,
+    matchedDisplayName: matchedDisplayName || (matchedPlayerId ? displayName : null),
   };
 }
 

@@ -43,51 +43,6 @@ function normalizeUuid(value: unknown) {
     : "";
 }
 
-function getOptionalEnv(name: string) {
-  return String(Deno.env.get(name) || "").trim();
-}
-
-async function dispatchScreenshotWorkflow(matchId: string) {
-  const token = getOptionalEnv("GITHUB_SCREENSHOT_DISPATCH_TOKEN");
-  if (!token) {
-    return {
-      dispatched: false,
-      reason: "未配置 GITHUB_SCREENSHOT_DISPATCH_TOKEN，已等待定时 Action 处理。",
-    };
-  }
-
-  const repository = getOptionalEnv("GITHUB_SCREENSHOT_REPOSITORY") || "Demon-Laplace/dota2-league";
-  const workflow = getOptionalEnv("GITHUB_SCREENSHOT_WORKFLOW") || "capture-opendota-screenshots.yml";
-  const ref = getOptionalEnv("GITHUB_SCREENSHOT_REF") || "main";
-  const response = await fetch(`https://api.github.com/repos/${repository}/actions/workflows/${workflow}/dispatches`, {
-    method: "POST",
-    headers: {
-      "Accept": "application/vnd.github+json",
-      "Authorization": `Bearer ${token}`,
-      "Content-Type": "application/json",
-      "X-GitHub-Api-Version": "2022-11-28",
-    },
-    body: JSON.stringify({
-      ref,
-      inputs: {
-        match_id: matchId,
-        limit: "1",
-        force: "false",
-      },
-    }),
-  });
-
-  if (!response.ok) {
-    const text = await response.text().catch(() => "");
-    return {
-      dispatched: false,
-      reason: `GitHub Action 触发失败（HTTP ${response.status}）：${text || response.statusText}`,
-    };
-  }
-
-  return { dispatched: true, reason: "" };
-}
-
 Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
@@ -187,12 +142,9 @@ Deno.serve(async (req: Request) => {
     return jsonResponse({ error: upsertError.message }, { status: 400 });
   }
 
-  const dispatchResult = await dispatchScreenshotWorkflow(matchRow.match_id);
   return jsonResponse({
     asset: asset as AssetRow,
-    dispatched: dispatchResult.dispatched,
-    message: dispatchResult.dispatched
-      ? "已提交 OpenDota 截图生成任务。"
-      : dispatchResult.reason,
+    dispatched: false,
+    message: "已记录 OpenDota 截图待处理请求；GitHub Action 仅在管理员手动强制同步时触发。",
   });
 });

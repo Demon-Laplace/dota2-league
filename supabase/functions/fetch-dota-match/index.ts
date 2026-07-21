@@ -468,7 +468,9 @@ Deno.serve(async (req: Request) => {
         const localPlayer = accountId ? localPlayerByAccountId.get(accountId) : null;
         const externalDisplayName = String(player.personaname || player.name || "").trim() || null;
         return {
+          provider: "steam",
           accountId,
+          steamAccountId: accountId,
           externalDisplayName,
           playerSlot: Number.isInteger(playerSlot) ? playerSlot : null,
           side: getPlayerSide(player.player_slot),

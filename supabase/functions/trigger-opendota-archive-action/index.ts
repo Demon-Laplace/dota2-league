@@ -205,7 +205,7 @@ async function handleTriggerRequest(req: Request) {
       force,
       ...queueResult,
       message: queueResult.queuedCount
-        ? "已加入定时同步队列；当前缺少 GITHUB_SCREENSHOT_DISPATCH_TOKEN，无法立即触发 GitHub Action。"
+        ? "已加入待处理队列；当前缺少 GITHUB_SCREENSHOT_DISPATCH_TOKEN，无法立即触发 GitHub Action。配置后请由管理员再次手动触发。"
         : "当前缺少 GITHUB_SCREENSHOT_DISPATCH_TOKEN，且该月份暂无可强制刷新的已有比赛详情。",
     });
   }
@@ -248,7 +248,7 @@ async function handleTriggerRequest(req: Request) {
       workflowId,
       ...queueResult,
       message: queueResult.queuedCount
-        ? `已加入定时同步队列；立即触发 GitHub Action 失败：${dispatchError}`
+        ? `已加入待处理队列；立即触发 GitHub Action 失败：${dispatchError}`
         : `立即触发 GitHub Action 失败：${dispatchError}`,
       actionsUrl: `https://github.com/${repository}/actions/workflows/${workflowId}`,
     });
