@@ -96,6 +96,7 @@
       backgroundPickerClose: "关闭",
       backgroundPickerApply: "应用背景",
       backgroundPickerFinalDay: "决赛日背景",
+      backgroundPickerBrightness: "蒙板明度（明暗）",
       backgroundUploadLabel: "上传背景",
       backgroundPickerPlayerSettings: "专属背景设置",
       backgroundPickerPlayerLabel: "选手",

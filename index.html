@@ -7,7 +7,7 @@
   <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin />
   <link rel="preconnect" href="https://klxkkwwszqtgeuozwtkw.supabase.co" crossorigin />
   <link rel="preload" as="image" href="./assets/Dota2_logo.png" fetchpriority="high" />
-  <link rel="stylesheet" href="style.css?v=20260608-realtime-rewards" />
+  <link rel="stylesheet" href="style.css?v=20260801-long-term-bugfix-v1" />
 </head>
   <body>
   <div id="loadingScreen" class="loading-screen" aria-live="polite">
@@ -685,6 +685,11 @@
             </aside>
             <div class="admin-background-preview-panel">
               <img id="adminBackgroundPreviewImage" class="admin-background-preview-image" src="" alt="选中背景预览" loading="lazy" decoding="async" fetchpriority="low" />
+              <label class="admin-background-brightness-control" for="adminBackgroundBrightnessInput">
+                <span data-copy="adminPanel.backgroundPickerBrightness"></span>
+                <input id="adminBackgroundBrightnessInput" type="range" min="20" max="100" step="1" value="42" title="调整背景明暗，不改变蒙板透明度" aria-label="调整蒙板明暗，不改变透明度" />
+                <output id="adminBackgroundBrightnessValue" for="adminBackgroundBrightnessInput">42%</output>
+              </label>
             </div>
           </div>
           <div id="adminBackgroundOptions" class="admin-background-options" aria-label="可选背景图片"></div>
@@ -1234,11 +1239,11 @@
   </div>
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="src/site-copy.js?v=20260608-realtime-rewards"></script>
+  <script src="src/site-copy.js?v=20260801-long-term-bugfix-v1"></script>
   <script type="module">
     import { animate } from "https://cdn.jsdelivr.net/npm/motion@12.23.24/+esm";
     window.Motion = { animate };
   </script>
-  <script src="app.js?v=20260608-realtime-rewards"></script>
+  <script src="app.js?v=20260801-long-term-bugfix-v1"></script>
 </body>
 </html>

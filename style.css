@@ -4,6 +4,7 @@
 
 :root {
   --app-bg-image: none;
+  --app-bg-brightness: 0.42;
   --bg-deep: #06111f;
   --bg-mid: #0b1c31;
   --panel: rgba(9, 25, 45, 0.72);
@@ -52,7 +53,7 @@ body::before {
   z-index: -2;
   pointer-events: none;
   background: var(--app-bg-image) center center / cover no-repeat;
-  filter: brightness(0.42) saturate(0.72) contrast(1.04);
+  filter: brightness(var(--app-bg-brightness)) saturate(0.72) contrast(1.04);
 }
 
 body::after {
@@ -10070,6 +10071,27 @@ button.admin-background-option.admin-background-option-selected {
   background: rgba(9, 9, 11, 0.72);
 }
 
+.admin-background-brightness-control {
+  display: grid;
+  grid-template-columns: auto minmax(160px, 1fr) 44px;
+  align-items: center;
+  gap: 10px;
+  width: min(100%, 760px);
+  color: rgba(244, 244, 245, 0.82);
+  font-size: 12px;
+}
+
+.admin-background-brightness-control input[type="range"] {
+  width: 100%;
+  accent-color: var(--teal);
+}
+
+.admin-background-brightness-control output {
+  color: var(--text-soft);
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
 .admin-background-actions {
   justify-content: flex-end;
   flex-wrap: wrap;
@@ -10606,6 +10628,14 @@ button.item-history-player-select:focus-visible {
 
   .admin-background-preview-image {
     width: 100%;
+  }
+
+  .admin-background-brightness-control {
+    grid-template-columns: minmax(0, 1fr) 44px;
+  }
+
+  .admin-background-brightness-control > span {
+    grid-column: 1 / -1;
   }
 }
 

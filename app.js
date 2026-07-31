@@ -22,6 +22,9 @@ const BACKGROUND_IMAGE_THUMBNAIL_WIDTH = 960;
 const BACKGROUND_IMAGE_THUMBNAIL_HEIGHT = 540;
 const BACKGROUND_IMAGE_THUMBNAIL_QUALITY = 0.82;
 const BACKGROUND_IMAGE_UPLOAD_MAX_BYTES = 25 * 1024 * 1024;
+const DEFAULT_BACKGROUND_BRIGHTNESS_PERCENT = 42;
+const MIN_BACKGROUND_BRIGHTNESS_PERCENT = 20;
+const MAX_BACKGROUND_BRIGHTNESS_PERCENT = 100;
 const DEFAULT_BACKGROUND_IMAGE_ID = "bg_21607b0db69e6d93";
 const GITHUB_REPOSITORY_FULL_NAME = "Demon-Laplace/dota2-league";
 const GITHUB_REPOSITORY_API_URL = `https://api.github.com/repos/${GITHUB_REPOSITORY_FULL_NAME}`;
@@ -210,8 +213,20 @@ function getDefaultBackgroundImageSettings() {
     manualSeasonKey: "",
     manualBackgroundId: "",
     finalDayBackgroundId: "",
+    backgroundBrightness: DEFAULT_BACKGROUND_BRIGHTNESS_PERCENT,
+    automaticChampionAppliedSeasonKey: "",
+    automaticFinalDayAppliedKey: "",
     playerBackgrounds: {},
   };
+}
+
+function normalizeBackgroundBrightnessPercent(value, fallback = DEFAULT_BACKGROUND_BRIGHTNESS_PERCENT) {
+  const numericValue = Number(value);
+  if (!Number.isFinite(numericValue)) return fallback;
+  return Math.min(
+    Math.max(Math.round(numericValue), MIN_BACKGROUND_BRIGHTNESS_PERCENT),
+    MAX_BACKGROUND_BRIGHTNESS_PERCENT
+  );
 }
 
 function getAdminBackgroundOptionById(id = "") {
@@ -252,6 +267,9 @@ function normalizeBackgroundImageSettings(settings = {}) {
   normalized.manualSeasonKey = String(settings.manualSeasonKey || "").trim();
   normalized.manualBackgroundId = manualOption?.id || "";
   normalized.finalDayBackgroundId = finalDayOption?.id || "";
+  normalized.backgroundBrightness = normalizeBackgroundBrightnessPercent(settings.backgroundBrightness);
+  normalized.automaticChampionAppliedSeasonKey = String(settings.automaticChampionAppliedSeasonKey || "").trim();
+  normalized.automaticFinalDayAppliedKey = String(settings.automaticFinalDayAppliedKey || "").trim();
 
   const playerBackgrounds = settings.playerBackgrounds && typeof settings.playerBackgrounds === "object" && !Array.isArray(settings.playerBackgrounds)
     ? settings.playerBackgrounds
@@ -312,6 +330,7 @@ function writeLocalBackgroundImageSettings(settings = {}) {
 function setBackgroundImageSettingsCache(settings = {}, { writeLocal = true } = {}) {
   const normalized = normalizeBackgroundImageSettings(settings);
   backgroundImageSettingsCache = normalized;
+  applyBackgroundBrightness(normalized.backgroundBrightness);
   if (writeLocal) {
     writeLocalBackgroundImageSettings(normalized);
   }
@@ -383,6 +402,14 @@ function applyBackgroundImageOption(option) {
   currentBackgroundImageId = option?.id || "";
 }
 
+function applyBackgroundBrightness(value = DEFAULT_BACKGROUND_BRIGHTNESS_PERCENT) {
+  currentBackgroundBrightness = normalizeBackgroundBrightnessPercent(value);
+  document.documentElement.style.setProperty(
+    "--app-bg-brightness",
+    String(currentBackgroundBrightness / 100)
+  );
+}
+
 function isLastFiveDaysOfMonth(dateText = getBeijingBusinessDateString()) {
   const match = String(dateText || "").match(/^(\d{4})-(\d{2})-(\d{2})$/);
   if (!match) return false;
@@ -447,10 +474,22 @@ function getChampionDedicatedBackgroundOption(settings = readBackgroundImageSett
   return mappedByName || null;
 }
 
+function getFinalDayAutomaticBackgroundKey(dateText = getBeijingBusinessDateString()) {
+  const monthMatch = String(dateText || "").match(/^(\d{4}-\d{2})-\d{2}$/);
+  if (!monthMatch) return "";
+  return `${getCurrentBackgroundSeasonKey() || "no-season"}:${monthMatch[1]}`;
+}
+
 function getPreferredBackgroundOption() {
   const settings = readBackgroundImageSettings();
   const finalDayOption = getAdminBackgroundOptionById(settings.finalDayBackgroundId);
-  if (finalDayOption && isLastFiveDaysOfMonth()) {
+  const finalDayAutomaticKey = getFinalDayAutomaticBackgroundKey();
+  if (
+    finalDayOption
+    && finalDayAutomaticKey
+    && isLastFiveDaysOfMonth()
+    && settings.automaticFinalDayAppliedKey !== finalDayAutomaticKey
+  ) {
     return { option: finalDayOption, source: "final_day" };
   }
 
@@ -461,7 +500,11 @@ function getPreferredBackgroundOption() {
   }
 
   const championOption = getChampionDedicatedBackgroundOption(settings);
-  if (championOption) {
+  if (
+    championOption
+    && currentSeasonKey
+    && settings.automaticChampionAppliedSeasonKey !== currentSeasonKey
+  ) {
     return { option: championOption, source: "champion" };
   }
 
@@ -482,6 +525,38 @@ function applyPreferredBackgroundImage() {
 
 let backgroundChampionLookupPromise = null;
 let backgroundChampionLookupSeasonKey = "";
+
+async function markAutomaticBackgroundApplied(resolved) {
+  if (!resolved?.option || !["champion", "final_day"].includes(resolved.source)) return;
+
+  const currentSeasonKey = getCurrentBackgroundSeasonKey();
+  const nextSettings = {
+    ...readBackgroundImageSettings(),
+    manualSeasonKey: currentSeasonKey,
+    manualBackgroundId: resolved.option.id,
+  };
+  if (resolved.source === "champion") {
+    nextSettings.automaticChampionAppliedSeasonKey = currentSeasonKey;
+  } else {
+    nextSettings.automaticFinalDayAppliedKey = getFinalDayAutomaticBackgroundKey();
+  }
+
+  setBackgroundImageSettingsCache(nextSettings, { writeLocal: true });
+  if (!isCurrentRoleAdmin()) return;
+
+  try {
+    await writeBackgroundImageSettings(nextSettings);
+  } catch (error) {
+    console.warn("保存一次性自动背景状态失败。", error);
+  }
+}
+
+async function applyResolvedAutomaticBackground(resolved) {
+  if (!resolved?.option) return null;
+  applyBackgroundImageOption(resolved.option);
+  await markAutomaticBackgroundApplied(resolved);
+  return resolved.option;
+}
 
 async function resolvePreviousChampionForBackground() {
   if (!activeSeason?.id || !hasPlayerBackgroundSettings()) return null;
@@ -520,9 +595,7 @@ async function resolvePreviousChampionForBackground() {
 
 async function refreshAutomaticBackgroundImage({ allowChampionLookup = false } = {}) {
   const resolved = getPreferredBackgroundOption();
-  if (resolved.option) {
-    applyBackgroundImageOption(resolved.option);
-  }
+  await applyResolvedAutomaticBackground(resolved);
   if (
     !allowChampionLookup
     || (resolved.option && resolved.source !== "fallback")
@@ -536,7 +609,7 @@ async function refreshAutomaticBackgroundImage({ allowChampionLookup = false } =
   if (!lookupKey) return resolved.option;
   if (backgroundChampionLookupPromise && backgroundChampionLookupSeasonKey === lookupKey) {
     await backgroundChampionLookupPromise;
-    return applyPreferredBackgroundImage();
+    return applyResolvedAutomaticBackground(getPreferredBackgroundOption());
   }
 
   backgroundChampionLookupSeasonKey = lookupKey;
@@ -550,7 +623,7 @@ async function refreshAutomaticBackgroundImage({ allowChampionLookup = false } =
     });
 
   await backgroundChampionLookupPromise;
-  return applyPreferredBackgroundImage();
+  return applyResolvedAutomaticBackground(getPreferredBackgroundOption());
 }
 
 async function applyFirstAvailableBackgroundImage() {
@@ -1018,6 +1091,8 @@ const adminBackgroundPickerBackdrop = document.getElementById("adminBackgroundPi
 const closeAdminBackgroundPickerBtn = document.getElementById("closeAdminBackgroundPickerBtn");
 const adminBackgroundOptions = document.getElementById("adminBackgroundOptions");
 const adminBackgroundPreviewImage = document.getElementById("adminBackgroundPreviewImage");
+const adminBackgroundBrightnessInput = document.getElementById("adminBackgroundBrightnessInput");
+const adminBackgroundBrightnessValue = document.getElementById("adminBackgroundBrightnessValue");
 const adminApplyBackgroundBtn = document.getElementById("adminApplyBackgroundBtn");
 const adminSetFinalDayBackgroundBtn = document.getElementById("adminSetFinalDayBackgroundBtn");
 const adminPlayerBackgroundSettingsBtn = document.getElementById("adminPlayerBackgroundSettingsBtn");
@@ -1278,8 +1353,10 @@ let isLifetimeRewardTotalsLoading = false;
 let isHomeStealthMode = false;
 let currentBackgroundImageUrl = "";
 let currentBackgroundImageId = "";
+let currentBackgroundBrightness = DEFAULT_BACKGROUND_BRIGHTNESS_PERCENT;
 let backgroundImageSettingsCache = null;
 let adminBackgroundDraftId = "";
+let adminBackgroundBrightnessDraft = DEFAULT_BACKGROUND_BRIGHTNESS_PERCENT;
 let adminBackgroundPreviewContextText = "";
 let adminBackgroundPreviewPlayerId = "";
 let adminPlayerBackgroundSettingsOpen = false;
@@ -3163,6 +3240,14 @@ function syncAdminBackgroundPreview() {
     adminBackgroundPreviewImage.alt = selectedOption
       ? `选中背景预览：${adminBackgroundPreviewContextText || getAdminBackgroundDisplayName(selectedOption)}`
       : "选中背景预览";
+    adminBackgroundPreviewImage.style.filter = `brightness(${adminBackgroundBrightnessDraft / 100}) saturate(0.72) contrast(1.04)`;
+  }
+  if (adminBackgroundBrightnessInput) {
+    adminBackgroundBrightnessInput.value = String(adminBackgroundBrightnessDraft);
+  }
+  if (adminBackgroundBrightnessValue) {
+    adminBackgroundBrightnessValue.value = `${adminBackgroundBrightnessDraft}%`;
+    adminBackgroundBrightnessValue.textContent = `${adminBackgroundBrightnessDraft}%`;
   }
   if (adminApplyBackgroundBtn) {
     adminApplyBackgroundBtn.disabled = !selectedOption || !isCurrentRoleAdmin();
@@ -3253,6 +3338,9 @@ function openAdminBackgroundPicker() {
     : (ADMIN_BACKGROUND_IMAGE_OPTIONS[0]?.id || "");
   adminBackgroundPreviewContextText = "";
   adminBackgroundPreviewPlayerId = "";
+  adminBackgroundBrightnessDraft = normalizeBackgroundBrightnessPercent(
+    readBackgroundImageSettings().backgroundBrightness
+  );
   adminPlayerBackgroundSettingsOpen = false;
   renderAdminBackgroundOptions();
   setAdminBackgroundPickerMessage("");
@@ -3279,12 +3367,14 @@ async function applyAdminBackgroundDraft() {
       fallbackBackgroundId: selectedOption.id,
       manualSeasonKey: getCurrentBackgroundSeasonKey(),
       manualBackgroundId: selectedOption.id,
+      backgroundBrightness: adminBackgroundBrightnessDraft,
     }));
   } catch (error) {
     reportSharedBackgroundSettingsError(error);
     return;
   }
   applyBackgroundImageOption(selectedOption);
+  applyBackgroundBrightness(adminBackgroundBrightnessDraft);
   syncAdminBackgroundPreview();
 
   const successMessage = `已应用背景：${getAdminBackgroundDisplayName(selectedOption)}`;
@@ -3307,6 +3397,7 @@ async function setFinalDayBackgroundDraft() {
     await updateBackgroundImageSettings((settings) => ({
       ...settings,
       finalDayBackgroundId: selectedOption.id,
+      automaticFinalDayAppliedKey: "",
     }));
   } catch (error) {
     reportSharedBackgroundSettingsError(error);
@@ -8076,7 +8167,7 @@ function renderItemCatalogManagement(mode = "scorer") {
   syncItemCatalogFormState(mode);
 }
 
-async function loadItemCatalog() {
+async function loadItemCatalog({ loadUsageSummary = true } = {}) {
   const { data, error } = await db
     .from("item_catalog")
     .select("id, code, name, config, score_delta_multiplier, score_delta_special, is_active, created_at, updated_at")
@@ -8170,9 +8261,17 @@ async function loadItemCatalog() {
   ) {
     clearItemCatalogPendingPlayerAction();
   }
-  await loadItemCatalogUsageSummary();
+  if (loadUsageSummary) {
+    await loadItemCatalogUsageSummary();
+  } else {
+    renderItemCatalogManagement("scorer");
+    renderItemCatalogManagement("admin");
+  }
   if (itemInventoryLogsModal && !itemInventoryLogsModal.hidden) {
     await loadItemInventoryLogs();
+  }
+  if (recentMatchesData.length || recentMatchDaysData.length) {
+    renderRecentMatchState();
   }
 }
 
@@ -20546,6 +20645,12 @@ if (adminBackgroundOptions) {
     selectAdminBackgroundDraft(optionButton.dataset.backgroundId || "");
   });
 }
+if (adminBackgroundBrightnessInput) {
+  adminBackgroundBrightnessInput.addEventListener("input", () => {
+    adminBackgroundBrightnessDraft = normalizeBackgroundBrightnessPercent(adminBackgroundBrightnessInput.value);
+    syncAdminBackgroundPreview();
+  });
+}
 if (adminApplyBackgroundBtn) {
   adminApplyBackgroundBtn.addEventListener("click", applyAdminBackgroundDraft);
 }
@@ -23494,6 +23599,7 @@ async function init() {
     const primaryHomeLoadPromise = Promise.all([
       runInitStep("加载基础数据", loadPrimaryHomeData),
       runInitStep("加载积分榜", loadLeaderboard),
+      runInitStep("加载道具目录", () => loadItemCatalog({ loadUsageSummary: false })),
     ]);
     await primaryHomeLoadPromise;
     await runInitStep("加载最近比赛", loadRecentMatches);
@@ -23511,7 +23617,7 @@ async function init() {
           Promise.all([
             runInitStep("加载报名队列", loadQueue),
             runInitStep("加载赛季赞助", loadRewardLogs),
-            runInitStep("加载道具目录", loadItemCatalog),
+            runInitStep("加载道具数量统计", loadItemCatalogUsageSummary),
             runInitStep("加载赛季完结状态", loadSeasonEndConfirmations),
             runInitStep("加载本地操作记录", loadSeasonActionLogs),
           ]).then(() => {
