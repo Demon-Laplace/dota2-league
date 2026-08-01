@@ -24,12 +24,22 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Read repository size once
+        id: snapshot
         shell: bash
         run: |
           set -euo pipefail
           size_kib="$(gh api "repos/${GITHUB_REPOSITORY}" --jq '.size')"
+          previous_size_kib="$(jq -r '.sizeKiB // empty' assets/github-repository-storage.json 2>/dev/null || true)"
+
+          if [ "$size_kib" = "$previous_size_kib" ]; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+            echo "Repository size is unchanged at ${size_kib} KiB."
+            exit 0
+          fi
+
           checked_at="$(date -u +'%Y-%m-%dT%H:%M:%SZ')"
           beijing_date="$(TZ=Asia/Shanghai date +'%Y-%m-%d')"
+          echo "changed=true" >> "$GITHUB_OUTPUT"
 
           jq -n \
             --arg repository "$GITHUB_REPOSITORY" \
@@ -45,6 +55,7 @@ jobs:
             }' > assets/github-repository-storage.json
 
       - name: Commit daily snapshot
+        if: steps.snapshot.outputs.changed == 'true'
         shell: bash
         run: |
           git config user.name "github-actions[bot]"

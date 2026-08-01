@@ -27,14 +27,21 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Setup Supabase CLI
         uses: supabase/setup-cli@v1
         with:
           version: latest
 
-      - name: Deploy all edge functions
+      - name: Deploy changed edge functions
+        env:
+          BEFORE_SHA: ${{ github.event.before }}
+          EVENT_NAME: ${{ github.event_name }}
         run: |
+          set -euo pipefail
+
           deploy_function() {
             local name="$1"
             shift
@@ -53,10 +60,77 @@ jobs:
             return 1
           }
 
-          deploy_function username-login --no-verify-jwt
+          delete_function() {
+            local name="$1"
+            local attempt
 
-          for dir in supabase/functions/*; do
-            if [ -d "$dir" ] && [ "$(basename "$dir")" != "_shared" ] && [ "$(basename "$dir")" != "username-login" ]; then
-              deploy_function "$(basename "$dir")"
+            for attempt in 1 2 3; do
+              if supabase functions delete "$name" --project-ref "$SUPABASE_PROJECT_ID" --yes; then
+                return 0
+              fi
+
+              if [ "$attempt" -lt 3 ]; then
+                sleep $((attempt * 10))
+              fi
+            done
+
+            return 1
+          }
+
+          deploy_named_function() {
+            local name="$1"
+            if [ "$name" = "username-login" ]; then
+              deploy_function "$name" --no-verify-jwt
+            else
+              deploy_function "$name"
             fi
-          done
+          }
+
+          deploy_all=false
+          if [ "$EVENT_NAME" = "workflow_dispatch" ] || [ -z "${BEFORE_SHA:-}" ] || [[ "$BEFORE_SHA" =~ ^0+$ ]]; then
+            deploy_all=true
+          fi
+
+          declare -A selected_functions=()
+          if [ "$deploy_all" = false ]; then
+            mapfile -t changed_paths < <(
+              git diff --name-only "$BEFORE_SHA" "$GITHUB_SHA" -- \
+                supabase/functions \
+                supabase/config.toml \
+                .github/workflows/deploy-functions.yml
+            )
+
+            for path in "${changed_paths[@]}"; do
+              case "$path" in
+                supabase/config.toml|.github/workflows/deploy-functions.yml|supabase/functions/_shared/*)
+                  deploy_all=true
+                  ;;
+                supabase/functions/*/*)
+                  function_name="${path#supabase/functions/}"
+                  function_name="${function_name%%/*}"
+                  selected_functions["$function_name"]=1
+                  ;;
+              esac
+            done
+          fi
+
+          if [ "$deploy_all" = true ]; then
+            for dir in supabase/functions/*; do
+              if [ -d "$dir" ] && [ "$(basename "$dir")" != "_shared" ]; then
+                selected_functions["$(basename "$dir")"]=1
+              fi
+            done
+          fi
+
+          if [ "${#selected_functions[@]}" -eq 0 ]; then
+            echo "No edge function changes detected."
+            exit 0
+          fi
+
+          while IFS= read -r function_name; do
+            if [ -d "supabase/functions/$function_name" ]; then
+              deploy_named_function "$function_name"
+            else
+              delete_function "$function_name"
+            fi
+          done < <(printf '%s\n' "${!selected_functions[@]}" | sort)

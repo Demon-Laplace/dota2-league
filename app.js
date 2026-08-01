@@ -15,6 +15,7 @@ const APP_CONFIG = {
 const SITE_COPY = window.__DOTA2SYS_SITE_COPY__ || {};
 const BACKGROUND_IMAGE_STORAGE_KEY = "nd_dota_site_background_image_v1";
 const BACKGROUND_IMAGE_SETTINGS_STORAGE_KEY = "nd_dota_site_background_settings_v2";
+const BACKGROUND_IMAGE_OPTIONS_DAILY_CACHE_KEY = "nd_dota_background_options_daily_v1";
 const BACKGROUND_IMAGE_STORAGE_BUCKET = "site-backgrounds";
 const BACKGROUND_IMAGE_STORAGE_OBJECT_SEPARATOR = "__";
 const BACKGROUND_IMAGE_THUMBNAIL_PREFIX = "thumbnails/";
@@ -32,6 +33,7 @@ const GITHUB_PAGES_REPOSITORY_RECOMMENDED_LIMIT_BYTES = 1024 * 1024 * 1024;
 const GITHUB_STORAGE_DAILY_CACHE_KEY = "nd_dota_github_storage_daily_v1";
 const SUPABASE_DATABASE_USAGE_QUOTA_BYTES = 500 * 1024 * 1024;
 const SUPABASE_SYSTEM_USAGE_DAILY_CACHE_STORAGE_KEY = "nd_dota_supabase_system_usage_daily_v3";
+const REALTIME_HIDDEN_DISCONNECT_DELAY_MS = 60 * 1000;
 const SEASON_BASE_SPONSOR_AMOUNT = 20;
 const LIFETIME_REWARD_EXTRA_DISPLAY_THRESHOLD = 100;
 const SEASON_ROLLOVER_REQUIRED_SCORER_CONFIRMATIONS = 1;
@@ -145,6 +147,26 @@ function setAdminBackgroundImageOptions(options = []) {
   ADMIN_BACKGROUND_IMAGE_IDS = new Set(normalizedOptions.map((option) => option.id));
 }
 
+function readBackgroundImageOptionsDailyCache() {
+  const snapshot = readLocalJsonStorage(BACKGROUND_IMAGE_OPTIONS_DAILY_CACHE_KEY, null);
+  if (
+    snapshot?.businessDate !== getExpectedGitHubStorageSnapshotDate()
+    || !Array.isArray(snapshot?.options)
+    || !snapshot.options.length
+  ) {
+    return null;
+  }
+  return snapshot.options;
+}
+
+function writeBackgroundImageOptionsDailyCache(options = []) {
+  if (!Array.isArray(options) || !options.length) return;
+  writeLocalJsonStorage(BACKGROUND_IMAGE_OPTIONS_DAILY_CACHE_KEY, {
+    businessDate: getExpectedGitHubStorageSnapshotDate(),
+    options,
+  });
+}
+
 async function loadStorageBackgroundThumbnailObjectVersions() {
   try {
     const { data, error } = await db.storage
@@ -191,9 +213,17 @@ async function loadStorageBackgroundImageOptions() {
   }
 }
 
-async function loadAdminBackgroundImageOptions() {
+async function loadAdminBackgroundImageOptions({ force = false } = {}) {
+  if (!force) {
+    const cachedOptions = readBackgroundImageOptionsDailyCache();
+    if (cachedOptions) {
+      setAdminBackgroundImageOptions(cachedOptions);
+      return ADMIN_BACKGROUND_IMAGE_OPTIONS;
+    }
+  }
   const storageOptions = await loadStorageBackgroundImageOptions();
   setAdminBackgroundImageOptions(storageOptions);
+  writeBackgroundImageOptionsDailyCache(storageOptions);
   return ADMIN_BACKGROUND_IMAGE_OPTIONS;
 }
 
@@ -356,6 +386,20 @@ async function loadSharedBackgroundImageSettings() {
   try {
     const { data, error } = await db.rpc("get_site_background_settings");
     if (error) throw error;
+    const rawSettings = data && typeof data === "object" && !Array.isArray(data) ? data : {};
+    const configuredRefs = [
+      rawSettings.fallbackBackgroundId || rawSettings.backgroundId || "",
+      rawSettings.manualBackgroundId || "",
+      rawSettings.finalDayBackgroundId || "",
+      ...Object.values(
+        rawSettings.playerBackgrounds && typeof rawSettings.playerBackgrounds === "object"
+          ? rawSettings.playerBackgrounds
+          : {}
+      ),
+    ].filter(Boolean);
+    if (configuredRefs.some((ref) => !getAdminBackgroundOptionByStoredRef(ref))) {
+      await loadAdminBackgroundImageOptions({ force: true });
+    }
     return setBackgroundImageSettingsCache(data || {}, { writeLocal: true });
   } catch (error) {
     if (!isMissingSharedBackgroundSettingsError(error)) {
@@ -1544,6 +1588,8 @@ let managedAccounts = [];
 let accessModalMode = "auth";
 let heroPickerState = null;
 let realtimeChannel = null;
+let realtimeHiddenDisconnectTimer = null;
+let realtimeDisconnectedWhileHidden = false;
 let refreshTimer = null;
 let restDayBoundaryTimer = null;
 let toastTimer = null;
@@ -1952,7 +1998,7 @@ async function flushRefreshQueue() {
         await loadSeasonEndConfirmations();
         await loadLeaderboard();
         await loadRewardLogs();
-        await loadItemCatalog();
+        await loadItemCatalog({ loadUsageSummary: false });
         await loadSeasonActionLogs();
         await loadRecentMatches();
         continue;
@@ -3066,7 +3112,7 @@ async function uploadAdminBackgroundImage() {
       return;
     }
 
-    await loadAdminBackgroundImageOptions();
+    await loadAdminBackgroundImageOptions({ force: true });
     const uploadedOption = ADMIN_BACKGROUND_IMAGE_OPTIONS.find((option) => option.objectName === objectName);
     if (uploadedOption) {
       adminBackgroundDraftId = uploadedOption.id;
@@ -3343,8 +3389,9 @@ function selectAdminBackgroundDraft(id = "") {
   syncAdminBackgroundPreview();
 }
 
-function openAdminBackgroundPicker() {
+async function openAdminBackgroundPicker() {
   if (!ensureAdminAccess("仅管理员可更换网站背景。")) return;
+  await loadAdminBackgroundImageOptions({ force: true });
   adminBackgroundDraftId = ADMIN_BACKGROUND_IMAGE_IDS.has(currentBackgroundImageId)
     ? currentBackgroundImageId
     : (ADMIN_BACKGROUND_IMAGE_OPTIONS[0]?.id || "");
@@ -5447,6 +5494,7 @@ function setScorerPanelOpen(isOpen) {
   }
   if (isScorerPanelOpen) {
     setAdminPanelOpen(false);
+    void loadItemCatalogUsageSummary();
   }
 }
 
@@ -5560,6 +5608,7 @@ function setAdminPanelOpen(isOpen) {
   if (isAdminPanelOpen) {
     setScorerPanelOpen(false);
     renderAdminHistoryRepairControls();
+    void loadItemCatalogUsageSummary();
   } else if (adminHistoryRepairState.seasonId) {
     stopAdminHistoryRepairMode("");
   }
@@ -8219,6 +8268,13 @@ async function loadItemCatalogUsageSummary() {
   return itemCatalogUsageSummaryPendingPromise;
 }
 
+function ensureItemCatalogUsageSummaryLoaded() {
+  if (itemCatalogUsageSummaryStatus === "ready" || itemCatalogUsageSummaryPendingPromise) {
+    return itemCatalogUsageSummaryPendingPromise;
+  }
+  return loadItemCatalogUsageSummary();
+}
+
 function buildItemCatalogCardHtml(entry, mode = "scorer") {
   const donationAmount = getItemCatalogConfigNumber(entry, "donation_amount", 0);
   const initialQuantity = getItemCatalogInitialQuantity(entry);
@@ -9203,7 +9259,7 @@ function getExpectedGitHubStorageSnapshotDate(date = new Date()) {
 function readGitHubStorageDailyCache(expectedDate) {
   try {
     const cached = JSON.parse(localStorage.getItem(GITHUB_STORAGE_DAILY_CACHE_KEY) || "null");
-    if (cached?.beijingDate !== expectedDate || !isFiniteStorageByteCount(cached?.sizeBytes)) {
+    if (cached?.cacheDate !== expectedDate || !isFiniteStorageByteCount(cached?.sizeBytes)) {
       return null;
     }
     return cached;
@@ -9254,7 +9310,8 @@ async function refreshGitHubRepositoryStorageStatus() {
 
     writeGitHubStorageDailyCache({
       sizeBytes: usedBytes,
-      beijingDate: String(snapshot?.beijingDate || ""),
+      cacheDate: expectedDate,
+      snapshotDate: String(snapshot?.beijingDate || ""),
       checkedAt: String(snapshot?.checkedAt || ""),
     });
     setGitHubRepositoryStorageDisplayText(
@@ -9288,7 +9345,7 @@ function getSupabaseSystemUsageDisplayText() {
 }
 
 function getSupabaseSystemUsageBusinessDate() {
-  return getBeijingBusinessDateString() || new Date().toISOString().slice(0, 10);
+  return getExpectedGitHubStorageSnapshotDate();
 }
 
 function getSupabaseSystemUsageRefreshKey() {
@@ -15500,7 +15557,7 @@ function renderLeaderboard(data) {
         </span>
       </td>
       <td>
-        <span class="leaderboard-stat-wrap ${hoverDirectionClass}" aria-label="${escapeHtml(gamesTooltip.text)}">
+        <span class="leaderboard-stat-wrap leaderboard-games-stat-wrap ${hoverDirectionClass}" data-role="games-detail" tabindex="0" aria-label="${escapeHtml(gamesTooltip.text)}">
           <span class="leaderboard-stat${gamesPlayed > 5 ? " leaderboard-stat-active" : ""}">${gamesPlayed}</span>
           <span class="leaderboard-stat-hovercard leaderboard-games-hovercard">${gamesTooltip.html}</span>
         </span>
@@ -20233,12 +20290,18 @@ async function reorderMatchesWithinDayToOrder(groupKey, nextOrder) {
   });
 }
 
-function subscribeRealtime() {
-  if (realtimeChannel) {
-    db.removeChannel(realtimeChannel);
-  }
+function disconnectRealtime({ hidden = false } = {}) {
+  if (!realtimeChannel) return;
+  const channel = realtimeChannel;
+  realtimeChannel = null;
+  realtimeDisconnectedWhileHidden = hidden;
+  void db.removeChannel(channel);
+}
 
-  realtimeChannel = db
+function subscribeRealtime() {
+  if (document.visibilityState === "hidden" || realtimeChannel) return;
+
+  const channel = db
     .channel("app-realtime")
     .on(
       "postgres_changes",
@@ -20364,7 +20427,14 @@ function subscribeRealtime() {
     )
     .subscribe((status) => {
       console.info("[realtime] app-realtime status:", status);
+      if (
+        ["CHANNEL_ERROR", "TIMED_OUT", "CLOSED"].includes(status)
+        && realtimeChannel === channel
+      ) {
+        realtimeChannel = null;
+      }
     });
+  realtimeChannel = channel;
 }
 
 if (seasonToggleBtn) {
@@ -20818,7 +20888,12 @@ if (adminParticipationRulesBtn) {
   });
 }
 if (adminBackgroundPickerBtn) {
-  adminBackgroundPickerBtn.addEventListener("click", openAdminBackgroundPicker);
+  adminBackgroundPickerBtn.addEventListener("click", () => {
+    void openAdminBackgroundPicker().catch((error) => {
+      console.error("加载背景列表失败：", error);
+      setMessage(`加载背景列表失败：${error?.message || "未知错误"}`, true);
+    });
+  });
 }
 if (adminBackgroundOptions) {
   adminBackgroundOptions.addEventListener("click", (event) => {
@@ -21961,7 +22036,17 @@ if (leaderboardScoreSortBtn) {
 }
 
 if (leaderboardBody) {
+  const requestGamesDetail = (event) => {
+    const gamesDetail = event.target instanceof Element
+      ? event.target.closest('[data-role="games-detail"]')
+      : null;
+    if (!gamesDetail) return;
+    void ensureItemCatalogUsageSummaryLoaded();
+  };
+  leaderboardBody.addEventListener("pointerover", requestGamesDetail);
+  leaderboardBody.addEventListener("focusin", requestGamesDetail);
   leaderboardBody.addEventListener("click", async (event) => {
+    requestGamesDetail(event);
     const trigger = event.target.closest('[data-role="score-detail"]');
     if (trigger) {
       const playerId = trigger.dataset.playerId || "";
@@ -22198,9 +22283,32 @@ document.addEventListener("click", (event) => {
 });
 
 document.addEventListener("visibilitychange", () => {
-  if (document.visibilityState !== "visible") return;
-  if (!authSession || !isCurrentRoleAdmin()) return;
-  void refreshGitHubRepositoryStorageStatus();
+  if (document.visibilityState === "hidden") {
+    if (realtimeHiddenDisconnectTimer) return;
+    realtimeHiddenDisconnectTimer = window.setTimeout(() => {
+      realtimeHiddenDisconnectTimer = null;
+      if (document.visibilityState === "hidden") {
+        disconnectRealtime({ hidden: true });
+      }
+    }, REALTIME_HIDDEN_DISCONNECT_DELAY_MS);
+    return;
+  }
+
+  if (realtimeHiddenDisconnectTimer) {
+    window.clearTimeout(realtimeHiddenDisconnectTimer);
+    realtimeHiddenDisconnectTimer = null;
+  }
+
+  const shouldRefreshMissedChanges = realtimeDisconnectedWhileHidden;
+  realtimeDisconnectedWhileHidden = false;
+  subscribeRealtime();
+  if (shouldRefreshMissedChanges) {
+    void requestImmediateRefresh({ seasonContext: true });
+  }
+});
+
+window.addEventListener("online", () => {
+  subscribeRealtime();
 });
 
 function readStoredAccessSession() {
@@ -23806,7 +23914,6 @@ async function init() {
           Promise.all([
             runInitStep("加载报名队列", loadQueue),
             runInitStep("加载赛季赞助", loadRewardLogs),
-            runInitStep("加载道具数量统计", loadItemCatalogUsageSummary),
             runInitStep("加载赛季完结状态", loadSeasonEndConfirmations),
             runInitStep("加载本地操作记录", loadSeasonActionLogs),
           ]).then(() => {
