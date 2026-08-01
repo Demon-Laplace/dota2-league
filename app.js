@@ -672,7 +672,8 @@ const RECENT_MATCH_SEASON_OPEN_STORAGE_KEY = "nd_dota_recent_match_seasons_open_
 const SEASON_PLAYER_POWER_CACHE_STORAGE_KEY = "nd_dota_season_player_power_cache_v1";
 const HOME_LEADERBOARD_CACHE_STORAGE_KEY = "nd_dota_home_leaderboard_cache_v1";
 const HOME_PLAYER_DIRECTORY_CACHE_STORAGE_KEY = "nd_dota_home_player_directory_cache_v1";
-const SEASON_CHAMPION_CACHE_STORAGE_KEY = "nd_dota_season_champions_v1";
+const SEASON_CHAMPION_CACHE_STORAGE_KEY = "nd_dota_season_champions_v2";
+const ADMIN_HISTORY_REPAIR_WINDOW_MS = 15 * 60 * 1000;
 const LIFETIME_REWARD_TOTALS_STORAGE_KEY = "nd_dota_lifetime_reward_totals_v1";
 const ACCESS_SESSION_STORAGE_KEY = "nd_dota_access_session_v2";
 const ACCESS_UI_HIDDEN_STORAGE_KEY = "nd_dota_access_ui_hidden_v1";
@@ -947,6 +948,13 @@ const scorerExitModeBtn = document.getElementById("scorerExitModeBtn");
 const adminExitModeBtn = document.getElementById("adminExitModeBtn");
 const scorerPanelSummary = document.getElementById("scorerPanelSummary");
 const adminPanelSummary = document.getElementById("adminPanelSummary");
+const adminHistoryRepairToggleBtn = document.getElementById("adminHistoryRepairToggleBtn");
+const adminHistoryRepairControls = document.getElementById("adminHistoryRepairControls");
+const adminHistoryRepairSeasonSelect = document.getElementById("adminHistoryRepairSeasonSelect");
+const adminHistoryRepairReasonInput = document.getElementById("adminHistoryRepairReasonInput");
+const adminStartHistoryRepairBtn = document.getElementById("adminStartHistoryRepairBtn");
+const adminStopHistoryRepairBtn = document.getElementById("adminStopHistoryRepairBtn");
+const adminHistoryRepairStatus = document.getElementById("adminHistoryRepairStatus");
 const scorerMembersCount = document.getElementById("scorerMembersCount");
 const scorerMembersList = document.getElementById("scorerMembersList");
 const scorerOpenManualScoreBtn = document.getElementById("scorerOpenManualScoreBtn");
@@ -1435,6 +1443,12 @@ let isSeasonPanelOpen = false;
 let isRewardPanelOpen = false;
 let isScorerPanelOpen = false;
 let isAdminPanelOpen = false;
+let isAdminHistoryRepairControlsOpen = false;
+let adminHistoryRepairState = {
+  seasonId: "",
+  reason: "",
+  expiresAt: 0,
+};
 let isLeaderboardCompact = false;
 let editingMatchId = null;
 let isMatchExhibition = false;
@@ -5439,6 +5453,106 @@ function setScorerPanelOpen(isOpen) {
   }
 }
 
+function getClosedSeasonsForHistoryRepair() {
+  return (allSeasons || [])
+    .filter((season) => season?.id && String(season.status || "").toLowerCase() === "closed")
+    .slice()
+    .sort((a, b) => String(b.start_at || "").localeCompare(String(a.start_at || ""), "zh-CN"));
+}
+
+function isAdminHistoryRepairActiveForSeason(seasonId = "") {
+  return Boolean(
+    isCurrentRoleAdmin()
+    && adminHistoryRepairState.seasonId
+    && adminHistoryRepairState.seasonId === seasonId
+    && adminHistoryRepairState.reason
+    && adminHistoryRepairState.expiresAt > Date.now()
+  );
+}
+
+function renderAdminHistoryRepairControls() {
+  if (!adminHistoryRepairControls) return;
+  const active = isAdminHistoryRepairActiveForSeason(adminHistoryRepairState.seasonId);
+  const closedSeasons = getClosedSeasonsForHistoryRepair();
+  const selectedSeasonId = active
+    ? adminHistoryRepairState.seasonId
+    : String(adminHistoryRepairSeasonSelect?.value || "");
+
+  adminHistoryRepairControls.hidden = !isAdminHistoryRepairControlsOpen;
+  adminHistoryRepairToggleBtn?.setAttribute("aria-expanded", String(isAdminHistoryRepairControlsOpen));
+  if (adminHistoryRepairSeasonSelect) {
+    adminHistoryRepairSeasonSelect.innerHTML = buildSeasonOptions(closedSeasons, selectedSeasonId);
+    adminHistoryRepairSeasonSelect.disabled = active;
+  }
+  if (adminHistoryRepairReasonInput) {
+    adminHistoryRepairReasonInput.disabled = active;
+    if (active) adminHistoryRepairReasonInput.value = adminHistoryRepairState.reason;
+  }
+  if (adminStartHistoryRepairBtn) adminStartHistoryRepairBtn.hidden = active;
+  if (adminStopHistoryRepairBtn) adminStopHistoryRepairBtn.hidden = !active;
+
+  if (active) {
+    const season = getSeasonMetaById(adminHistoryRepairState.seasonId);
+    const remainingMinutes = Math.max(1, Math.ceil((adminHistoryRepairState.expiresAt - Date.now()) / 60000));
+    setMessageNode(
+      adminHistoryRepairStatus,
+      `${season?.name || "所选赛季"} 维修模式已开启，约 ${remainingMinutes} 分钟后自动结束。所有操作将写入长期审计记录。`
+    );
+  } else {
+    setMessageNode(adminHistoryRepairStatus, "");
+  }
+}
+
+function stopAdminHistoryRepairMode(message = "历史维修模式已结束。") {
+  adminHistoryRepairState = { seasonId: "", reason: "", expiresAt: 0 };
+  clearBackfillForm();
+  setBackfillFormOpen(false);
+  renderBackfillForm();
+  renderAdminHistoryRepairControls();
+  if (message) setAdminPanelMessage(message);
+}
+
+async function startAdminHistoryRepairMode() {
+  if (!isCurrentRoleAdmin()) return;
+  await loadSeasons();
+  const seasonId = String(adminHistoryRepairSeasonSelect?.value || "").trim();
+  const reason = String(adminHistoryRepairReasonInput?.value || "").trim();
+  const season = getClosedSeasonsForHistoryRepair().find((entry) => entry.id === seasonId) || null;
+  if (!season) {
+    setMessageNode(adminHistoryRepairStatus, "请选择一个已结束赛季。", true);
+    return;
+  }
+  if (reason.length < 4) {
+    setMessageNode(adminHistoryRepairStatus, "请填写至少 4 个字的维修原因。", true);
+    return;
+  }
+
+  adminHistoryRepairState = {
+    seasonId,
+    reason,
+    expiresAt: Date.now() + ADMIN_HISTORY_REPAIR_WINDOW_MS,
+  };
+  backfillSeasonSelect.value = seasonId;
+  clearBackfillForm();
+  backfillSeasonSelect.value = seasonId;
+  backfillDateInput.value = season.end_date || getPreviousBeijingBusinessDateString();
+  setBackfillFormOpen(true);
+  setMatchFormOpen(false);
+  renderAdminHistoryRepairControls();
+  renderBackfillForm();
+  await ensureBackfillSeasonSelectionLoaded({ forcePlayers: true });
+  await loadRecentMatchesForSeason(seasonId, { keepOpen: true });
+  refreshBackfillSelectOptions();
+  backfillFormPanel?.scrollIntoView({ behavior: "smooth", block: "start" });
+
+  const expectedExpiry = adminHistoryRepairState.expiresAt;
+  setTimeout(() => {
+    if (adminHistoryRepairState.expiresAt === expectedExpiry && Date.now() >= expectedExpiry) {
+      stopAdminHistoryRepairMode("历史维修窗口已自动到期。");
+    }
+  }, ADMIN_HISTORY_REPAIR_WINDOW_MS + 500);
+}
+
 function setAdminPanelOpen(isOpen) {
   isAdminPanelOpen = isOpen && isCurrentRoleAdmin();
   adminPanel.hidden = !isAdminPanelOpen;
@@ -5448,6 +5562,9 @@ function setAdminPanelOpen(isOpen) {
   }
   if (isAdminPanelOpen) {
     setScorerPanelOpen(false);
+    renderAdminHistoryRepairControls();
+  } else if (adminHistoryRepairState.seasonId) {
+    stopAdminHistoryRepairMode("");
   }
 }
 
@@ -14933,9 +15050,14 @@ function renderMatchForm() {
 function renderBackfillForm() {
   refreshBackfillSelectOptions();
   renderDoublePanel("backfill");
-  backfillSeasonSelect.innerHTML = buildSeasonOptions(allSeasons, backfillSeasonSelect.value);
+  const repairSeason = isAdminHistoryRepairActiveForSeason(adminHistoryRepairState.seasonId)
+    ? getSeasonMetaById(adminHistoryRepairState.seasonId)
+    : null;
+  const availableSeasons = repairSeason ? [repairSeason] : allSeasons;
+  backfillSeasonSelect.innerHTML = buildSeasonOptions(availableSeasons, backfillSeasonSelect.value);
   const hasEnoughPlayers = backfillPlayers.length >= TEAM_SIZE * 2;
   const hasSeason = Boolean(backfillSeasonSelect.value);
+  backfillSeasonSelect.disabled = Boolean(repairSeason);
   backfillDateInput.max = getBackfillDateMaxValue();
   backfillDateInput.min = getBackfillDateMinValue();
   renderInlineTeamDoubleControls("backfill", !hasSeason || !hasEnoughPlayers);
@@ -16672,16 +16794,22 @@ function isSeasonArchivedInDatabase(seasonId) {
 
 function isSeasonEditableForMatchRecords(seasonId) {
   const status = getSeasonStatus(seasonId);
-  return status === "draft" || status === "active" || status === "closed";
+  return status === "draft" || status === "active";
 }
 
 function canModifyMatchRecordsForSeason(seasonId) {
-  return isCurrentRoleScorer() && isSeasonEditableForMatchRecords(seasonId);
+  return (
+    (isCurrentRoleScorer() && isSeasonEditableForMatchRecords(seasonId))
+    || isAdminHistoryRepairActiveForSeason(seasonId)
+  );
 }
 
 function getSeasonReadOnlyReason(seasonId) {
   if (isSeasonArchivedInDatabase(seasonId)) {
     return "该赛季已导入 GitHub，只能查看不能修改。";
+  }
+  if (getSeasonStatus(seasonId) === "closed") {
+    return "该赛季已完结；仅管理员可从管理面板开启临时历史维修。";
   }
   return "该赛季当前不可修改。";
 }
@@ -19542,6 +19670,14 @@ function validateBackfillPlayers(teamAIds, teamBIds) {
     return `补录比赛日期不能早于 ${selectedSeason.start_date}。`;
   }
 
+  if (
+    isAdminHistoryRepairActiveForSeason(selectedSeason?.id || "")
+    && selectedSeason?.end_date
+    && backfillDateInput.value > selectedSeason.end_date
+  ) {
+    return `历史维修日期不能晚于 ${selectedSeason.end_date}。`;
+  }
+
   if (!editingMatchId && backfillDateInput.value > getPreviousBeijingBusinessDateString()) {
     return "补录比赛日期只能选择今天之前。";
   }
@@ -19705,6 +19841,7 @@ async function recordBackfillMatch() {
   const targetMatchId = editingMatchId;
   const targetSeasonId = backfillSeasonSelect.value;
   const targetMatchDate = backfillDateInput.value;
+  const isHistoricalRepair = isAdminHistoryRepairActiveForSeason(targetSeasonId);
   if (isEditing) {
     if (!ensureMatchRecordEditable(targetMatchId, "修改")) return;
   } else if (!canModifyMatchRecordsForSeason(targetSeasonId)) {
@@ -19771,6 +19908,7 @@ async function recordBackfillMatch() {
     p_double_downs: doubleDownPayload,
     p_is_exhibition: isBackfillExhibition,
   };
+  const repairReason = isHistoricalRepair ? adminHistoryRepairState.reason : "";
   const optimisticMatch = buildOptimisticMatchRecord(
     targetMatchId || `optimistic-${Date.now()}`,
     targetSeasonId,
@@ -19792,14 +19930,26 @@ async function recordBackfillMatch() {
   }
 
   if (isEditing) {
-    ({ data: matchId, error } = await db.rpc("update_match_result", updatePayload));
-    if (error && !isBackfillExhibition && shouldRetryWithoutExhibitionFlag(error, "update_match_result")) {
+    const updateFunctionName = isHistoricalRepair
+      ? "admin_update_historical_match_repair"
+      : "update_match_result";
+    const targetUpdatePayload = isHistoricalRepair
+      ? { ...updatePayload, p_reason: repairReason }
+      : updatePayload;
+    ({ data: matchId, error } = await db.rpc(updateFunctionName, targetUpdatePayload));
+    if (!isHistoricalRepair && error && !isBackfillExhibition && shouldRetryWithoutExhibitionFlag(error, "update_match_result")) {
       const { p_is_exhibition: ignoredFlag, ...legacyUpdatePayload } = updatePayload;
       ({ data: matchId, error } = await db.rpc("update_match_result", legacyUpdatePayload));
     }
   } else {
-    ({ data: matchId, error } = await db.rpc("record_match_result_backfill", backfillPayload));
-    if (error && !isBackfillExhibition && shouldRetryWithoutExhibitionFlag(error, "record_match_result_backfill")) {
+    const backfillFunctionName = isHistoricalRepair
+      ? "admin_record_historical_match_repair"
+      : "record_match_result_backfill";
+    const targetBackfillPayload = isHistoricalRepair
+      ? { ...backfillPayload, p_reason: repairReason }
+      : backfillPayload;
+    ({ data: matchId, error } = await db.rpc(backfillFunctionName, targetBackfillPayload));
+    if (!isHistoricalRepair && error && !isBackfillExhibition && shouldRetryWithoutExhibitionFlag(error, "record_match_result_backfill")) {
       const { p_is_exhibition: ignoredFlag, ...legacyBackfillPayload } = backfillPayload;
       ({ data: matchId, error } = await db.rpc("record_match_result_backfill", legacyBackfillPayload));
     }
@@ -19942,9 +20092,15 @@ async function deleteMatch(matchId, buttonEl) {
   await animateRecentMatchRemoval(matchId);
   const removedMatchState = removeRecentMatchLocally(matchId);
 
-  const { error } = await db.rpc("delete_match_and_recalculate", {
-    p_match_id: matchId,
-  });
+  const seasonId = String(matchForLog?.season_id || "");
+  const isHistoricalRepair = isAdminHistoryRepairActiveForSeason(seasonId);
+  const deleteFunctionName = isHistoricalRepair
+    ? "admin_delete_historical_match_repair"
+    : "delete_match_and_recalculate";
+  const deletePayload = isHistoricalRepair
+    ? { p_match_id: matchId, p_reason: adminHistoryRepairState.reason }
+    : { p_match_id: matchId };
+  const { error } = await db.rpc(deleteFunctionName, deletePayload);
 
   if (error) {
     restoreRecentMatchLocally(removedMatchState);
@@ -19956,8 +20112,11 @@ async function deleteMatch(matchId, buttonEl) {
     return;
   }
 
-  setMessage("比赛记录已删除，积分已按全部比赛记录重算。");
-  setMatchMessage("比赛记录已删除，积分已按全部比赛记录重算。");
+  const deleteSuccessMessage = isHistoricalRepair
+    ? "历史比赛记录已删除，相关积分与附件已同步清理，并已写入长期审计。"
+    : "比赛记录已删除，积分已按全部比赛记录重算。";
+  setMessage(deleteSuccessMessage);
+  setMatchMessage(deleteSuccessMessage);
   appendAdminActionLog(actionLogText);
   if (matchForLog?.season_id) {
     recentMatchLoadedSeasonIds.delete(matchForLog.season_id);
@@ -20255,6 +20414,20 @@ scorerExitModeBtn.addEventListener("click", exitAccessRole);
 adminExitModeBtn.addEventListener("click", exitAccessRole);
 closeScorerPanelBtn.addEventListener("click", () => setScorerPanelOpen(false));
 closeAdminPanelBtn.addEventListener("click", () => setAdminPanelOpen(false));
+if (adminHistoryRepairToggleBtn) {
+  adminHistoryRepairToggleBtn.addEventListener("click", async () => {
+    if (!isCurrentRoleAdmin()) return;
+    isAdminHistoryRepairControlsOpen = !isAdminHistoryRepairControlsOpen;
+    if (isAdminHistoryRepairControlsOpen) await loadSeasons();
+    renderAdminHistoryRepairControls();
+  });
+}
+if (adminStartHistoryRepairBtn) {
+  adminStartHistoryRepairBtn.addEventListener("click", startAdminHistoryRepairMode);
+}
+if (adminStopHistoryRepairBtn) {
+  adminStopHistoryRepairBtn.addEventListener("click", () => stopAdminHistoryRepairMode());
+}
 resetSeasonBtn.addEventListener("click", resetCurrentSeason);
 if (scorerOpenSeasonRulesBtn) {
   scorerOpenSeasonRulesBtn.addEventListener("click", () => {
@@ -22299,6 +22472,13 @@ function applyRolePermissions() {
     adminModeBtn.textContent = isAdminPanelOpen
       ? copyText("runtime.common.adminModeOpen", "收起管理")
       : copyText("runtime.common.adminModeClosed", "管理员模式");
+  }
+  if (adminHistoryRepairToggleBtn) {
+    adminHistoryRepairToggleBtn.hidden = !isAdmin;
+    adminHistoryRepairToggleBtn.disabled = !isAdmin;
+  }
+  if (!isAdmin && adminHistoryRepairState.seasonId) {
+    stopAdminHistoryRepairMode("");
   }
 
   resetSeasonBtn.hidden = true;

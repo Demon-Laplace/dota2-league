@@ -172,6 +172,24 @@
             <button id="adminPrizeDistributionBtn" class="button-secondary" type="button" data-copy="adminPanel.prizeDistributionAction"></button>
             <button id="adminParticipationRulesBtn" class="button-secondary" type="button" data-copy="adminPanel.participationRulesAction"></button>
             <button id="adminBackgroundPickerBtn" class="button-secondary" type="button" data-copy="adminPanel.backgroundPickerAction"></button>
+            <button id="adminHistoryRepairToggleBtn" class="button-secondary" type="button" aria-expanded="false">历史补录维修</button>
+          </div>
+          <div id="adminHistoryRepairControls" class="admin-toolbar-section" hidden>
+            <div class="section-head admin-toolbar-subhead">
+              <div>
+                <h3>历史补录维修</h3>
+                <p class="muted">仅管理员可开启 15 分钟；正常补录路径仍无法修改已结束赛季。</p>
+              </div>
+            </div>
+            <div class="row admin-panel-actions">
+              <select id="adminHistoryRepairSeasonSelect" aria-label="选择已结束赛季">
+                <option value="">请选择已结束赛季</option>
+              </select>
+              <input id="adminHistoryRepairReasonInput" type="text" maxlength="160" placeholder="填写维修原因（必填）" />
+              <button id="adminStartHistoryRepairBtn" class="button-danger" type="button">开启 15 分钟维修</button>
+              <button id="adminStopHistoryRepairBtn" class="button-secondary" type="button" hidden>结束维修</button>
+            </div>
+            <p id="adminHistoryRepairStatus" class="message"></p>
           </div>
           <div class="admin-toolbar-section">
             <div class="section-head admin-toolbar-subhead">
@@ -1244,6 +1262,6 @@
     import { animate } from "https://cdn.jsdelivr.net/npm/motion@12.23.24/+esm";
     window.Motion = { animate };
   </script>
-  <script src="app.js?v=20260801-long-term-bugfix-v1"></script>
+  <script src="app.js?v=20260801-history-repair-v1"></script>
 </body>
 </html>
