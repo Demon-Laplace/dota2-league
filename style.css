@@ -2732,6 +2732,12 @@ button:disabled {
 
 .leaderboard-power-sheet {
   width: min(1120px, calc(100vw - 28px));
+  max-height: calc(100dvh - 40px);
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+  touch-action: pan-y;
   padding: 18px 18px 16px;
   border-radius: 16px;
   border: 1px solid rgba(112, 142, 170, 0.16);
@@ -2864,7 +2870,7 @@ button:disabled {
   gap: 8px;
 }
 
-.leaderboard-power-sheet:not(.leaderboard-participation-sheet) .leaderboard-power-sheet-title {
+.leaderboard-power-sheet-title {
   display: inline-flex;
   align-items: center;
   flex-wrap: wrap;
@@ -3021,37 +3027,61 @@ button:disabled {
 }
 
 .leaderboard-participation-sheet {
-  width: min(720px, calc(100vw - 28px));
+  width: min(1120px, calc(100vw - 28px));
 }
 
 .leaderboard-participation-sheet-list {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
-  gap: 6px;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  column-gap: 18px;
+  row-gap: 16px;
   margin-top: 10px;
 }
 
 .leaderboard-participation-row {
-  display: grid;
-  gap: 4px;
-  padding: 8px 10px;
-  border-radius: 10px;
-  border: 1px solid rgba(120, 158, 201, 0.14);
-  background:
-    linear-gradient(180deg, rgba(14, 18, 26, 0.92), rgba(10, 14, 20, 0.96)),
-    linear-gradient(135deg, rgba(78, 120, 167, 0.08), transparent 42%);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  min-width: 0;
+  min-height: 38px;
+  padding: 9px 0 2px;
+  border: 0;
+  border-top: 1px solid rgba(112, 142, 170, 0.18);
+  border-radius: 0;
+  background: transparent;
 }
 
 .leaderboard-participation-range {
-  color: #e7f0fb;
-  font-size: 12px;
-  line-height: 1.25;
+  min-width: 0;
+  color: #f7fbff;
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 1.1;
 }
 
 .leaderboard-participation-value {
-  color: #f7fbff;
-  font-size: 12px;
+  display: inline-flex;
+  align-items: center;
+  flex: 0 0 auto;
+  min-width: 0;
+  padding: 3px 8px;
+  border-radius: 999px;
+  border: 1px solid rgba(112, 142, 170, 0.18);
+  background: rgba(14, 22, 32, 0.84);
+  color: rgba(203, 217, 233, 0.92);
+  font-size: 11px;
   line-height: 1.2;
+}
+
+#leaderboardPowerViewModal,
+#leaderboardParticipationViewModal {
+  place-items: start center;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+  touch-action: pan-y;
 }
 
 .hero-picker-dialog.relation-stats-dialog {
@@ -5929,7 +5959,13 @@ button:disabled {
 @media (max-width: 760px) {
   .leaderboard-power-sheet {
     width: min(100vw - 18px, 100%);
+    max-height: calc(100dvh - 18px);
     padding: 16px 14px 14px;
+  }
+
+  #leaderboardPowerViewModal,
+  #leaderboardParticipationViewModal {
+    padding: 9px;
   }
 
   .leaderboard-champions-sheet {
@@ -5956,6 +5992,21 @@ button:disabled {
   .leaderboard-power-sheet-list .season-rank-list,
   .leaderboard-power-sheet-list .season-unranked-list {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .leaderboard-participation-sheet-list {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    column-gap: 12px;
+    row-gap: 8px;
+  }
+
+  .leaderboard-participation-row {
+    min-height: 34px;
+    padding-top: 8px;
+  }
+
+  .leaderboard-participation-range {
+    font-size: 13px;
   }
 
   .relation-stats-summary,

@@ -17172,17 +17172,11 @@ function renderRecentMatches(groups) {
     if (!visibleDayGroups.length) {
       const placeholder = document.createElement("article");
       placeholder.className = "recent-match-card recent-match-card-empty";
+      const placeholderLabel = seasonLoadError
+        ? "加载失败"
+        : (!isSeasonLoaded || isSeasonLoading ? "载入中" : "无记录");
       placeholder.innerHTML = `
-        <span class="recent-match-round-badge">${isSeasonLoading ? "加载中" : (seasonLoadError ? "加载失败" : "历史记录")}</span>
-        <div class="recent-match-head">
-          <div class="recent-match-title">
-            <strong class="recent-match-result-pending">${escapeHtml(
-              isSeasonLoading
-                ? "正在加载该赛季比赛记录"
-                : (seasonLoadError || (isSeasonLoaded ? "该赛季暂无比赛记录" : "展开后加载该赛季比赛记录"))
-            )}</strong>
-          </div>
-        </div>
+        <span class="recent-match-round-badge">${escapeHtml(placeholderLabel)}</span>
       `;
       seasonContent.appendChild(placeholder);
     }
