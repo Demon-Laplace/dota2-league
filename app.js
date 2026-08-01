@@ -9186,22 +9186,43 @@ function getGitHubRepositoryStorageDisplayText() {
 }
 
 async function refreshGitHubRepositoryStorageStatus() {
-  if (typeof fetch !== "function") {
-    setGitHubRepositoryStorageDisplayText("未知");
-    return;
-  }
   if (githubRepositoryStorageRefreshPromise) {
     return githubRepositoryStorageRefreshPromise;
   }
 
   githubRepositoryStorageRefreshPromise = (async () => {
-    const response = await fetch(GITHUB_REPOSITORY_API_URL, { cache: "no-cache" });
-    if (!response.ok) {
-      throw new Error(`GitHub API 返回 ${response.status}`);
+    let edgeFunctionError = null;
+    let usedBytes = Number.NaN;
+
+    if (authSession && isCurrentRoleScorer()) {
+      try {
+        const result = await invokeFunction("github-repository-storage");
+        usedBytes = Number(result?.sizeBytes);
+      } catch (error) {
+        edgeFunctionError = error;
+        console.warn("通过 Edge Function 读取 GitHub 仓库空间失败，尝试公共接口。", error);
+      }
     }
 
-    const repository = await response.json();
-    const usedBytes = Number(repository?.size) * 1024;
+    if (!isFiniteStorageByteCount(usedBytes)) {
+      if (typeof fetch !== "function") {
+        throw edgeFunctionError || new Error("当前环境不支持读取 GitHub 仓库空间。");
+      }
+      const response = await fetch(GITHUB_REPOSITORY_API_URL, {
+        cache: "no-cache",
+        headers: {
+          Accept: "application/vnd.github+json",
+          "X-GitHub-Api-Version": "2022-11-28",
+        },
+      });
+      if (!response.ok) {
+        throw edgeFunctionError || new Error(`GitHub API 返回 ${response.status}`);
+      }
+
+      const repository = await response.json();
+      usedBytes = Number(repository?.size) * 1024;
+    }
+
     if (!Number.isFinite(usedBytes) || usedBytes < 0) {
       throw new Error("GitHub API 未返回有效仓库大小。");
     }
@@ -9224,7 +9245,7 @@ async function refreshGitHubRepositoryStorageStatus() {
 function refreshGitHubRepositoryStorageStatusAfterPush() {
   GITHUB_STORAGE_POST_PUSH_REFRESH_DELAYS_MS.forEach((delayMs) => {
     const refresh = () => {
-      if (authSession && isCurrentRoleAdmin()) {
+      if (authSession && isCurrentRoleScorer()) {
         void refreshGitHubRepositoryStorageStatus();
       }
     };
@@ -9241,7 +9262,7 @@ function startGitHubRepositoryStorageAutoRefresh() {
   if (githubRepositoryStorageRefreshTimer || typeof window === "undefined") return;
   void refreshGitHubRepositoryStorageStatus();
   githubRepositoryStorageRefreshTimer = window.setInterval(() => {
-    if (!authSession || !isCurrentRoleAdmin()) {
+    if (!authSession || !isCurrentRoleScorer()) {
       stopGitHubRepositoryStorageAutoRefresh();
       return;
     }
@@ -9256,7 +9277,7 @@ function stopGitHubRepositoryStorageAutoRefresh() {
 }
 
 function syncGitHubRepositoryStorageAutoRefresh() {
-  if (authSession && isCurrentRoleAdmin()) {
+  if (authSession && isCurrentRoleScorer()) {
     startGitHubRepositoryStorageAutoRefresh();
     return;
   }
