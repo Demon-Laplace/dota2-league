@@ -1,0 +1,54 @@
+name: Update repository storage snapshot
+
+on:
+  schedule:
+    # 18:00 UTC is 02:00 the next day in Beijing (UTC+8).
+    - cron: "0 18 * * *"
+  workflow_dispatch:
+
+concurrency:
+  group: update-repository-storage
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+jobs:
+  update-storage-snapshot:
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ github.token }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Read repository size once
+        shell: bash
+        run: |
+          set -euo pipefail
+          size_kib="$(gh api "repos/${GITHUB_REPOSITORY}" --jq '.size')"
+          checked_at="$(date -u +'%Y-%m-%dT%H:%M:%SZ')"
+          beijing_date="$(TZ=Asia/Shanghai date +'%Y-%m-%d')"
+
+          jq -n \
+            --arg repository "$GITHUB_REPOSITORY" \
+            --arg checkedAt "$checked_at" \
+            --arg beijingDate "$beijing_date" \
+            --argjson sizeKiB "$size_kib" \
+            '{
+              repository: $repository,
+              sizeKiB: $sizeKiB,
+              sizeBytes: ($sizeKiB * 1024),
+              checkedAt: $checkedAt,
+              beijingDate: $beijingDate
+            }' > assets/github-repository-storage.json
+
+      - name: Commit daily snapshot
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add assets/github-repository-storage.json
+          git commit -m "chore: update daily repository storage snapshot"
+          git push origin "HEAD:${GITHUB_REF_NAME}"

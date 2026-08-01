@@ -27,10 +27,9 @@ const MIN_BACKGROUND_BRIGHTNESS_PERCENT = 20;
 const MAX_BACKGROUND_BRIGHTNESS_PERCENT = 100;
 const DEFAULT_BACKGROUND_IMAGE_ID = "bg_21607b0db69e6d93";
 const GITHUB_REPOSITORY_FULL_NAME = "Demon-Laplace/dota2-league";
-const GITHUB_REPOSITORY_API_URL = `https://api.github.com/repos/${GITHUB_REPOSITORY_FULL_NAME}`;
+const GITHUB_REPOSITORY_STORAGE_SNAPSHOT_URL = `https://raw.githubusercontent.com/${GITHUB_REPOSITORY_FULL_NAME}/main/assets/github-repository-storage.json`;
 const GITHUB_PAGES_REPOSITORY_RECOMMENDED_LIMIT_BYTES = 1024 * 1024 * 1024;
-const GITHUB_STORAGE_POST_PUSH_REFRESH_DELAYS_MS = [0, 4000, 15000];
-const GITHUB_STORAGE_AUTO_REFRESH_INTERVAL_MS = 5 * 60 * 1000;
+const GITHUB_STORAGE_DAILY_CACHE_KEY = "nd_dota_github_storage_daily_v1";
 const SUPABASE_DATABASE_USAGE_QUOTA_BYTES = 500 * 1024 * 1024;
 const SUPABASE_SYSTEM_USAGE_DAILY_CACHE_STORAGE_KEY = "nd_dota_supabase_system_usage_daily_v3";
 const SEASON_BASE_SPONSOR_AMOUNT = 20;
@@ -39,7 +38,6 @@ const SEASON_ROLLOVER_REQUIRED_SCORER_CONFIRMATIONS = 1;
 let ADMIN_BACKGROUND_IMAGE_OPTIONS = [];
 let ADMIN_BACKGROUND_IMAGE_IDS = new Set(ADMIN_BACKGROUND_IMAGE_OPTIONS.map((option) => option.id));
 let githubRepositoryStorageDisplayText = "读取中";
-let githubRepositoryStorageRefreshTimer = null;
 let githubRepositoryStorageRefreshPromise = null;
 let supabaseSystemUsageDisplayText = "数据库：读取中";
 let supabaseSystemUsageRefreshKey = "";
@@ -4287,7 +4285,6 @@ async function exportClosedSeasonArchiveToGithub() {
   appendAdminActionLog(
     `将 ${targetSeason.name || "该赛季"} 导出到 GitHub，并在 Supabase 数据库中标记为只读归档${exportResult?.path ? `；GitHub 路径：${exportResult.path}` : ""}。`
   );
-  refreshGitHubRepositoryStorageStatusAfterPush();
   setSeasonArchiveExportModalOpen(false);
   requestImmediateRefresh({
     seasonContext: true,
@@ -9185,48 +9182,81 @@ function getGitHubRepositoryStorageDisplayText() {
   return githubRepositoryStorageDisplayText || "未知";
 }
 
+function getExpectedGitHubStorageSnapshotDate(date = new Date()) {
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Shanghai",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    hourCycle: "h23",
+  }).formatToParts(date);
+  const values = Object.fromEntries(parts.map((part) => [part.type, part.value]));
+  const year = Number(values.year);
+  const month = Number(values.month);
+  const day = Number(values.day);
+  const hour = Number(values.hour);
+  const snapshotDate = new Date(Date.UTC(year, month - 1, day - (hour < 2 ? 1 : 0)));
+  return snapshotDate.toISOString().slice(0, 10);
+}
+
+function readGitHubStorageDailyCache(expectedDate) {
+  try {
+    const cached = JSON.parse(localStorage.getItem(GITHUB_STORAGE_DAILY_CACHE_KEY) || "null");
+    if (cached?.beijingDate !== expectedDate || !isFiniteStorageByteCount(cached?.sizeBytes)) {
+      return null;
+    }
+    return cached;
+  } catch (_error) {
+    return null;
+  }
+}
+
+function writeGitHubStorageDailyCache(snapshot) {
+  try {
+    localStorage.setItem(GITHUB_STORAGE_DAILY_CACHE_KEY, JSON.stringify(snapshot));
+  } catch (_error) {
+    // Storage can be unavailable in private browsing; the daily server snapshot still works.
+  }
+}
+
 async function refreshGitHubRepositoryStorageStatus() {
   if (githubRepositoryStorageRefreshPromise) {
     return githubRepositoryStorageRefreshPromise;
   }
 
   githubRepositoryStorageRefreshPromise = (async () => {
-    let edgeFunctionError = null;
-    let usedBytes = Number.NaN;
-
-    if (authSession && isCurrentRoleScorer()) {
-      try {
-        const result = await invokeFunction("github-repository-storage");
-        usedBytes = Number(result?.sizeBytes);
-      } catch (error) {
-        edgeFunctionError = error;
-        console.warn("通过 Edge Function 读取 GitHub 仓库空间失败，尝试公共接口。", error);
-      }
+    const expectedDate = getExpectedGitHubStorageSnapshotDate();
+    const cached = readGitHubStorageDailyCache(expectedDate);
+    if (cached) {
+      setGitHubRepositoryStorageDisplayText(
+        formatUsageWithQuota(Number(cached.sizeBytes), GITHUB_PAGES_REPOSITORY_RECOMMENDED_LIMIT_BYTES)
+      );
+      return;
     }
 
+    if (typeof fetch !== "function") {
+      throw new Error("当前环境不支持读取 GitHub 仓库空间快照。");
+    }
+    const response = await fetch(
+      `${GITHUB_REPOSITORY_STORAGE_SNAPSHOT_URL}?date=${encodeURIComponent(expectedDate)}`,
+      { cache: "no-cache" }
+    );
+    if (!response.ok) {
+      throw new Error(`GitHub 空间快照返回 ${response.status}`);
+    }
+
+    const snapshot = await response.json();
+    const usedBytes = Number(snapshot?.sizeBytes);
     if (!isFiniteStorageByteCount(usedBytes)) {
-      if (typeof fetch !== "function") {
-        throw edgeFunctionError || new Error("当前环境不支持读取 GitHub 仓库空间。");
-      }
-      const response = await fetch(GITHUB_REPOSITORY_API_URL, {
-        cache: "no-cache",
-        headers: {
-          Accept: "application/vnd.github+json",
-          "X-GitHub-Api-Version": "2022-11-28",
-        },
-      });
-      if (!response.ok) {
-        throw edgeFunctionError || new Error(`GitHub API 返回 ${response.status}`);
-      }
-
-      const repository = await response.json();
-      usedBytes = Number(repository?.size) * 1024;
+      throw new Error("GitHub 空间快照未返回有效仓库大小。");
     }
 
-    if (!Number.isFinite(usedBytes) || usedBytes < 0) {
-      throw new Error("GitHub API 未返回有效仓库大小。");
-    }
-
+    writeGitHubStorageDailyCache({
+      sizeBytes: usedBytes,
+      beijingDate: String(snapshot?.beijingDate || ""),
+      checkedAt: String(snapshot?.checkedAt || ""),
+    });
     setGitHubRepositoryStorageDisplayText(
       formatUsageWithQuota(usedBytes, GITHUB_PAGES_REPOSITORY_RECOMMENDED_LIMIT_BYTES)
     );
@@ -9242,46 +9272,10 @@ async function refreshGitHubRepositoryStorageStatus() {
   }
 }
 
-function refreshGitHubRepositoryStorageStatusAfterPush() {
-  GITHUB_STORAGE_POST_PUSH_REFRESH_DELAYS_MS.forEach((delayMs) => {
-    const refresh = () => {
-      if (authSession && isCurrentRoleScorer()) {
-        void refreshGitHubRepositoryStorageStatus();
-      }
-    };
-
-    if (delayMs > 0) {
-      window.setTimeout(refresh, delayMs);
-    } else {
-      refresh();
-    }
-  });
-}
-
-function startGitHubRepositoryStorageAutoRefresh() {
-  if (githubRepositoryStorageRefreshTimer || typeof window === "undefined") return;
-  void refreshGitHubRepositoryStorageStatus();
-  githubRepositoryStorageRefreshTimer = window.setInterval(() => {
-    if (!authSession || !isCurrentRoleScorer()) {
-      stopGitHubRepositoryStorageAutoRefresh();
-      return;
-    }
-    void refreshGitHubRepositoryStorageStatus();
-  }, GITHUB_STORAGE_AUTO_REFRESH_INTERVAL_MS);
-}
-
-function stopGitHubRepositoryStorageAutoRefresh() {
-  if (!githubRepositoryStorageRefreshTimer || typeof window === "undefined") return;
-  window.clearInterval(githubRepositoryStorageRefreshTimer);
-  githubRepositoryStorageRefreshTimer = null;
-}
-
 function syncGitHubRepositoryStorageAutoRefresh() {
   if (authSession && isCurrentRoleScorer()) {
-    startGitHubRepositoryStorageAutoRefresh();
-    return;
+    void refreshGitHubRepositoryStorageStatus();
   }
-  stopGitHubRepositoryStorageAutoRefresh();
 }
 
 function setSupabaseSystemUsageDisplayText(text = "未知") {
