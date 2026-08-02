@@ -101,6 +101,7 @@
               aria-expanded="false"
             ></button>
             <button id="scorerOpenLogsBtn" class="button-secondary" type="button" data-copy="scorerPanel.logsButton"></button>
+            <button id="scorerDailyBonusHeroesBtn" class="button-secondary" type="button" data-copy="scorerPanel.dailyBonusHeroesAction"></button>
             <button id="scorerFinishTodayMatchDayBtn" class="button-secondary recent-match-tool recent-match-tool-finish admin-panel-finish-match-day-btn" type="button" data-copy="scorerPanel.finishToday"></button>
             <button id="scorerRecalculateScoresBtn" class="button-secondary" type="button" data-copy="scorerPanel.recalculate"></button>
             <div class="season-rollover-block season-rollover-block-toolbar" data-role="season-rollover-block" hidden>
@@ -155,6 +156,7 @@
               aria-expanded="false"
             ></button>
             <button id="adminOpenLogsBtn" class="button-secondary" type="button" data-copy="adminPanel.logsButton"></button>
+            <button id="adminDailyBonusHeroesBtn" class="button-secondary" type="button" data-copy="adminPanel.dailyBonusHeroesAction"></button>
             <button id="adminFinishTodayMatchDayBtn" class="button-secondary recent-match-tool recent-match-tool-finish admin-panel-finish-match-day-btn" type="button" data-copy="adminPanel.finishToday"></button>
             <button id="adminRecalculateScoresBtn" class="button-secondary" type="button" data-copy="adminPanel.recalculate"></button>
             <div class="season-rollover-block season-rollover-block-toolbar" data-role="season-rollover-block" hidden>
@@ -403,9 +405,15 @@
             <div>
               <h2 data-copy="recentMatches.title"></h2>
             </div>
-            <div class="recent-matches-toolbar">
-              <button id="openMatchFormBtn" class="recent-match-tool recent-match-tool-primary" data-copy="recentMatches.addTodayMatch"></button>
-              <button id="openBackfillFormBtn" class="button-secondary recent-match-tool recent-match-tool-secondary" data-copy="recentMatches.backfillMatch"></button>
+            <div class="recent-matches-head-actions">
+              <aside id="dailyBonusHeroes" class="daily-bonus-heroes" aria-live="polite" hidden>
+                <span class="daily-bonus-heroes-title" data-copy="dailyBonusHeroes.title"></span>
+                <div id="dailyBonusHeroesList" class="daily-bonus-heroes-list"></div>
+              </aside>
+              <div class="recent-matches-toolbar">
+                <button id="openMatchFormBtn" class="recent-match-tool recent-match-tool-primary" data-copy="recentMatches.addTodayMatch"></button>
+                <button id="openBackfillFormBtn" class="button-secondary recent-match-tool recent-match-tool-secondary" data-copy="recentMatches.backfillMatch"></button>
+              </div>
             </div>
           </div>
           <div id="matchFormPanel" class="match-form-panel recent-match-form-panel" hidden>
@@ -712,6 +720,54 @@
           </div>
           <div id="adminBackgroundOptions" class="admin-background-options" aria-label="可选背景图片"></div>
         </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="dailyBonusHeroesModal" class="hero-picker-modal" hidden>
+    <div id="dailyBonusHeroesBackdrop" class="hero-picker-backdrop"></div>
+    <div class="hero-picker-dialog management-dialog daily-bonus-heroes-dialog" role="dialog" aria-modal="true" aria-labelledby="dailyBonusHeroesModalTitle">
+      <div class="section-head">
+        <div>
+          <h2 id="dailyBonusHeroesModalTitle" data-copy="dailyBonusHeroes.managementTitle"></h2>
+          <p class="muted" data-copy="dailyBonusHeroes.managementDescription"></p>
+        </div>
+        <button id="closeDailyBonusHeroesBtn" class="button-secondary" type="button" data-copy="dailyBonusHeroes.close"></button>
+      </div>
+      <div class="management-dialog-scroll daily-bonus-heroes-management">
+        <label class="daily-bonus-toggle-row" for="dailyBonusHeroesEnabledInput">
+          <span data-copy="dailyBonusHeroes.enabledLabel"></span>
+          <input id="dailyBonusHeroesEnabledInput" type="checkbox" />
+        </label>
+        <label class="daily-bonus-field" for="dailyBonusHeroesCountInput">
+          <span data-copy="dailyBonusHeroes.countLabel"></span>
+          <input id="dailyBonusHeroesCountInput" type="number" min="1" step="1" inputmode="numeric" />
+        </label>
+        <div class="daily-bonus-points-block">
+          <div class="daily-bonus-field-head">
+            <span data-copy="dailyBonusHeroes.pointsLabel"></span>
+            <span class="muted" data-copy="dailyBonusHeroes.pointsHint"></span>
+          </div>
+          <div id="dailyBonusHeroesPointsInputs" class="daily-bonus-points-inputs"></div>
+        </div>
+        <div class="row daily-bonus-save-row">
+          <button id="saveDailyBonusHeroesBtn" type="button" data-copy="dailyBonusHeroes.save"></button>
+        </div>
+        <div class="daily-bonus-seed-block">
+          <label class="daily-bonus-field" for="dailyBonusHeroesSeedInput">
+            <span data-copy="dailyBonusHeroes.seedLabel"></span>
+            <input id="dailyBonusHeroesSeedInput" type="text" inputmode="numeric" autocomplete="off" data-copy-placeholder="dailyBonusHeroes.seedPlaceholder" />
+          </label>
+          <div class="row">
+            <button id="applyDailyBonusHeroesSeedBtn" class="button-secondary" type="button" data-copy="dailyBonusHeroes.applySeed"></button>
+            <button id="randomizeDailyBonusHeroesBtn" class="button-secondary" type="button" data-copy="dailyBonusHeroes.randomize"></button>
+          </div>
+        </div>
+        <div class="daily-bonus-preview-block">
+          <span class="daily-bonus-field-head" data-copy="dailyBonusHeroes.previewTitle"></span>
+          <div id="dailyBonusHeroesPreview" class="daily-bonus-preview"></div>
+        </div>
+        <p id="dailyBonusHeroesMessage" class="message"></p>
       </div>
     </div>
   </div>
@@ -1257,11 +1313,11 @@
   </div>
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="src/site-copy.js?v=20260801-long-term-bugfix-v1"></script>
+  <script src="src/site-copy.js?v=20260802-daily-bonus-heroes-v1"></script>
   <script type="module">
     import { animate } from "https://cdn.jsdelivr.net/npm/motion@12.23.24/+esm";
     window.Motion = { animate };
   </script>
-  <script src="app.js?v=20260801-quota-optimization-v1"></script>
+  <script src="app.js?v=20260802-daily-bonus-heroes-v1"></script>
 </body>
 </html>

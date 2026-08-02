@@ -1054,6 +1054,7 @@ const scorerOpenSeasonRulesBtn = document.getElementById("scorerOpenSeasonRulesB
 const scorerOpenPowerManagementBtn = document.getElementById("scorerOpenPowerManagementBtn");
 const scorerOpenPlayerManagementBtn = document.getElementById("scorerOpenPlayerManagementBtn");
 const scorerOpenLogsBtn = document.getElementById("scorerOpenLogsBtn");
+const scorerDailyBonusHeroesBtn = document.getElementById("scorerDailyBonusHeroesBtn");
 const scorerOpenItemHistoryBtn = document.getElementById("scorerOpenItemHistoryBtn");
 const scorerQuickAddPlayerInput = document.getElementById("scorerQuickAddPlayerInput");
 const scorerQuickAddPlayerBtn = document.getElementById("scorerQuickAddPlayerBtn");
@@ -1079,6 +1080,7 @@ const adminOpenSeasonRulesBtn = document.getElementById("adminOpenSeasonRulesBtn
 const adminOpenPowerManagementBtn = document.getElementById("adminOpenPowerManagementBtn");
 const adminOpenPlayerManagementBtn = document.getElementById("adminOpenPlayerManagementBtn");
 const adminOpenLogsBtn = document.getElementById("adminOpenLogsBtn");
+const adminDailyBonusHeroesBtn = document.getElementById("adminDailyBonusHeroesBtn");
 const adminOpenItemHistoryBtn = document.getElementById("adminOpenItemHistoryBtn");
 const adminQuickAddPlayerInput = document.getElementById("adminQuickAddPlayerInput");
 const adminQuickAddPlayerBtn = document.getElementById("adminQuickAddPlayerBtn");
@@ -1153,6 +1155,18 @@ const adminSavePlayerBackgroundBtn = document.getElementById("adminSavePlayerBac
 const adminClearPlayerBackgroundBtn = document.getElementById("adminClearPlayerBackgroundBtn");
 const adminPlayerBackgroundList = document.getElementById("adminPlayerBackgroundList");
 const adminBackgroundPickerMessage = document.getElementById("adminBackgroundPickerMessage");
+const dailyBonusHeroesModal = document.getElementById("dailyBonusHeroesModal");
+const dailyBonusHeroesBackdrop = document.getElementById("dailyBonusHeroesBackdrop");
+const closeDailyBonusHeroesBtn = document.getElementById("closeDailyBonusHeroesBtn");
+const dailyBonusHeroesEnabledInput = document.getElementById("dailyBonusHeroesEnabledInput");
+const dailyBonusHeroesCountInput = document.getElementById("dailyBonusHeroesCountInput");
+const dailyBonusHeroesPointsInputs = document.getElementById("dailyBonusHeroesPointsInputs");
+const saveDailyBonusHeroesBtn = document.getElementById("saveDailyBonusHeroesBtn");
+const dailyBonusHeroesSeedInput = document.getElementById("dailyBonusHeroesSeedInput");
+const applyDailyBonusHeroesSeedBtn = document.getElementById("applyDailyBonusHeroesSeedBtn");
+const randomizeDailyBonusHeroesBtn = document.getElementById("randomizeDailyBonusHeroesBtn");
+const dailyBonusHeroesPreview = document.getElementById("dailyBonusHeroesPreview");
+const dailyBonusHeroesMessage = document.getElementById("dailyBonusHeroesMessage");
 const adminRecalculateScoresBtn = document.getElementById("adminRecalculateScoresBtn");
 const adminClearScorerRememberBtn = document.getElementById("adminClearScorerRememberBtn");
 const adminSeasonInitialScoreInput = document.getElementById("adminSeasonInitialScoreInput");
@@ -1293,6 +1307,8 @@ const recordMatchBtn = document.getElementById("recordMatchBtn");
 const recordBackfillBtn = document.getElementById("recordBackfillBtn");
 const recentMatchesList = document.getElementById("recentMatchesList");
 const recentMatchesEmpty = document.getElementById("recentMatchesEmpty");
+const dailyBonusHeroes = document.getElementById("dailyBonusHeroes");
+const dailyBonusHeroesList = document.getElementById("dailyBonusHeroesList");
 const heroPickerModal = document.getElementById("heroPickerModal");
 const heroPickerBackdrop = document.getElementById("heroPickerBackdrop");
 const closeHeroPickerBtn = document.getElementById("closeHeroPickerBtn");
@@ -1456,6 +1472,9 @@ let recentMatchesData = [];
 let recentMatchDaysData = [];
 let recentMatchAttendanceNotesData = [];
 let recentMatchDayGroupsData = [];
+let dailyBonusHeroSettings = null;
+let dailyBonusHeroLoadPromise = null;
+let dailyBonusHeroMutationPending = false;
 let recentMatchDragState = null;
 let recentMatchLoadedSeasonIds = new Set();
 let recentMatchLoadingSeasonIds = new Set();
@@ -1590,6 +1609,7 @@ let heroPickerState = null;
 let realtimeChannel = null;
 let realtimeHiddenDisconnectTimer = null;
 let realtimeDisconnectedWhileHidden = false;
+let dailyBonusHeroBoundaryTimer = null;
 let refreshTimer = null;
 let restDayBoundaryTimer = null;
 let toastTimer = null;
@@ -5444,6 +5464,279 @@ function getFilteredHeroes(searchTerm = "") {
   );
 }
 
+function getBeijingCalendarDateString(date = new Date()) {
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Shanghai",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(date);
+  const values = Object.fromEntries(parts.map((part) => [part.type, part.value]));
+  return `${values.year}-${values.month}-${values.day}`;
+}
+
+function normalizeDailyBonusHeroSettings(rawSettings = {}) {
+  const availableHeroCount = Math.max(1, DOTA_HEROES.length);
+  const requestedCount = Math.trunc(Number(rawSettings?.heroCount));
+  const heroCount = Math.min(
+    Number.isInteger(requestedCount) && requestedCount > 0 ? requestedCount : 4,
+    availableHeroCount
+  );
+  const rawPoints = Array.isArray(rawSettings?.rewardPoints) ? rawSettings.rewardPoints : [];
+  const rewardPoints = Array.from({ length: heroCount }, (_unused, index) => {
+    const value = Number(rawPoints[index] ?? 1);
+    return Number.isFinite(value) ? value : 1;
+  });
+  const hasSeed = rawSettings?.seed !== null
+    && rawSettings?.seed !== undefined
+    && String(rawSettings.seed).trim() !== "";
+  const seedValue = hasSeed ? Number(rawSettings.seed) : Number.NaN;
+
+  return {
+    enabled: Boolean(rawSettings?.enabled),
+    heroCount,
+    rewardPoints,
+    businessDate: String(rawSettings?.businessDate || getBeijingCalendarDateString()),
+    seed: Number.isInteger(seedValue) && seedValue >= 0 && seedValue <= 4294967295
+      ? seedValue
+      : null,
+  };
+}
+
+function createDailyBonusSeededRandom(seed = 0) {
+  let state = Number(seed) >>> 0;
+  return () => {
+    state = (state + 0x6D2B79F5) >>> 0;
+    let value = state;
+    value = Math.imul(value ^ (value >>> 15), value | 1);
+    value ^= value + Math.imul(value ^ (value >>> 7), value | 61);
+    return ((value ^ (value >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+function getDailyBonusHeroEntries(settings = dailyBonusHeroSettings) {
+  const normalized = normalizeDailyBonusHeroSettings(settings || {});
+  if (normalized.seed === null) return [];
+  const random = createDailyBonusSeededRandom(normalized.seed);
+  const shuffledHeroes = [...DOTA_HEROES];
+  for (let index = shuffledHeroes.length - 1; index > 0; index -= 1) {
+    const swapIndex = Math.floor(random() * (index + 1));
+    [shuffledHeroes[index], shuffledHeroes[swapIndex]] = [shuffledHeroes[swapIndex], shuffledHeroes[index]];
+  }
+  return shuffledHeroes.slice(0, normalized.heroCount).map((heroName, index) => ({
+    heroName,
+    displayName: getHeroDisplayName(heroName),
+    points: normalized.rewardPoints[index] ?? 1,
+  }));
+}
+
+function buildDailyBonusHeroChipsHtml(settings = dailyBonusHeroSettings) {
+  return getDailyBonusHeroEntries(settings).map((entry) => `
+    <span class="daily-bonus-hero-chip" title="${escapeHtml(entry.heroName)}">
+      <span>${escapeHtml(entry.displayName)}</span>
+      <strong class="daily-bonus-hero-points">${escapeHtml(formatSignedScore(entry.points))}</strong>
+    </span>
+  `).join("");
+}
+
+function renderDailyBonusHeroes() {
+  if (!dailyBonusHeroes || !dailyBonusHeroesList) return;
+  const shouldShow = Boolean(
+    dailyBonusHeroSettings?.enabled
+    && dailyBonusHeroSettings.seed !== null
+    && dailyBonusHeroSettings.heroCount > 0
+  );
+  dailyBonusHeroes.hidden = !shouldShow;
+  dailyBonusHeroesList.innerHTML = shouldShow
+    ? buildDailyBonusHeroChipsHtml(dailyBonusHeroSettings)
+    : "";
+}
+
+function getDailyBonusHeroPointDraftValues() {
+  if (!dailyBonusHeroesPointsInputs) return [];
+  return [...dailyBonusHeroesPointsInputs.querySelectorAll('input[data-role="daily-bonus-point"]')]
+    .map((input) => Number(input.value));
+}
+
+function renderDailyBonusHeroPointInputs(count, pointValues = []) {
+  if (!dailyBonusHeroesPointsInputs) return;
+  const safeCount = Math.max(1, Math.min(Math.trunc(Number(count)) || 1, DOTA_HEROES.length));
+  dailyBonusHeroesPointsInputs.innerHTML = Array.from({ length: safeCount }, (_unused, index) => {
+    const value = Number(pointValues[index] ?? dailyBonusHeroSettings?.rewardPoints?.[index] ?? 1);
+    return `
+      <label class="daily-bonus-point-field">
+        <span>${escapeHtml(formatCopyText("dailyBonusHeroes.positionLabel", { index: index + 1 }, `第 ${index + 1} 个英雄`))}</span>
+        <input data-role="daily-bonus-point" data-index="${index}" type="number" step="0.5" min="-10000" max="10000" inputmode="decimal" value="${escapeHtml(formatScore(Number.isFinite(value) ? value : 1))}" />
+      </label>
+    `;
+  }).join("");
+}
+
+function renderDailyBonusHeroPreview() {
+  if (!dailyBonusHeroesPreview) return;
+  const entriesHtml = buildDailyBonusHeroChipsHtml(dailyBonusHeroSettings);
+  dailyBonusHeroesPreview.innerHTML = entriesHtml || '<span class="muted">今日种子尚未生成</span>';
+}
+
+function renderDailyBonusHeroManagement() {
+  if (!dailyBonusHeroSettings) return;
+  if (dailyBonusHeroesEnabledInput) {
+    dailyBonusHeroesEnabledInput.checked = dailyBonusHeroSettings.enabled;
+  }
+  if (dailyBonusHeroesCountInput) {
+    dailyBonusHeroesCountInput.max = String(DOTA_HEROES.length);
+    dailyBonusHeroesCountInput.value = String(dailyBonusHeroSettings.heroCount);
+  }
+  if (dailyBonusHeroesSeedInput) {
+    dailyBonusHeroesSeedInput.value = dailyBonusHeroSettings.seed === null
+      ? ""
+      : String(dailyBonusHeroSettings.seed);
+  }
+  renderDailyBonusHeroPointInputs(
+    dailyBonusHeroSettings.heroCount,
+    dailyBonusHeroSettings.rewardPoints
+  );
+  renderDailyBonusHeroPreview();
+}
+
+function setDailyBonusHeroManagementBusy(isBusy) {
+  dailyBonusHeroMutationPending = Boolean(isBusy);
+  [
+    dailyBonusHeroesEnabledInput,
+    dailyBonusHeroesCountInput,
+    saveDailyBonusHeroesBtn,
+    dailyBonusHeroesSeedInput,
+    applyDailyBonusHeroesSeedBtn,
+    randomizeDailyBonusHeroesBtn,
+  ].forEach((element) => {
+    if (element) element.disabled = dailyBonusHeroMutationPending || !isCurrentRoleScorer();
+  });
+  dailyBonusHeroesPointsInputs
+    ?.querySelectorAll('input[data-role="daily-bonus-point"]')
+    .forEach((input) => {
+      input.disabled = dailyBonusHeroMutationPending || !isCurrentRoleScorer();
+    });
+}
+
+async function loadDailyBonusHeroSettings() {
+  if (dailyBonusHeroLoadPromise) return dailyBonusHeroLoadPromise;
+  dailyBonusHeroLoadPromise = (async () => {
+    const { data, error } = await db.rpc("get_daily_bonus_hero_settings");
+    if (error) throw error;
+    dailyBonusHeroSettings = normalizeDailyBonusHeroSettings(data || {});
+    renderDailyBonusHeroes();
+    if (dailyBonusHeroesModal && !dailyBonusHeroesModal.hidden) {
+      renderDailyBonusHeroManagement();
+      setDailyBonusHeroManagementBusy(false);
+    }
+    return dailyBonusHeroSettings;
+  })();
+
+  try {
+    return await dailyBonusHeroLoadPromise;
+  } finally {
+    dailyBonusHeroLoadPromise = null;
+  }
+}
+
+async function openDailyBonusHeroManagement() {
+  if (!ensureScorerAccess("仅记分员或管理员可管理每日奖励英雄。")) return;
+  setMessageNode(dailyBonusHeroesMessage, "");
+  await loadDailyBonusHeroSettings();
+  renderDailyBonusHeroManagement();
+  setDailyBonusHeroManagementBusy(false);
+  setManagedDialogOpen("dailyBonusHeroes", true, {
+    initialFocus: dailyBonusHeroesEnabledInput || closeDailyBonusHeroesBtn || undefined,
+  });
+}
+
+async function saveDailyBonusHeroSettings() {
+  if (!ensureScorerAccess("仅记分员或管理员可管理每日奖励英雄。")) return;
+  const heroCount = Math.trunc(Number(dailyBonusHeroesCountInput?.value));
+  if (!Number.isInteger(heroCount) || heroCount < 1 || heroCount > DOTA_HEROES.length) {
+    setMessageNode(dailyBonusHeroesMessage, `每日英雄个数需为 1 至 ${DOTA_HEROES.length}。`, true);
+    return;
+  }
+  const rewardPoints = getDailyBonusHeroPointDraftValues();
+  if (
+    rewardPoints.length !== heroCount
+    || rewardPoints.some((value) => !Number.isFinite(value) || Math.abs(value) > 10000)
+  ) {
+    setMessageNode(dailyBonusHeroesMessage, "请为每个位置填写 -10000 至 10000 之间的奖励分数。", true);
+    return;
+  }
+
+  setDailyBonusHeroManagementBusy(true);
+  setMessageNode(dailyBonusHeroesMessage, "正在保存...");
+  try {
+    const { data, error } = await db.rpc("set_daily_bonus_hero_settings", {
+      p_enabled: Boolean(dailyBonusHeroesEnabledInput?.checked),
+      p_hero_count: heroCount,
+      p_reward_points: rewardPoints,
+    });
+    if (error) throw error;
+    dailyBonusHeroSettings = normalizeDailyBonusHeroSettings(data || {});
+    renderDailyBonusHeroes();
+    renderDailyBonusHeroManagement();
+    setMessageNode(dailyBonusHeroesMessage, "每日奖励英雄设置已保存。");
+    showGlobalToast("每日奖励英雄设置已保存");
+  } catch (error) {
+    setMessageNode(dailyBonusHeroesMessage, `保存失败：${error?.message || "未知错误"}`, true);
+  } finally {
+    setDailyBonusHeroManagementBusy(false);
+  }
+}
+
+async function rerollDailyBonusHeroes({ automatic = false } = {}) {
+  if (!ensureScorerAccess("仅记分员或管理员可更换每日奖励英雄。")) return;
+  let seed = null;
+  if (!automatic) {
+    const seedText = String(dailyBonusHeroesSeedInput?.value || "").trim();
+    if (!/^\d+$/.test(seedText)) {
+      setMessageNode(dailyBonusHeroesMessage, "请输入 0 至 4294967295 之间的整数种子。", true);
+      return;
+    }
+    seed = Number(seedText);
+    if (!Number.isSafeInteger(seed) || seed < 0 || seed > 4294967295) {
+      setMessageNode(dailyBonusHeroesMessage, "请输入 0 至 4294967295 之间的整数种子。", true);
+      return;
+    }
+  }
+
+  setDailyBonusHeroManagementBusy(true);
+  setMessageNode(dailyBonusHeroesMessage, automatic ? "正在自动生成种子..." : "正在使用新种子...");
+  try {
+    const { data, error } = await db.rpc("reroll_daily_bonus_heroes", { p_seed: seed });
+    if (error) throw error;
+    dailyBonusHeroSettings = normalizeDailyBonusHeroSettings(data || {});
+    renderDailyBonusHeroes();
+    renderDailyBonusHeroManagement();
+    setMessageNode(dailyBonusHeroesMessage, `今日英雄已更换，种子：${dailyBonusHeroSettings.seed}。`);
+    showGlobalToast("今日奖励英雄已更换");
+  } catch (error) {
+    setMessageNode(dailyBonusHeroesMessage, `更换失败：${error?.message || "未知错误"}`, true);
+  } finally {
+    setDailyBonusHeroManagementBusy(false);
+  }
+}
+
+function scheduleDailyBonusHeroBoundaryRefresh() {
+  if (dailyBonusHeroBoundaryTimer) {
+    window.clearTimeout(dailyBonusHeroBoundaryTimer);
+  }
+  const beijingNow = getBeijingNowDate();
+  const nextMidnight = new Date(beijingNow);
+  nextMidnight.setHours(24, 0, 3, 0);
+  const delayMs = Math.max(nextMidnight.getTime() - beijingNow.getTime(), 1000);
+  dailyBonusHeroBoundaryTimer = window.setTimeout(() => {
+    dailyBonusHeroBoundaryTimer = null;
+    void loadDailyBonusHeroSettings().catch((error) => {
+      console.warn("跨日更新每日奖励英雄失败。", error);
+    });
+    scheduleDailyBonusHeroBoundaryRefresh();
+  }, delayMs);
+}
+
 function setMatchFormOpen(isOpen) {
   isMatchFormOpen = isOpen && isCurrentRoleScorer();
   matchFormPanel.hidden = !isMatchFormOpen;
@@ -5643,6 +5936,7 @@ const managedDialogEntries = [
   { modal: leaderboardLifetimeRewardsModal, close: () => setManagedDialogOpen("leaderboardLifetimeRewards", false) },
   { modal: playerRelationModal, close: () => setManagedDialogOpen("playerRelation", false) },
   { modal: adminBackgroundPickerModal, close: () => setManagedDialogOpen("adminBackgroundPicker", false) },
+  { modal: dailyBonusHeroesModal, close: () => setManagedDialogOpen("dailyBonusHeroes", false) },
 ].filter((entry) => entry.modal);
 
 const seasonRolloverEntries = [...document.querySelectorAll('[data-role="season-rollover-block"]')]
@@ -5742,6 +6036,8 @@ function getManagedDialogModal(key = "") {
       return playerRelationModal;
     case "adminBackgroundPicker":
       return adminBackgroundPickerModal;
+    case "dailyBonusHeroes":
+      return dailyBonusHeroesModal;
     default:
       return null;
   }
@@ -20425,6 +20721,15 @@ function subscribeRealtime() {
         });
       }
     )
+    .on(
+      "postgres_changes",
+      { event: "*", schema: "public", table: "daily_bonus_hero_settings" },
+      () => {
+        void loadDailyBonusHeroSettings().catch((error) => {
+          console.warn("实时更新每日奖励英雄设置失败。", error);
+        });
+      }
+    )
     .subscribe((status) => {
       console.info("[realtime] app-realtime status:", status);
       if (
@@ -20893,6 +21198,41 @@ if (adminBackgroundPickerBtn) {
       console.error("加载背景列表失败：", error);
       setMessage(`加载背景列表失败：${error?.message || "未知错误"}`, true);
     });
+  });
+}
+[scorerDailyBonusHeroesBtn, adminDailyBonusHeroesBtn].forEach((button) => {
+  if (!button) return;
+  button.addEventListener("click", () => {
+    void openDailyBonusHeroManagement().catch((error) => {
+      console.error("加载每日奖励英雄设置失败：", error);
+      setMessage(`加载每日奖励英雄设置失败：${error?.message || "未知错误"}`, true);
+    });
+  });
+});
+if (dailyBonusHeroesCountInput) {
+  dailyBonusHeroesCountInput.addEventListener("change", () => {
+    const currentValues = getDailyBonusHeroPointDraftValues();
+    const nextCount = Math.max(
+      1,
+      Math.min(Math.trunc(Number(dailyBonusHeroesCountInput.value)) || 1, DOTA_HEROES.length)
+    );
+    renderDailyBonusHeroPointInputs(nextCount, currentValues);
+    setDailyBonusHeroManagementBusy(dailyBonusHeroMutationPending);
+  });
+}
+if (saveDailyBonusHeroesBtn) {
+  saveDailyBonusHeroesBtn.addEventListener("click", () => {
+    void saveDailyBonusHeroSettings();
+  });
+}
+if (applyDailyBonusHeroesSeedBtn) {
+  applyDailyBonusHeroesSeedBtn.addEventListener("click", () => {
+    void rerollDailyBonusHeroes({ automatic: false });
+  });
+}
+if (randomizeDailyBonusHeroesBtn) {
+  randomizeDailyBonusHeroesBtn.addEventListener("click", () => {
+    void rerollDailyBonusHeroes({ automatic: true });
   });
 }
 if (adminBackgroundOptions) {
@@ -21856,6 +22196,7 @@ if (itemInventoryLogsList) {
   [leaderboardLifetimeRewardsBackdrop, () => setManagedDialogOpen("leaderboardLifetimeRewards", false)],
   [playerRelationBackdrop, () => setManagedDialogOpen("playerRelation", false)],
   [adminBackgroundPickerBackdrop, () => setManagedDialogOpen("adminBackgroundPicker", false)],
+  [dailyBonusHeroesBackdrop, () => setManagedDialogOpen("dailyBonusHeroes", false)],
 ].forEach(([node, handler]) => {
   if (node) {
     node.addEventListener("click", handler);
@@ -21882,6 +22223,7 @@ if (itemInventoryLogsList) {
   [closeLeaderboardLifetimeRewardsBtn, () => setManagedDialogOpen("leaderboardLifetimeRewards", false)],
   [closePlayerRelationBtn, () => setManagedDialogOpen("playerRelation", false)],
   [closeAdminBackgroundPickerBtn, () => setManagedDialogOpen("adminBackgroundPicker", false)],
+  [closeDailyBonusHeroesBtn, () => setManagedDialogOpen("dailyBonusHeroes", false)],
 ].forEach(([node, handler]) => {
   if (node) {
     node.addEventListener("click", handler);
@@ -22305,6 +22647,14 @@ document.addEventListener("visibilitychange", () => {
   if (shouldRefreshMissedChanges) {
     void requestImmediateRefresh({ seasonContext: true });
   }
+  if (
+    dailyBonusHeroSettings
+    && dailyBonusHeroSettings.businessDate !== getBeijingCalendarDateString()
+  ) {
+    void loadDailyBonusHeroSettings().catch((error) => {
+      console.warn("恢复页面时更新每日奖励英雄失败。", error);
+    });
+  }
 });
 
 window.addEventListener("online", () => {
@@ -22647,6 +22997,12 @@ function applyRolePermissions() {
   if (adminBackgroundPickerBtn) {
     adminBackgroundPickerBtn.disabled = !isAdmin;
   }
+  if (scorerDailyBonusHeroesBtn) {
+    scorerDailyBonusHeroesBtn.disabled = !canScore;
+  }
+  if (adminDailyBonusHeroesBtn) {
+    adminDailyBonusHeroesBtn.disabled = !canScore;
+  }
   if (adminApplyBackgroundBtn) {
     adminApplyBackgroundBtn.disabled = !isAdmin || !getAdminBackgroundOptionById(adminBackgroundDraftId);
   }
@@ -22692,6 +23048,7 @@ function applyRolePermissions() {
     setManagedDialogOpen("adminActionLogs", false);
   }
   if (!canScore) {
+    setManagedDialogOpen("dailyBonusHeroes", false);
     setManagedDialogOpen("itemInventoryLogs", false);
     setManagedDialogOpen("scorerSeasonRule", false);
     setManagedDialogOpen("scorerPower", false);
@@ -22700,6 +23057,7 @@ function applyRolePermissions() {
     setManagedDialogOpen("scorerItemCatalog", false);
     setManagedDialogOpen("scorerActionLogs", false);
   }
+  setDailyBonusHeroManagementBusy(dailyBonusHeroMutationPending);
 
   syncGitHubRepositoryStorageAutoRefresh();
   renderRoleMembers();
@@ -23873,6 +24231,7 @@ async function init() {
     selectRewardPlayer("");
     renderHeroOptions();
     scheduleRestDayBoundaryRefresh();
+    scheduleDailyBonusHeroBoundaryRefresh();
     matchStartTimeInput.value = formatTime24(readStoredMatchDayStartTime()?.startTime || "");
     backfillDateInput.value = getPreviousBeijingBusinessDateString();
     renderMatchForm();
@@ -23897,6 +24256,7 @@ async function init() {
       runInitStep("加载基础数据", loadPrimaryHomeData),
       runInitStep("加载积分榜", loadLeaderboard),
       runInitStep("加载道具目录", () => loadItemCatalog({ loadUsageSummary: false })),
+      runInitStep("加载每日奖励英雄", loadDailyBonusHeroSettings),
     ]);
     await primaryHomeLoadPromise;
     await runInitStep("加载最近比赛", loadRecentMatches);

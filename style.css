@@ -9863,6 +9863,167 @@ button.score-detail-summary-filter-active:focus-visible {
   box-shadow: none;
 }
 
+.recent-matches-head-actions {
+  display: flex;
+  align-items: flex-start;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-left: auto;
+}
+
+.daily-bonus-heroes {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+  padding: 7px 10px;
+  border: 1px solid rgba(244, 244, 245, 0.13);
+  border-radius: 8px;
+  background: rgba(9, 18, 30, 0.58);
+}
+
+.daily-bonus-heroes[hidden] {
+  display: none !important;
+}
+
+.daily-bonus-heroes-title,
+.daily-bonus-field-head {
+  color: rgba(228, 234, 242, 0.72);
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1.2;
+  letter-spacing: 0.04em;
+}
+
+.daily-bonus-heroes-list,
+.daily-bonus-preview {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.daily-bonus-hero-chip {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 5px;
+  min-height: 25px;
+  padding: 4px 7px;
+  border: 1px solid rgba(99, 213, 208, 0.2);
+  border-radius: 7px;
+  background: rgba(20, 44, 58, 0.42);
+  color: #eef4f8;
+  font-size: 12px;
+  line-height: 1.2;
+}
+
+.daily-bonus-hero-points {
+  color: #8fe0d8;
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+}
+
+.daily-bonus-heroes-dialog {
+  grid-template-rows: auto minmax(0, 1fr);
+}
+
+.daily-bonus-heroes-management,
+.daily-bonus-points-block,
+.daily-bonus-seed-block,
+.daily-bonus-preview-block,
+.daily-bonus-field {
+  display: grid;
+  gap: 8px;
+}
+
+.daily-bonus-toggle-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 10px 0;
+  border-bottom: 1px solid rgba(244, 244, 245, 0.1);
+}
+
+.daily-bonus-toggle-row input {
+  width: 18px;
+  height: 18px;
+  min-width: 18px;
+  margin: 0;
+  padding: 0;
+}
+
+.daily-bonus-field > span:first-child,
+.daily-bonus-toggle-row > span:first-child {
+  color: rgba(244, 244, 245, 0.88);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.daily-bonus-field input {
+  width: 100%;
+  min-width: 0;
+}
+
+.daily-bonus-field-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 6px 12px;
+}
+
+.daily-bonus-points-inputs {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(132px, 1fr));
+  gap: 8px;
+}
+
+.daily-bonus-point-field {
+  display: grid;
+  gap: 5px;
+}
+
+.daily-bonus-point-field span {
+  color: rgba(218, 226, 236, 0.68);
+  font-size: 11px;
+}
+
+.daily-bonus-point-field input {
+  width: 100%;
+  min-width: 0;
+}
+
+.daily-bonus-seed-block,
+.daily-bonus-preview-block {
+  padding-top: 12px;
+  border-top: 1px solid rgba(244, 244, 245, 0.1);
+}
+
+.daily-bonus-save-row {
+  justify-content: flex-end;
+}
+
+@media (max-width: 760px) {
+  .recent-matches-head-actions {
+    width: 100%;
+    justify-content: flex-start;
+    margin-left: 0;
+  }
+
+  .daily-bonus-heroes {
+    width: 100%;
+  }
+
+  .daily-bonus-heroes-dialog {
+    max-height: min(88vh, 860px);
+  }
+
+  .daily-bonus-points-inputs {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
 #addRewardBtn,
 #startMatchDayBtn,
 #openMatchFormBtn,
