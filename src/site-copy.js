@@ -233,6 +233,8 @@
       managementDescription: "开启后持续生效。每天北京时间 00:00 后首次访问时自动生成当天随机种子，也可手动更换今天的种子。",
       close: "关闭",
       enabledLabel: "开启每日奖励英雄",
+      enabledStatus: "已开启",
+      disabledStatus: "已关闭",
       countLabel: "每日英雄个数",
       pointsLabel: "对应奖励分数",
       pointsHint: "按抽取顺序设置，不绑定具体英雄",

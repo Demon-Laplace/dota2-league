@@ -7,7 +7,7 @@
   <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin />
   <link rel="preconnect" href="https://klxkkwwszqtgeuozwtkw.supabase.co" crossorigin />
   <link rel="preload" as="image" href="./assets/Dota2_logo.png" fetchpriority="high" />
-  <link rel="stylesheet" href="style.css?v=20260801-mobile-sheets-v1" />
+  <link rel="stylesheet" href="style.css?v=20260802-daily-bonus-compact-v1" />
 </head>
   <body>
   <div id="loadingScreen" class="loading-screen" aria-live="polite">
@@ -727,22 +727,31 @@
   <div id="dailyBonusHeroesModal" class="hero-picker-modal" hidden>
     <div id="dailyBonusHeroesBackdrop" class="hero-picker-backdrop"></div>
     <div class="hero-picker-dialog management-dialog daily-bonus-heroes-dialog" role="dialog" aria-modal="true" aria-labelledby="dailyBonusHeroesModalTitle">
-      <div class="section-head">
-        <div>
+      <div class="daily-bonus-dialog-head">
+        <div class="daily-bonus-dialog-title-row">
           <h2 id="dailyBonusHeroesModalTitle" data-copy="dailyBonusHeroes.managementTitle"></h2>
-          <p class="muted" data-copy="dailyBonusHeroes.managementDescription"></p>
+          <button id="closeDailyBonusHeroesBtn" class="button-secondary daily-bonus-close-btn" type="button" data-copy="dailyBonusHeroes.close"></button>
         </div>
-        <button id="closeDailyBonusHeroesBtn" class="button-secondary" type="button" data-copy="dailyBonusHeroes.close"></button>
+        <p class="muted" data-copy="dailyBonusHeroes.managementDescription"></p>
       </div>
       <div class="management-dialog-scroll daily-bonus-heroes-management">
-        <label class="daily-bonus-toggle-row" for="dailyBonusHeroesEnabledInput">
-          <span data-copy="dailyBonusHeroes.enabledLabel"></span>
-          <input id="dailyBonusHeroesEnabledInput" type="checkbox" />
-        </label>
-        <label class="daily-bonus-field" for="dailyBonusHeroesCountInput">
-          <span data-copy="dailyBonusHeroes.countLabel"></span>
-          <input id="dailyBonusHeroesCountInput" type="number" min="1" step="1" inputmode="numeric" />
-        </label>
+        <div class="daily-bonus-primary-settings">
+          <label class="daily-bonus-toggle-row" for="dailyBonusHeroesEnabledInput">
+            <span data-copy="dailyBonusHeroes.enabledLabel"></span>
+            <span class="daily-bonus-toggle-control">
+              <input id="dailyBonusHeroesEnabledInput" type="checkbox" role="switch" />
+              <span class="daily-bonus-toggle-track" aria-hidden="true"><span class="daily-bonus-toggle-thumb"></span></span>
+              <span class="daily-bonus-toggle-status" aria-hidden="true">
+                <span class="daily-bonus-toggle-status-on" data-copy="dailyBonusHeroes.enabledStatus"></span>
+                <span class="daily-bonus-toggle-status-off" data-copy="dailyBonusHeroes.disabledStatus"></span>
+              </span>
+            </span>
+          </label>
+          <label class="daily-bonus-field daily-bonus-count-field" for="dailyBonusHeroesCountInput">
+            <span data-copy="dailyBonusHeroes.countLabel"></span>
+            <input id="dailyBonusHeroesCountInput" type="number" min="1" step="1" inputmode="numeric" />
+          </label>
+        </div>
         <div class="daily-bonus-points-block">
           <div class="daily-bonus-field-head">
             <span data-copy="dailyBonusHeroes.pointsLabel"></span>
@@ -758,7 +767,7 @@
             <span data-copy="dailyBonusHeroes.seedLabel"></span>
             <input id="dailyBonusHeroesSeedInput" type="text" inputmode="numeric" autocomplete="off" data-copy-placeholder="dailyBonusHeroes.seedPlaceholder" />
           </label>
-          <div class="row">
+          <div class="row daily-bonus-seed-actions">
             <button id="applyDailyBonusHeroesSeedBtn" class="button-secondary" type="button" data-copy="dailyBonusHeroes.applySeed"></button>
             <button id="randomizeDailyBonusHeroesBtn" class="button-secondary" type="button" data-copy="dailyBonusHeroes.randomize"></button>
           </div>
