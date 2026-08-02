@@ -5908,8 +5908,17 @@ function mountMatchHeroRewardPopover(trigger) {
   return true;
 }
 
+function renderMatchHeroRewardLoading() {
+  if (!matchHeroRewardOptions) return;
+  matchHeroRewardOptions.setAttribute("aria-busy", "true");
+  matchHeroRewardOptions.innerHTML = Array.from({ length: 3 }, () => (
+    '<span class="match-hero-reward-loading" aria-hidden="true"></span>'
+  )).join("");
+}
+
 function renderMatchHeroRewardOptions() {
   if (!matchHeroRewardOptions || !matchHeroRewardState) return;
+  matchHeroRewardOptions.setAttribute("aria-busy", "false");
   const retainedEntries = matchHeroRewardState.rewardSettings
     ? getDailyBonusHeroEntries(matchHeroRewardState.rewardSettings)
     : [];
@@ -5954,8 +5963,9 @@ function renderMatchHeroRewardOptions() {
   }).join("");
 }
 
-async function loadMatchHeroRewardAdjustments() {
+async function loadMatchHeroRewardAdjustments({ render = true } = {}) {
   if (!matchHeroRewardState?.matchId || !matchHeroRewardState?.playerId) return;
+  const expectedState = matchHeroRewardState;
   const expectedMatchId = matchHeroRewardState.matchId;
   const expectedPlayerId = matchHeroRewardState.playerId;
   const { data, error } = await db
@@ -5966,12 +5976,16 @@ async function loadMatchHeroRewardAdjustments() {
     .order("created_at", { ascending: true })
     .limit(100);
   if (error) throw error;
-  if (!matchHeroRewardState || matchHeroRewardState.matchId !== expectedMatchId || matchHeroRewardState.playerId !== expectedPlayerId) return;
+  if (
+    matchHeroRewardState !== expectedState
+    || matchHeroRewardState.matchId !== expectedMatchId
+    || matchHeroRewardState.playerId !== expectedPlayerId
+  ) return;
   matchHeroRewardState.appliedRewards = (data || []).map((row) => ({
     ...row,
     points_delta: Number(row.points_delta ?? 0),
   }));
-  renderMatchHeroRewardOptions();
+  if (render) renderMatchHeroRewardOptions();
 }
 
 async function toggleMatchHeroRewardPopover(trigger) {
@@ -5992,38 +6006,48 @@ async function toggleMatchHeroRewardPopover(trigger) {
     showGlobalToast("未找到对应的比赛选手记录，请刷新页面后重试。", true);
     return;
   }
-  let rewardSettings = null;
-  try {
-    await loadDailyBonusHeroSettings();
-    rewardSettings = await loadDailyBonusHeroMatchDay(context.matchDate);
-  } catch (error) {
-    showGlobalToast(`每日奖励英雄载入失败：${getErrorMessage(error)}`, true);
-    return;
-  }
-  matchHeroRewardState = {
+  const initialRewardSettings = dailyBonusHeroMatchDayCache.get(context.matchDate)
+    || (dailyBonusHeroSettings?.businessDate === context.matchDate ? dailyBonusHeroSettings : null);
+  const pendingState = {
     ...context,
-    rewardSettings,
+    rewardSettings: initialRewardSettings,
     triggerElement: trigger,
-    busy: false,
+    busy: true,
     appliedRewards: [],
   };
-  try {
-    await loadMatchHeroRewardAdjustments();
-  } catch (error) {
+  matchHeroRewardState = pendingState;
+  if (!trigger?.isConnected || !mountMatchHeroRewardPopover(trigger)) {
     closeMatchHeroRewardPopover();
-    showGlobalToast(buildMatchOperationFailureMessage("本场英雄奖励载入失败", error), true);
+    showGlobalToast("无法打开英雄奖励选择，请刷新页面后重试。", true);
     return;
   }
-  const hasOwnedSelection = matchHeroRewardState.appliedRewards
+  if (initialRewardSettings) {
+    renderMatchHeroRewardOptions();
+  } else {
+    renderMatchHeroRewardLoading();
+  }
+
+  let rewardSettings = null;
+  try {
+    [rewardSettings] = await Promise.all([
+      loadDailyBonusHeroMatchDay(context.matchDate),
+      loadMatchHeroRewardAdjustments({ render: false }),
+    ]);
+  } catch (error) {
+    if (matchHeroRewardState === pendingState) {
+      closeMatchHeroRewardPopover();
+      showGlobalToast(buildMatchOperationFailureMessage("本场英雄奖励载入失败", error), true);
+    }
+    return;
+  }
+  if (matchHeroRewardState !== pendingState) return;
+  pendingState.rewardSettings = rewardSettings;
+  pendingState.busy = false;
+  const hasOwnedSelection = pendingState.appliedRewards
     .some((row) => row.player_id === context.playerId && row.hero_name);
   if (!rewardSettings && !hasOwnedSelection) {
     closeMatchHeroRewardPopover();
     showGlobalToast("仅支持最近三个比赛日的英雄奖励追溯。", true);
-    return;
-  }
-  if (!trigger?.isConnected || !mountMatchHeroRewardPopover(trigger)) {
-    closeMatchHeroRewardPopover();
-    showGlobalToast("无法打开英雄奖励选择，请刷新页面后重试。", true);
     return;
   }
   renderMatchHeroRewardOptions();
