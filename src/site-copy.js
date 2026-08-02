@@ -230,7 +230,7 @@
     dailyBonusHeroes: {
       title: "每日奖励英雄",
       managementTitle: "每日奖励英雄",
-      managementDescription: "开启后持续生效。每天北京时间 00:00 后首次访问时自动生成当天随机种子，也可手动更换今天的种子。",
+      managementDescription: "开启后持续生效。每天北京时间 02:00 与网站统一刷新时间同步更换，也可手动更换当前业务日的种子。",
       close: "关闭",
       enabledLabel: "开启每日奖励英雄",
       enabledStatus: "已开启",

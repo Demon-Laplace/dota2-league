@@ -1609,7 +1609,6 @@ let heroPickerState = null;
 let realtimeChannel = null;
 let realtimeHiddenDisconnectTimer = null;
 let realtimeDisconnectedWhileHidden = false;
-let dailyBonusHeroBoundaryTimer = null;
 let refreshTimer = null;
 let restDayBoundaryTimer = null;
 let toastTimer = null;
@@ -5464,17 +5463,6 @@ function getFilteredHeroes(searchTerm = "") {
   );
 }
 
-function getBeijingCalendarDateString(date = new Date()) {
-  const parts = new Intl.DateTimeFormat("en-CA", {
-    timeZone: "Asia/Shanghai",
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-  }).formatToParts(date);
-  const values = Object.fromEntries(parts.map((part) => [part.type, part.value]));
-  return `${values.year}-${values.month}-${values.day}`;
-}
-
 function normalizeDailyBonusHeroSettings(rawSettings = {}) {
   const availableHeroCount = Math.max(1, DOTA_HEROES.length);
   const requestedCount = Math.trunc(Number(rawSettings?.heroCount));
@@ -5496,7 +5484,7 @@ function normalizeDailyBonusHeroSettings(rawSettings = {}) {
     enabled: Boolean(rawSettings?.enabled),
     heroCount,
     rewardPoints,
-    businessDate: String(rawSettings?.businessDate || getBeijingCalendarDateString()),
+    businessDate: String(rawSettings?.businessDate || getBeijingBusinessDateString()),
     seed: Number.isInteger(seedValue) && seedValue >= 0 && seedValue <= 4294967295
       ? seedValue
       : null,
@@ -5718,23 +5706,6 @@ async function rerollDailyBonusHeroes({ automatic = false } = {}) {
   } finally {
     setDailyBonusHeroManagementBusy(false);
   }
-}
-
-function scheduleDailyBonusHeroBoundaryRefresh() {
-  if (dailyBonusHeroBoundaryTimer) {
-    window.clearTimeout(dailyBonusHeroBoundaryTimer);
-  }
-  const beijingNow = getBeijingNowDate();
-  const nextMidnight = new Date(beijingNow);
-  nextMidnight.setHours(24, 0, 3, 0);
-  const delayMs = Math.max(nextMidnight.getTime() - beijingNow.getTime(), 1000);
-  dailyBonusHeroBoundaryTimer = window.setTimeout(() => {
-    dailyBonusHeroBoundaryTimer = null;
-    void loadDailyBonusHeroSettings().catch((error) => {
-      console.warn("跨日更新每日奖励英雄失败。", error);
-    });
-    scheduleDailyBonusHeroBoundaryRefresh();
-  }, delayMs);
 }
 
 function setMatchFormOpen(isOpen) {
@@ -11790,6 +11761,9 @@ function scheduleRestDayBoundaryRefresh() {
   restDayBoundaryTimer = window.setTimeout(() => {
     renderRecentMatches(recentMatchDayGroupsData);
     renderMatchDayStatus();
+    void loadDailyBonusHeroSettings().catch((error) => {
+      console.warn("凌晨 2 点更新每日奖励英雄失败。", error);
+    });
     if (isCurrentRoleAdmin()) {
       prepareSupabaseSystemUsageStatusForAdmin();
       refreshSupabaseSystemUsageStatus();
@@ -22649,7 +22623,7 @@ document.addEventListener("visibilitychange", () => {
   }
   if (
     dailyBonusHeroSettings
-    && dailyBonusHeroSettings.businessDate !== getBeijingCalendarDateString()
+    && dailyBonusHeroSettings.businessDate !== getBeijingBusinessDateString()
   ) {
     void loadDailyBonusHeroSettings().catch((error) => {
       console.warn("恢复页面时更新每日奖励英雄失败。", error);
@@ -24231,7 +24205,6 @@ async function init() {
     selectRewardPlayer("");
     renderHeroOptions();
     scheduleRestDayBoundaryRefresh();
-    scheduleDailyBonusHeroBoundaryRefresh();
     matchStartTimeInput.value = formatTime24(readStoredMatchDayStartTime()?.startTime || "");
     backfillDateInput.value = getPreviousBeijingBusinessDateString();
     renderMatchForm();

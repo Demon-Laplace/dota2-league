@@ -9873,10 +9873,13 @@ button.score-detail-summary-filter-active:focus-visible {
 }
 
 .daily-bonus-heroes {
-  display: grid;
-  gap: 6px;
+  display: flex;
+  align-items: center;
+  height: 34px;
+  min-height: 34px;
   min-width: 0;
-  padding: 7px 10px;
+  max-width: min(52vw, 560px);
+  padding: 4px 6px;
   border: 1px solid rgba(244, 244, 245, 0.13);
   border-radius: 8px;
   background: rgba(9, 18, 30, 0.58);
@@ -9886,7 +9889,6 @@ button.score-detail-summary-filter-active:focus-visible {
   display: none !important;
 }
 
-.daily-bonus-heroes-title,
 .daily-bonus-field-head {
   color: rgba(228, 234, 242, 0.72);
   font-size: 11px;
@@ -9899,8 +9901,28 @@ button.score-detail-summary-filter-active:focus-visible {
 .daily-bonus-preview {
   display: flex;
   align-items: center;
-  flex-wrap: wrap;
   gap: 6px;
+}
+
+.daily-bonus-heroes-list {
+  min-width: 0;
+  overflow-x: auto;
+  flex-wrap: nowrap;
+  scrollbar-width: none;
+}
+
+.daily-bonus-heroes-list::-webkit-scrollbar {
+  display: none;
+}
+
+.daily-bonus-preview {
+  flex-wrap: wrap;
+}
+
+.daily-bonus-heroes-list .daily-bonus-hero-chip {
+  flex: 0 0 auto;
+  min-height: 24px;
+  padding: 3px 6px;
 }
 
 .daily-bonus-hero-chip {
@@ -10179,6 +10201,7 @@ button.daily-bonus-close-btn.button-secondary {
 
   .daily-bonus-heroes {
     width: 100%;
+    max-width: none;
   }
 
   .daily-bonus-heroes-dialog {
