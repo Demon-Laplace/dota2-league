@@ -1175,14 +1175,11 @@ const applyDailyBonusHeroesSeedBtn = document.getElementById("applyDailyBonusHer
 const randomizeDailyBonusHeroesBtn = document.getElementById("randomizeDailyBonusHeroesBtn");
 const dailyBonusHeroesPreview = document.getElementById("dailyBonusHeroesPreview");
 const dailyBonusHeroesMessage = document.getElementById("dailyBonusHeroesMessage");
-const matchHeroRewardModal = document.getElementById("matchHeroRewardModal");
-const matchHeroRewardBackdrop = document.getElementById("matchHeroRewardBackdrop");
-const closeMatchHeroRewardBtn = document.getElementById("closeMatchHeroRewardBtn");
-const matchHeroRewardSubtitle = document.getElementById("matchHeroRewardSubtitle");
-const matchHeroRewardOptions = document.getElementById("matchHeroRewardOptions");
-const matchHeroRewardApplied = document.getElementById("matchHeroRewardApplied");
-const applyMatchHeroRewardBtn = document.getElementById("applyMatchHeroRewardBtn");
-const matchHeroRewardMessage = document.getElementById("matchHeroRewardMessage");
+let matchHeroRewardPopover = null;
+let matchHeroRewardOptions = null;
+let matchHeroRewardApplied = null;
+let applyMatchHeroRewardBtn = null;
+let matchHeroRewardMessage = null;
 const adminRecalculateScoresBtn = document.getElementById("adminRecalculateScoresBtn");
 const adminClearScorerRememberBtn = document.getElementById("adminClearScorerRememberBtn");
 const adminSeasonInitialScoreInput = document.getElementById("adminSeasonInitialScoreInput");
@@ -5884,6 +5881,52 @@ function canApplyHeroRewardToMatch(match = {}, group = {}) {
   );
 }
 
+function closeMatchHeroRewardPopover(options = {}) {
+  const trigger = matchHeroRewardState?.triggerElement;
+  if (trigger instanceof HTMLElement) {
+    trigger.setAttribute("aria-expanded", "false");
+  }
+  matchHeroRewardPopover?.remove();
+  matchHeroRewardPopover = null;
+  matchHeroRewardOptions = null;
+  matchHeroRewardApplied = null;
+  applyMatchHeroRewardBtn = null;
+  matchHeroRewardMessage = null;
+  matchHeroRewardState = null;
+  if (options.restoreFocus && trigger instanceof HTMLElement && trigger.isConnected) {
+    trigger.focus();
+  }
+}
+
+function mountMatchHeroRewardPopover(trigger, context) {
+  const playerListItem = trigger.closest("li");
+  if (!playerListItem) return false;
+  const matchLabel = context.matchNo > 0 ? `第 ${context.matchNo} 场` : "本场比赛";
+  const popover = document.createElement("div");
+  popover.className = "match-hero-reward-popover";
+  popover.dataset.role = "match-hero-reward-popover";
+  popover.innerHTML = `
+    <div class="match-hero-reward-popover-head">
+      <span><strong>${escapeHtml(context.playerName)}</strong> · ${escapeHtml(context.matchDate)} ${escapeHtml(matchLabel)}</span>
+      <button type="button" class="button-secondary match-hero-reward-close-btn" data-role="close-match-hero-reward">收起</button>
+    </div>
+    <div class="player-double-options player-double-options-open match-hero-reward-options" data-role="match-hero-reward-options"></div>
+    <div class="match-hero-reward-applied" data-role="match-hero-reward-applied" hidden></div>
+    <div class="match-hero-reward-actions">
+      <button type="button" data-role="apply-match-hero-reward">确认加分</button>
+    </div>
+    <p class="message match-hero-reward-message" data-role="match-hero-reward-message"></p>
+  `;
+  playerListItem.append(popover);
+  matchHeroRewardPopover = popover;
+  matchHeroRewardOptions = popover.querySelector('[data-role="match-hero-reward-options"]');
+  matchHeroRewardApplied = popover.querySelector('[data-role="match-hero-reward-applied"]');
+  applyMatchHeroRewardBtn = popover.querySelector('[data-role="apply-match-hero-reward"]');
+  matchHeroRewardMessage = popover.querySelector('[data-role="match-hero-reward-message"]');
+  trigger.setAttribute("aria-expanded", "true");
+  return true;
+}
+
 function renderMatchHeroRewardOptions() {
   if (!matchHeroRewardOptions || !matchHeroRewardState) return;
   const entries = getDailyBonusHeroEntries(dailyBonusHeroSettings);
@@ -5907,7 +5950,7 @@ function renderMatchHeroRewardOptions() {
     return `
       <button
         type="button"
-        class="manual-score-player-chip match-hero-reward-option${isSelected ? " manual-score-player-chip-active" : ""}"
+        class="player-double-option match-hero-reward-option${isSelected ? " player-double-option-active" : ""}"
         data-role="match-hero-reward-option"
         data-hero-name="${escapeHtml(entry.heroName)}"
         data-hero-index="${entry.index}"
@@ -5968,8 +6011,19 @@ async function loadMatchHeroRewardAdjustments() {
   renderMatchHeroRewardApplied();
 }
 
-async function openMatchHeroRewardModal(matchId, playerId) {
+async function toggleMatchHeroRewardPopover(trigger) {
   if (!ensureScorerAccess("仅记分员或管理员可添加英雄奖励。")) return;
+  const matchId = trigger?.dataset?.matchId || "";
+  const playerId = trigger?.dataset?.playerId || "";
+  if (
+    matchHeroRewardPopover
+    && matchHeroRewardState?.matchId === matchId
+    && matchHeroRewardState?.playerId === playerId
+  ) {
+    closeMatchHeroRewardPopover({ restoreFocus: true });
+    return;
+  }
+  closeMatchHeroRewardPopover();
   try {
     await loadDailyBonusHeroSettings();
   } catch (error) {
@@ -5983,20 +6037,19 @@ async function openMatchHeroRewardModal(matchId, playerId) {
   }
   matchHeroRewardState = {
     ...context,
+    triggerElement: trigger,
     selectedHeroName: "",
     busy: false,
     appliedRewards: [],
   };
-  if (matchHeroRewardSubtitle) {
-    const matchLabel = context.matchNo > 0 ? `第 ${context.matchNo} 场` : "本场比赛";
-    matchHeroRewardSubtitle.textContent = `${context.playerName} · ${context.matchDate} ${matchLabel}`;
+  if (!trigger?.isConnected || !mountMatchHeroRewardPopover(trigger, context)) {
+    closeMatchHeroRewardPopover();
+    showGlobalToast("无法打开英雄奖励选择，请刷新页面后重试。", true);
+    return;
   }
   setMessageNode(matchHeroRewardMessage, "");
   renderMatchHeroRewardOptions();
   renderMatchHeroRewardApplied();
-  setManagedDialogOpen("matchHeroReward", true, {
-    initialFocus: matchHeroRewardOptions?.querySelector("button:not(:disabled)") || closeMatchHeroRewardBtn || undefined,
-  });
   try {
     await loadMatchHeroRewardAdjustments();
   } catch (error) {
@@ -6307,7 +6360,6 @@ const managedDialogEntries = [
   { modal: playerRelationModal, close: () => setManagedDialogOpen("playerRelation", false) },
   { modal: adminBackgroundPickerModal, close: () => setManagedDialogOpen("adminBackgroundPicker", false) },
   { modal: dailyBonusHeroesModal, close: () => setManagedDialogOpen("dailyBonusHeroes", false) },
-  { modal: matchHeroRewardModal, close: () => setManagedDialogOpen("matchHeroReward", false) },
 ].filter((entry) => entry.modal);
 
 const seasonRolloverEntries = [...document.querySelectorAll('[data-role="season-rollover-block"]')]
@@ -6409,8 +6461,6 @@ function getManagedDialogModal(key = "") {
       return adminBackgroundPickerModal;
     case "dailyBonusHeroes":
       return dailyBonusHeroesModal;
-    case "matchHeroReward":
-      return matchHeroRewardModal;
     default:
       return null;
   }
@@ -6442,15 +6492,6 @@ function setManagedDialogOpen(key = "", isOpen = false, options = {}) {
     } else if (key === "adminBackgroundPicker") {
       adminPlayerBackgroundSettingsOpen = false;
       renderAdminPlayerBackgroundSettings();
-    } else if (key === "matchHeroReward") {
-      matchHeroRewardState = null;
-      if (matchHeroRewardOptions) matchHeroRewardOptions.innerHTML = "";
-      if (matchHeroRewardApplied) {
-        matchHeroRewardApplied.innerHTML = "";
-        matchHeroRewardApplied.hidden = true;
-      }
-      if (matchHeroRewardSubtitle) matchHeroRewardSubtitle.textContent = "";
-      setMessageNode(matchHeroRewardMessage, "");
     }
   }
 }
@@ -14100,17 +14141,16 @@ function buildPlayerKdaSummaryHtml(entry = {}) {
 
 function buildMatchPlayerScoreDeltaHtml(entry = {}, context = {}) {
   const delta = Number(entry?.score_change ?? 0);
-  const tagName = context.canApplyReward ? "button" : "span";
   const actionAttributes = context.canApplyReward
-    ? `type="button" data-role="match-hero-reward" data-match-id="${escapeHtml(context.matchId || "")}" data-player-id="${escapeHtml(entry.player_id || "")}" aria-label="为${escapeHtml(stripPlayerNameMeta(entry.display_name || "该选手") || "该选手")}添加英雄奖励" title="选择当日英雄奖励"`
+    ? `role="button" tabindex="0" data-role="match-hero-reward" data-match-id="${escapeHtml(context.matchId || "")}" data-player-id="${escapeHtml(entry.player_id || "")}" aria-expanded="false" aria-label="为${escapeHtml(stripPlayerNameMeta(entry.display_name || "该选手") || "该选手")}添加英雄奖励" title="选择当日英雄奖励"`
     : "";
   if (!Number.isFinite(delta)) {
-    return `<${tagName} class="match-player-score-delta-badge match-player-score-delta-neutral${context.canApplyReward ? " match-player-score-delta-action" : ""}" ${actionAttributes}>0</${tagName}>`;
+    return `<span class="match-player-score-delta-badge match-player-score-delta-neutral" ${actionAttributes}>0</span>`;
   }
   const toneClass = delta > 0
     ? "match-player-score-delta-positive"
     : (delta < 0 ? "match-player-score-delta-negative" : "match-player-score-delta-neutral");
-  return `<${tagName} class="match-player-score-delta-badge ${toneClass}${context.canApplyReward ? " match-player-score-delta-action" : ""}" ${actionAttributes}>${escapeHtml(formatScore(Math.abs(delta)))}</${tagName}>`;
+  return `<span class="match-player-score-delta-badge ${toneClass}" ${actionAttributes}>${escapeHtml(formatScore(Math.abs(delta)))}</span>`;
 }
 
 function buildSingleDoubleOptionsHtml(formType, player, allSelectedPlayers, itemEntry) {
@@ -17877,6 +17917,7 @@ function isCurrentBusinessDayGroup(group) {
 }
 
 function renderRecentMatches(groups) {
+  closeMatchHeroRewardPopover();
   recentMatchesList.innerHTML = "";
   const highestRewardIds = getHighestRewardPlayerIds(leaderboardPlayers);
   const hardcoreLoseIds = getHardcoreLoseTaggedPlayerIds(leaderboardPlayers);
@@ -21685,26 +21726,6 @@ if (randomizeDailyBonusHeroesBtn) {
     void rerollDailyBonusHeroes({ automatic: true });
   });
 }
-if (matchHeroRewardOptions) {
-  matchHeroRewardOptions.addEventListener("click", (event) => {
-    const button = event.target.closest('[data-role="match-hero-reward-option"]');
-    if (!button || button.disabled || !matchHeroRewardState || matchHeroRewardState.busy) return;
-    matchHeroRewardState.selectedHeroName = button.dataset.heroName || "";
-    renderMatchHeroRewardOptions();
-  });
-}
-if (matchHeroRewardApplied) {
-  matchHeroRewardApplied.addEventListener("click", (event) => {
-    const button = event.target.closest('[data-role="revoke-match-hero-reward"]');
-    if (!button || button.disabled) return;
-    void revokeMatchHeroReward(button.dataset.adjustmentId || "");
-  });
-}
-if (applyMatchHeroRewardBtn) {
-  applyMatchHeroRewardBtn.addEventListener("click", () => {
-    void applySelectedMatchHeroReward();
-  });
-}
 if (adminBackgroundOptions) {
   adminBackgroundOptions.addEventListener("click", (event) => {
     const optionButton = event.target.closest(".admin-background-option");
@@ -22332,14 +22353,47 @@ signupPlayerGrid.addEventListener("click", async (event) => {
 });
 
 recentMatchesList.addEventListener("click", async (event) => {
+  const closeHeroRewardButton = event.target.closest('[data-role="close-match-hero-reward"]');
+  if (closeHeroRewardButton) {
+    event.preventDefault();
+    event.stopPropagation();
+    closeMatchHeroRewardPopover({ restoreFocus: true });
+    return;
+  }
+
+  const heroRewardOption = event.target.closest('[data-role="match-hero-reward-option"]');
+  if (heroRewardOption) {
+    event.preventDefault();
+    event.stopPropagation();
+    if (heroRewardOption.disabled || !matchHeroRewardState || matchHeroRewardState.busy) return;
+    matchHeroRewardState.selectedHeroName = heroRewardOption.dataset.heroName || "";
+    renderMatchHeroRewardOptions();
+    return;
+  }
+
+  const applyHeroRewardButton = event.target.closest('[data-role="apply-match-hero-reward"]');
+  if (applyHeroRewardButton) {
+    event.preventDefault();
+    event.stopPropagation();
+    if (!applyHeroRewardButton.disabled) await applySelectedMatchHeroReward();
+    return;
+  }
+
+  const revokeHeroRewardButton = event.target.closest('[data-role="revoke-match-hero-reward"]');
+  if (revokeHeroRewardButton) {
+    event.preventDefault();
+    event.stopPropagation();
+    if (!revokeHeroRewardButton.disabled) {
+      await revokeMatchHeroReward(revokeHeroRewardButton.dataset.adjustmentId || "");
+    }
+    return;
+  }
+
   const heroRewardButton = event.target.closest('[data-role="match-hero-reward"]');
   if (heroRewardButton) {
     event.preventDefault();
     event.stopPropagation();
-    await openMatchHeroRewardModal(
-      heroRewardButton.dataset.matchId || "",
-      heroRewardButton.dataset.playerId || ""
-    );
+    await toggleMatchHeroRewardPopover(heroRewardButton);
     return;
   }
 
@@ -22456,6 +22510,15 @@ recentMatchesList.addEventListener("click", async (event) => {
   if (!button) return;
 
   await deleteMatch(button.dataset.matchId, button);
+});
+
+recentMatchesList.addEventListener("keydown", (event) => {
+  if (event.key !== "Enter" && event.key !== " ") return;
+  const heroRewardButton = event.target.closest('[data-role="match-hero-reward"]');
+  if (!heroRewardButton) return;
+  event.preventDefault();
+  event.stopPropagation();
+  void toggleMatchHeroRewardPopover(heroRewardButton);
 });
 
 if (recentMatchesList) {
@@ -22678,7 +22741,6 @@ if (itemInventoryLogsList) {
   [playerRelationBackdrop, () => setManagedDialogOpen("playerRelation", false)],
   [adminBackgroundPickerBackdrop, () => setManagedDialogOpen("adminBackgroundPicker", false)],
   [dailyBonusHeroesBackdrop, () => setManagedDialogOpen("dailyBonusHeroes", false)],
-  [matchHeroRewardBackdrop, () => setManagedDialogOpen("matchHeroReward", false)],
 ].forEach(([node, handler]) => {
   if (node) {
     node.addEventListener("click", handler);
@@ -22706,7 +22768,6 @@ if (itemInventoryLogsList) {
   [closePlayerRelationBtn, () => setManagedDialogOpen("playerRelation", false)],
   [closeAdminBackgroundPickerBtn, () => setManagedDialogOpen("adminBackgroundPicker", false)],
   [closeDailyBonusHeroesBtn, () => setManagedDialogOpen("dailyBonusHeroes", false)],
-  [closeMatchHeroRewardBtn, () => setManagedDialogOpen("matchHeroReward", false)],
 ].forEach(([node, handler]) => {
   if (node) {
     node.addEventListener("click", handler);
@@ -23030,6 +23091,10 @@ if (scoreDetailSummary) {
 }
 
 document.addEventListener("keydown", (event) => {
+  if (event.key === "Escape" && matchHeroRewardPopover) {
+    closeMatchHeroRewardPopover({ restoreFocus: true });
+    return;
+  }
   if (event.key === "Tab") {
     const openModal = getOpenDialogModal();
     if (!openModal) return;
@@ -23532,7 +23597,7 @@ function applyRolePermissions() {
   }
   if (!canScore) {
     setManagedDialogOpen("dailyBonusHeroes", false);
-    setManagedDialogOpen("matchHeroReward", false);
+    closeMatchHeroRewardPopover();
     setManagedDialogOpen("itemInventoryLogs", false);
     setManagedDialogOpen("scorerSeasonRule", false);
     setManagedDialogOpen("scorerPower", false);

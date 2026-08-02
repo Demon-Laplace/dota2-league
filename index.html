@@ -7,7 +7,7 @@
   <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin />
   <link rel="preconnect" href="https://klxkkwwszqtgeuozwtkw.supabase.co" crossorigin />
   <link rel="preload" as="image" href="./assets/Dota2_logo.png" fetchpriority="high" />
-  <link rel="stylesheet" href="style.css?v=20260802-match-hero-reward-v1" />
+  <link rel="stylesheet" href="style.css?v=20260802-inline-hero-reward-v1" />
 </head>
   <body>
   <div id="loadingScreen" class="loading-screen" aria-live="polite">
@@ -773,25 +773,6 @@
     </div>
   </div>
 
-  <div id="matchHeroRewardModal" class="hero-picker-modal" hidden>
-    <div id="matchHeroRewardBackdrop" class="hero-picker-backdrop"></div>
-    <div class="hero-picker-dialog management-dialog match-hero-reward-dialog" role="dialog" aria-modal="true" aria-labelledby="matchHeroRewardTitle">
-      <div class="section-head">
-        <div>
-          <h2 id="matchHeroRewardTitle" data-copy="dailyBonusHeroes.matchRewardTitle"></h2>
-          <p id="matchHeroRewardSubtitle" class="muted"></p>
-        </div>
-        <button id="closeMatchHeroRewardBtn" class="button-secondary" type="button" data-copy="dailyBonusHeroes.close"></button>
-      </div>
-      <div id="matchHeroRewardOptions" class="manual-score-player-chips match-hero-reward-options"></div>
-      <div id="matchHeroRewardApplied" class="match-hero-reward-applied"></div>
-      <div class="row match-hero-reward-actions">
-        <button id="applyMatchHeroRewardBtn" type="button" data-copy="dailyBonusHeroes.applyMatchReward"></button>
-      </div>
-      <p id="matchHeroRewardMessage" class="message"></p>
-    </div>
-  </div>
-
   <div id="scorerSeasonRuleModal" class="hero-picker-modal" hidden>
     <div id="scorerSeasonRuleBackdrop" class="hero-picker-backdrop"></div>
     <div class="hero-picker-dialog management-dialog" role="dialog" aria-modal="true" aria-labelledby="scorerSeasonRuleTitle">
@@ -1333,11 +1314,11 @@
   </div>
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="src/site-copy.js?v=20260802-match-hero-reward-v1"></script>
+  <script src="src/site-copy.js?v=20260802-inline-hero-reward-v1"></script>
   <script type="module">
     import { animate } from "https://cdn.jsdelivr.net/npm/motion@12.23.24/+esm";
     window.Motion = { animate };
   </script>
-  <script src="app.js?v=20260802-match-hero-reward-v1"></script>
+  <script src="app.js?v=20260802-inline-hero-reward-v1"></script>
 </body>
 </html>
