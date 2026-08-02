@@ -853,8 +853,11 @@ function getLatestSchemaMigrationHint(error) {
     || message.includes("apply_hero_reward_score")
     || message.includes("revoke_hero_reward_score")
     || message.includes("set_daily_bonus_hero_reward_point")
+    || message.includes("daily_bonus_hero_match_days")
+    || message.includes("get_daily_bonus_hero_match_day")
+    || message.includes("sync_daily_bonus_hero_match_day")
   ) {
-    return "请先应用最新数据库迁移 20260802220000_dynamic_match_hero_reward_scores.sql。";
+    return "请先应用最新数据库迁移 20260803010000_three_match_day_hero_reward_history.sql。";
   }
   if (message.includes("manual_score_adjustments") || message.includes("revoke_manual_score_adjustment")) {
     return "请先在 Supabase 执行最新 SQL，至少应用已修改过的 20260501000000_core_schema.sql 和 20260509110000_manual_score_anchor_to_match_day_tail.sql。";
@@ -1485,6 +1488,7 @@ let recentMatchAttendanceNotesData = [];
 let recentMatchDayGroupsData = [];
 let dailyBonusHeroSettings = null;
 let dailyBonusHeroLoadPromise = null;
+const dailyBonusHeroMatchDayCache = new Map();
 let dailyBonusHeroMutationPending = false;
 let recentMatchDragState = null;
 let recentMatchLoadedSeasonIds = new Set();
@@ -5507,11 +5511,14 @@ function getFilteredHeroes(searchTerm = "") {
 
 function normalizeDailyBonusHeroSettings(rawSettings = {}) {
   const availableHeroCount = Math.max(1, DOTA_HEROES.length);
+  const heroNames = Array.isArray(rawSettings?.heroNames)
+    ? rawSettings.heroNames.map((name) => String(name || "").trim()).filter(Boolean)
+    : [];
   const requestedCount = Math.trunc(Number(rawSettings?.heroCount));
-  const heroCount = Math.min(
-    Number.isInteger(requestedCount) && requestedCount > 0 ? requestedCount : 4,
-    availableHeroCount
-  );
+  const heroCount = heroNames.length || Math.min(
+      Number.isInteger(requestedCount) && requestedCount > 0 ? requestedCount : 4,
+      availableHeroCount
+    );
   const rawPoints = Array.isArray(rawSettings?.rewardPoints) ? rawSettings.rewardPoints : [];
   const rewardPoints = Array.from({ length: heroCount }, (_unused, index) => {
     const rawValue = rawPoints[index];
@@ -5527,9 +5534,13 @@ function normalizeDailyBonusHeroSettings(rawSettings = {}) {
   return {
     enabled: Boolean(rawSettings?.enabled),
     heroCount,
+    heroNames,
     rewardPoints,
     rewardPointsDate: String(rawSettings?.rewardPointsDate || ""),
     businessDate: String(rawSettings?.businessDate || getBeijingBusinessDateString()),
+    currentBusinessDate: String(rawSettings?.currentBusinessDate || getBeijingBusinessDateString()),
+    retained: rawSettings?.retained !== false,
+    provisional: Boolean(rawSettings?.provisional),
     seed: Number.isInteger(seedValue) && seedValue >= 0 && seedValue <= 4294967295
       ? seedValue
       : null,
@@ -5550,18 +5561,62 @@ function createDailyBonusSeededRandom(seed = 0) {
 function getDailyBonusHeroEntries(settings = dailyBonusHeroSettings) {
   const normalized = normalizeDailyBonusHeroSettings(settings || {});
   if (normalized.seed === null) return [];
-  const random = createDailyBonusSeededRandom(normalized.seed);
-  const shuffledHeroes = [...DOTA_HEROES];
-  for (let index = shuffledHeroes.length - 1; index > 0; index -= 1) {
-    const swapIndex = Math.floor(random() * (index + 1));
-    [shuffledHeroes[index], shuffledHeroes[swapIndex]] = [shuffledHeroes[swapIndex], shuffledHeroes[index]];
+  let selectedHeroes = normalized.heroNames;
+  if (!selectedHeroes.length) {
+    const random = createDailyBonusSeededRandom(normalized.seed);
+    const shuffledHeroes = [...DOTA_HEROES];
+    for (let index = shuffledHeroes.length - 1; index > 0; index -= 1) {
+      const swapIndex = Math.floor(random() * (index + 1));
+      [shuffledHeroes[index], shuffledHeroes[swapIndex]] = [shuffledHeroes[swapIndex], shuffledHeroes[index]];
+    }
+    selectedHeroes = shuffledHeroes.slice(0, normalized.heroCount);
   }
-  return shuffledHeroes.slice(0, normalized.heroCount).map((heroName, index) => ({
+  return selectedHeroes.map((heroName, index) => ({
     index,
     heroName,
     displayName: getHeroDisplayName(heroName),
     points: normalized.rewardPoints[index] ?? null,
   }));
+}
+
+async function syncDailyBonusHeroMatchDay(settings = dailyBonusHeroSettings) {
+  const normalized = normalizeDailyBonusHeroSettings(settings || {});
+  if (!isCurrentRoleScorer() || !normalized.businessDate || normalized.seed === null) {
+    return normalized;
+  }
+  const heroNames = getDailyBonusHeroEntries(normalized).map((entry) => entry.heroName);
+  const { data, error } = await db.rpc("sync_daily_bonus_hero_match_day", {
+    p_match_date: normalized.businessDate,
+    p_seed: normalized.seed,
+    p_hero_names: heroNames,
+  });
+  if (error) throw error;
+  const snapshot = normalizeDailyBonusHeroSettings(data || normalized);
+  dailyBonusHeroMatchDayCache.set(snapshot.businessDate, snapshot);
+  return snapshot;
+}
+
+async function loadDailyBonusHeroMatchDay(matchDate, { force = false } = {}) {
+  const normalizedDate = String(matchDate || "").trim();
+  if (!normalizedDate) return null;
+  if (!force && dailyBonusHeroMatchDayCache.has(normalizedDate)) {
+    return dailyBonusHeroMatchDayCache.get(normalizedDate);
+  }
+  const { data, error } = await db.rpc("get_daily_bonus_hero_match_day", {
+    p_match_date: normalizedDate,
+  });
+  if (error) throw error;
+  if (!data) {
+    dailyBonusHeroMatchDayCache.delete(normalizedDate);
+    return null;
+  }
+  let snapshot = normalizeDailyBonusHeroSettings(data);
+  if (snapshot.provisional && isCurrentRoleScorer()) {
+    snapshot = await syncDailyBonusHeroMatchDay(snapshot);
+  } else {
+    dailyBonusHeroMatchDayCache.set(normalizedDate, snapshot);
+  }
+  return snapshot;
 }
 
 function buildDailyBonusHeroChipsHtml(settings = dailyBonusHeroSettings, { interactive = false } = {}) {
@@ -5661,6 +5716,7 @@ async function openDailyBonusHeroManagement() {
   if (!ensureScorerAccess("仅记分员或管理员可管理每日奖励英雄。")) return;
   setMessageNode(dailyBonusHeroesMessage, "");
   await loadDailyBonusHeroSettings();
+  dailyBonusHeroSettings = await syncDailyBonusHeroMatchDay(dailyBonusHeroSettings);
   renderDailyBonusHeroManagement();
   setDailyBonusHeroManagementBusy(false);
   setManagedDialogOpen("dailyBonusHeroes", true, {
@@ -5684,6 +5740,8 @@ async function saveDailyBonusHeroSettings() {
     });
     if (error) throw error;
     dailyBonusHeroSettings = normalizeDailyBonusHeroSettings(data || {});
+    dailyBonusHeroMatchDayCache.delete(dailyBonusHeroSettings.businessDate);
+    dailyBonusHeroSettings = await syncDailyBonusHeroMatchDay(dailyBonusHeroSettings);
     renderDailyBonusHeroes();
     renderDailyBonusHeroManagement();
     scoreDetailSeasonCache.clear();
@@ -5699,6 +5757,12 @@ async function saveDailyBonusHeroSettings() {
 
 async function setDailyBonusHeroRewardPoint(heroIndex) {
   if (!ensureScorerAccess("仅记分员或管理员可设置英雄奖励分数。")) return;
+  try {
+    dailyBonusHeroSettings = await syncDailyBonusHeroMatchDay(dailyBonusHeroSettings);
+  } catch (error) {
+    showGlobalToast(buildMatchOperationFailureMessage("每日奖励英雄同步失败", error), true);
+    return;
+  }
   const normalizedIndex = Math.trunc(Number(heroIndex));
   const entry = getDailyBonusHeroEntries(dailyBonusHeroSettings)[normalizedIndex] || null;
   if (!entry) {
@@ -5732,6 +5796,9 @@ async function setDailyBonusHeroRewardPoint(heroIndex) {
     });
     if (error) throw error;
     dailyBonusHeroSettings = normalizeDailyBonusHeroSettings(data || {});
+    dailyBonusHeroMatchDayCache.delete(dailyBonusHeroSettings.businessDate);
+    const currentSnapshot = await loadDailyBonusHeroMatchDay(dailyBonusHeroSettings.businessDate, { force: true });
+    if (currentSnapshot) dailyBonusHeroSettings = currentSnapshot;
     renderDailyBonusHeroes();
     renderDailyBonusHeroManagement();
     scoreDetailSeasonCache.clear();
@@ -5766,6 +5833,8 @@ async function rerollDailyBonusHeroes({ automatic = false } = {}) {
     const { data, error } = await db.rpc("reroll_daily_bonus_heroes", { p_seed: seed });
     if (error) throw error;
     dailyBonusHeroSettings = normalizeDailyBonusHeroSettings(data || {});
+    dailyBonusHeroMatchDayCache.delete(dailyBonusHeroSettings.businessDate);
+    dailyBonusHeroSettings = await syncDailyBonusHeroMatchDay(dailyBonusHeroSettings);
     renderDailyBonusHeroes();
     renderDailyBonusHeroManagement();
     scoreDetailSeasonCache.clear();
@@ -5841,28 +5910,34 @@ function mountMatchHeroRewardPopover(trigger) {
 
 function renderMatchHeroRewardOptions() {
   if (!matchHeroRewardOptions || !matchHeroRewardState) return;
-  const currentEntries = getDailyBonusHeroEntries(dailyBonusHeroSettings);
+  const retainedEntries = matchHeroRewardState.rewardSettings
+    ? getDailyBonusHeroEntries(matchHeroRewardState.rewardSettings)
+    : [];
   const activeAssignments = matchHeroRewardState.appliedRewards || [];
   const featureAvailable = Boolean(
-    dailyBonusHeroSettings?.enabled
-    && matchHeroRewardState.matchDate === dailyBonusHeroSettings.businessDate
-    && matchHeroRewardState.matchDate === getBeijingBusinessDateString()
+    matchHeroRewardState.rewardSettings?.enabled
+    && matchHeroRewardState.rewardSettings?.retained
+    && retainedEntries.length
   );
-  const isCurrentMatchDay = matchHeroRewardState.matchDate === getBeijingBusinessDateString();
-  const entries = isCurrentMatchDay
-    ? currentEntries
-    : activeAssignments
-      .filter((row) => row.player_id === matchHeroRewardState.playerId && row.hero_name)
-      .map((row) => ({
-        heroName: row.hero_name,
-        displayName: getHeroDisplayName(row.hero_name),
-      }));
+  const hasRetainedEntries = retainedEntries.length > 0;
+  const retainedHeroNames = new Set(retainedEntries.map((entry) => entry.heroName));
+  const ownedLegacyEntries = activeAssignments
+    .filter((row) => (
+      row.player_id === matchHeroRewardState.playerId
+      && row.hero_name
+      && !retainedHeroNames.has(row.hero_name)
+    ))
+    .map((row) => ({
+      heroName: row.hero_name,
+      displayName: getHeroDisplayName(row.hero_name),
+    }));
+  const entries = [...retainedEntries, ...ownedLegacyEntries];
   matchHeroRewardOptions.innerHTML = entries.map((entry) => {
     const assignment = activeAssignments.find((row) => row.hero_name === entry.heroName) || null;
     const isOwned = assignment?.player_id === matchHeroRewardState.playerId;
     const isUsedByOtherPlayer = Boolean(assignment && !isOwned);
     const isDisabled = matchHeroRewardState.busy
-      || (isCurrentMatchDay ? (!featureAvailable || isUsedByOtherPlayer) : !isOwned);
+      || (!isOwned && (!hasRetainedEntries || !featureAvailable || isUsedByOtherPlayer));
     return `
       <button
         type="button"
@@ -5912,19 +5987,22 @@ async function toggleMatchHeroRewardPopover(trigger) {
     return;
   }
   closeMatchHeroRewardPopover();
-  try {
-    await loadDailyBonusHeroSettings();
-  } catch (error) {
-    showGlobalToast(`每日奖励英雄载入失败：${getErrorMessage(error)}`, true);
-    return;
-  }
   const context = findRecentMatchHeroRewardContext(matchId, playerId);
   if (!context) {
     showGlobalToast("未找到对应的比赛选手记录，请刷新页面后重试。", true);
     return;
   }
+  let rewardSettings = null;
+  try {
+    await loadDailyBonusHeroSettings();
+    rewardSettings = await loadDailyBonusHeroMatchDay(context.matchDate);
+  } catch (error) {
+    showGlobalToast(`每日奖励英雄载入失败：${getErrorMessage(error)}`, true);
+    return;
+  }
   matchHeroRewardState = {
     ...context,
+    rewardSettings,
     triggerElement: trigger,
     busy: false,
     appliedRewards: [],
@@ -5936,12 +6014,11 @@ async function toggleMatchHeroRewardPopover(trigger) {
     showGlobalToast(buildMatchOperationFailureMessage("本场英雄奖励载入失败", error), true);
     return;
   }
-  const isCurrentMatchDay = context.matchDate === getBeijingBusinessDateString();
   const hasOwnedSelection = matchHeroRewardState.appliedRewards
     .some((row) => row.player_id === context.playerId && row.hero_name);
-  if (!isCurrentMatchDay && !hasOwnedSelection) {
+  if (!rewardSettings && !hasOwnedSelection) {
     closeMatchHeroRewardPopover();
-    showGlobalToast("这名选手在本场没有英雄奖励记录。", true);
+    showGlobalToast("仅支持最近三个比赛日的英雄奖励追溯。", true);
     return;
   }
   if (!trigger?.isConnected || !mountMatchHeroRewardPopover(trigger)) {
@@ -5955,23 +6032,36 @@ async function toggleMatchHeroRewardPopover(trigger) {
 async function applyMatchHeroRewardSelection(heroName) {
   if (!ensureScorerAccess("仅记分员或管理员可添加英雄奖励。") || !matchHeroRewardState) return;
   const state = { ...matchHeroRewardState };
-  const entry = getDailyBonusHeroEntries(dailyBonusHeroSettings)
+  const entry = getDailyBonusHeroEntries(state.rewardSettings)
     .find((candidate) => candidate.heroName === heroName) || null;
   if (!entry) {
     showGlobalToast("未找到这个每日奖励英雄，请刷新页面后重试。", true);
     return;
   }
   if (
-    !dailyBonusHeroSettings?.enabled
-    || state.matchDate !== dailyBonusHeroSettings.businessDate
-    || state.matchDate !== getBeijingBusinessDateString()
+    !state.rewardSettings?.enabled
+    || !state.rewardSettings?.retained
   ) {
-    showGlobalToast("英雄奖励只可添加到当前凌晨 2 点刷新后的比赛日。", true);
+    showGlobalToast("该比赛日不在最近三个比赛日的英雄奖励追溯范围内。", true);
     return;
   }
   if ((state.appliedRewards || []).some((row) => row.hero_name === entry.heroName)) {
     showGlobalToast("这个英雄已经在本场比赛使用。", true);
     return;
+  }
+
+  const isCurrentMatchDay = state.matchDate === getBeijingBusinessDateString();
+  if (!isCurrentMatchDay) {
+    const confirmed = await confirmAction(
+      `确认在 ${state.matchDate} 第 ${state.matchNo || "?"} 场为 ${state.playerName} 补充选择 ${entry.displayName} 吗？`,
+      { title: "确认补录英雄奖励", confirmLabel: "确认添加" }
+    );
+    if (
+      !confirmed
+      || !matchHeroRewardState
+      || matchHeroRewardState.matchId !== state.matchId
+      || matchHeroRewardState.playerId !== state.playerId
+    ) return;
   }
 
   matchHeroRewardState.busy = true;
@@ -5990,7 +6080,7 @@ async function applyMatchHeroRewardSelection(heroName) {
     showGlobalToast(awardedPoints > 0
       ? `${state.playerName} 获得 ${entry.displayName} ${formatSignedScore(awardedPoints)} 分`
       : `${state.playerName} 已选择 ${entry.displayName}，奖励分数待设置`);
-    appendAdminActionLog(`为 ${state.playerName} 选择了 ${entry.displayName} 英雄奖励，挂在 ${state.matchDate} 第 ${state.matchNo || "?"} 场，当前计分 ${formatSignedScore(awardedPoints)}。`);
+    appendAdminActionLog(`${isCurrentMatchDay ? "为" : "补录：为"} ${state.playerName} 选择了 ${entry.displayName} 英雄奖励，挂在 ${state.matchDate} 第 ${state.matchNo || "?"} 场，当前计分 ${formatSignedScore(awardedPoints)}。`);
     if (matchHeroRewardState?.matchId === state.matchId && matchHeroRewardState?.playerId === state.playerId) {
       matchHeroRewardState.busy = false;
       await loadMatchHeroRewardAdjustments();
@@ -21101,6 +21191,7 @@ function subscribeRealtime() {
       "postgres_changes",
       { event: "*", schema: "public", table: "daily_bonus_hero_settings" },
       () => {
+        dailyBonusHeroMatchDayCache.delete(getBeijingBusinessDateString());
         void loadDailyBonusHeroSettings().catch((error) => {
           console.warn("实时更新每日奖励英雄设置失败。", error);
         });
