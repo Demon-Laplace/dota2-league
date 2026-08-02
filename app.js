@@ -711,7 +711,6 @@ const HARDCORE_TAG_QUANTILE = 0.35;
 const HARDCORE_TAG_SHOW_THRESHOLD = 0.35;
 const LEADERBOARD_COMPACT_STORAGE_KEY = "nd_dota_leaderboard_compact_v1";
 const RECENT_MATCH_SEASON_OPEN_STORAGE_KEY = "nd_dota_recent_match_seasons_open_v1";
-const MATCH_HERO_REWARD_ASSIGNMENTS_STORAGE_KEY = "nd_dota_match_hero_reward_assignments_v1";
 const SEASON_PLAYER_POWER_CACHE_STORAGE_KEY = "nd_dota_season_player_power_cache_v1";
 const HOME_LEADERBOARD_CACHE_STORAGE_KEY = "nd_dota_home_leaderboard_cache_v1";
 const HOME_PLAYER_DIRECTORY_CACHE_STORAGE_KEY = "nd_dota_home_player_directory_cache_v1";
@@ -855,7 +854,7 @@ function getLatestSchemaMigrationHint(error) {
     || message.includes("revoke_hero_reward_score")
     || message.includes("set_daily_bonus_hero_reward_point")
   ) {
-    return "请先应用最新数据库迁移 20260802200000_match_day_hero_rewards.sql。";
+    return "请先应用最新数据库迁移 20260802220000_dynamic_match_hero_reward_scores.sql。";
   }
   if (message.includes("manual_score_adjustments") || message.includes("revoke_manual_score_adjustment")) {
     return "请先在 Supabase 执行最新 SQL，至少应用已修改过的 20260501000000_core_schema.sql 和 20260509110000_manual_score_anchor_to_match_day_tail.sql。";
@@ -1177,9 +1176,6 @@ const dailyBonusHeroesPreview = document.getElementById("dailyBonusHeroesPreview
 const dailyBonusHeroesMessage = document.getElementById("dailyBonusHeroesMessage");
 let matchHeroRewardPopover = null;
 let matchHeroRewardOptions = null;
-let matchHeroRewardApplied = null;
-let applyMatchHeroRewardBtn = null;
-let matchHeroRewardMessage = null;
 const adminRecalculateScoresBtn = document.getElementById("adminRecalculateScoresBtn");
 const adminClearScorerRememberBtn = document.getElementById("adminClearScorerRememberBtn");
 const adminSeasonInitialScoreInput = document.getElementById("adminSeasonInitialScoreInput");
@@ -5690,6 +5686,8 @@ async function saveDailyBonusHeroSettings() {
     dailyBonusHeroSettings = normalizeDailyBonusHeroSettings(data || {});
     renderDailyBonusHeroes();
     renderDailyBonusHeroManagement();
+    scoreDetailSeasonCache.clear();
+    await requestImmediateRefresh({ leaderboard: true });
     setMessageNode(dailyBonusHeroesMessage, "每日奖励英雄设置已保存。");
     showGlobalToast("每日奖励英雄设置已保存");
   } catch (error) {
@@ -5730,11 +5728,14 @@ async function setDailyBonusHeroRewardPoint(heroIndex) {
     const { data, error } = await db.rpc("set_daily_bonus_hero_reward_point", {
       p_hero_index: normalizedIndex + 1,
       p_points: points,
+      p_hero_name: entry.heroName,
     });
     if (error) throw error;
     dailyBonusHeroSettings = normalizeDailyBonusHeroSettings(data || {});
     renderDailyBonusHeroes();
     renderDailyBonusHeroManagement();
+    scoreDetailSeasonCache.clear();
+    await requestImmediateRefresh({ leaderboard: true });
     showGlobalToast(points === 0 ? `已取消${entry.displayName}的英雄奖励` : `${entry.displayName}已设为 ${formatSignedScore(points)} 分`);
   } catch (error) {
     showGlobalToast(buildMatchOperationFailureMessage("设置英雄奖励失败", error), true);
@@ -5767,6 +5768,8 @@ async function rerollDailyBonusHeroes({ automatic = false } = {}) {
     dailyBonusHeroSettings = normalizeDailyBonusHeroSettings(data || {});
     renderDailyBonusHeroes();
     renderDailyBonusHeroManagement();
+    scoreDetailSeasonCache.clear();
+    await requestImmediateRefresh({ leaderboard: true });
     setMessageNode(dailyBonusHeroesMessage, `今日英雄已更换，种子：${dailyBonusHeroSettings.seed}。`);
     showGlobalToast("今日奖励英雄已更换");
   } catch (error) {
@@ -5774,80 +5777,6 @@ async function rerollDailyBonusHeroes({ automatic = false } = {}) {
   } finally {
     setDailyBonusHeroManagementBusy(false);
   }
-}
-
-function readMatchHeroRewardAssignments() {
-  try {
-    const parsed = JSON.parse(window.localStorage.getItem(MATCH_HERO_REWARD_ASSIGNMENTS_STORAGE_KEY) || "{}");
-    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return {};
-    const currentBusinessDate = getBeijingBusinessDateString();
-    return Object.fromEntries(
-      Object.entries(parsed)
-        .map(([matchId, assignments]) => {
-          if (!assignments || typeof assignments !== "object" || Array.isArray(assignments)) return null;
-          const validAssignments = Object.fromEntries(
-            Object.entries(assignments).filter(([_heroName, assignment]) => (
-              assignment
-              && typeof assignment === "object"
-              && String(assignment.businessDate || "") === currentBusinessDate
-            ))
-          );
-          return Object.keys(validAssignments).length ? [matchId, validAssignments] : null;
-        })
-        .filter(Boolean)
-    );
-  } catch {
-    return {};
-  }
-}
-
-function writeMatchHeroRewardAssignments(assignments = {}) {
-  try {
-    window.localStorage.setItem(MATCH_HERO_REWARD_ASSIGNMENTS_STORAGE_KEY, JSON.stringify(assignments));
-  } catch {
-    // Local hero mutual exclusion is best-effort and must not block an audited score adjustment.
-  }
-}
-
-function rememberMatchHeroRewardAssignment(matchId, heroName, assignment = {}) {
-  const normalizedMatchId = String(matchId || "").trim();
-  const normalizedHeroName = String(heroName || "").trim();
-  if (!normalizedMatchId || !normalizedHeroName) return;
-  const assignments = readMatchHeroRewardAssignments();
-  assignments[normalizedMatchId] = assignments[normalizedMatchId] || {};
-  assignments[normalizedMatchId][normalizedHeroName] = {
-    playerId: String(assignment.playerId || ""),
-    adjustmentId: String(assignment.adjustmentId || ""),
-    businessDate: getBeijingBusinessDateString(),
-    createdAt: new Date().toISOString(),
-  };
-  writeMatchHeroRewardAssignments(assignments);
-}
-
-function forgetMatchHeroRewardAssignmentByAdjustmentId(adjustmentId) {
-  const normalizedId = String(adjustmentId || "").trim();
-  if (!normalizedId) return;
-  const assignments = readMatchHeroRewardAssignments();
-  let changed = false;
-  Object.entries(assignments).forEach(([matchId, heroAssignments]) => {
-    Object.entries(heroAssignments || {}).forEach(([heroName, assignment]) => {
-      if (String(assignment?.adjustmentId || "") !== normalizedId) return;
-      delete assignments[matchId][heroName];
-      changed = true;
-    });
-    if (!Object.keys(assignments[matchId] || {}).length) {
-      delete assignments[matchId];
-    }
-  });
-  if (changed) writeMatchHeroRewardAssignments(assignments);
-}
-
-function getLocalMatchHeroRewardAssignmentByAdjustmentId(matchId, adjustmentId) {
-  const normalizedId = String(adjustmentId || "").trim();
-  const heroAssignments = readMatchHeroRewardAssignments()[String(matchId || "").trim()] || {};
-  const match = Object.entries(heroAssignments)
-    .find(([_heroName, assignment]) => String(assignment?.adjustmentId || "") === normalizedId);
-  return match ? { heroName: match[0], ...match[1] } : null;
 }
 
 function findRecentMatchHeroRewardContext(matchId, playerId) {
@@ -5889,105 +5818,65 @@ function closeMatchHeroRewardPopover(options = {}) {
   matchHeroRewardPopover?.remove();
   matchHeroRewardPopover = null;
   matchHeroRewardOptions = null;
-  matchHeroRewardApplied = null;
-  applyMatchHeroRewardBtn = null;
-  matchHeroRewardMessage = null;
   matchHeroRewardState = null;
   if (options.restoreFocus && trigger instanceof HTMLElement && trigger.isConnected) {
     trigger.focus();
   }
 }
 
-function mountMatchHeroRewardPopover(trigger, context) {
-  const playerListItem = trigger.closest("li");
-  if (!playerListItem) return false;
-  const matchLabel = context.matchNo > 0 ? `第 ${context.matchNo} 场` : "本场比赛";
+function mountMatchHeroRewardPopover(trigger) {
+  const matchCard = trigger.closest(".recent-match-card");
+  const teams = matchCard?.querySelector(".recent-match-teams");
+  if (!matchCard || !teams) return false;
   const popover = document.createElement("div");
   popover.className = "match-hero-reward-popover";
   popover.dataset.role = "match-hero-reward-popover";
-  popover.innerHTML = `
-    <div class="match-hero-reward-popover-head">
-      <span><strong>${escapeHtml(context.playerName)}</strong> · ${escapeHtml(context.matchDate)} ${escapeHtml(matchLabel)}</span>
-      <button type="button" class="button-secondary match-hero-reward-close-btn" data-role="close-match-hero-reward">收起</button>
-    </div>
-    <div class="player-double-options player-double-options-open match-hero-reward-options" data-role="match-hero-reward-options"></div>
-    <div class="match-hero-reward-applied" data-role="match-hero-reward-applied" hidden></div>
-    <div class="match-hero-reward-actions">
-      <button type="button" data-role="apply-match-hero-reward">确认加分</button>
-    </div>
-    <p class="message match-hero-reward-message" data-role="match-hero-reward-message"></p>
-  `;
-  playerListItem.append(popover);
+  popover.innerHTML = '<div class="match-hero-reward-options" data-role="match-hero-reward-options"></div>';
+  teams.insertAdjacentElement("afterend", popover);
   matchHeroRewardPopover = popover;
   matchHeroRewardOptions = popover.querySelector('[data-role="match-hero-reward-options"]');
-  matchHeroRewardApplied = popover.querySelector('[data-role="match-hero-reward-applied"]');
-  applyMatchHeroRewardBtn = popover.querySelector('[data-role="apply-match-hero-reward"]');
-  matchHeroRewardMessage = popover.querySelector('[data-role="match-hero-reward-message"]');
   trigger.setAttribute("aria-expanded", "true");
   return true;
 }
 
 function renderMatchHeroRewardOptions() {
   if (!matchHeroRewardOptions || !matchHeroRewardState) return;
-  const entries = getDailyBonusHeroEntries(dailyBonusHeroSettings);
-  const usedAssignments = readMatchHeroRewardAssignments()[matchHeroRewardState.matchId] || {};
+  const currentEntries = getDailyBonusHeroEntries(dailyBonusHeroSettings);
+  const activeAssignments = matchHeroRewardState.appliedRewards || [];
   const featureAvailable = Boolean(
     dailyBonusHeroSettings?.enabled
     && matchHeroRewardState.matchDate === dailyBonusHeroSettings.businessDate
     && matchHeroRewardState.matchDate === getBeijingBusinessDateString()
   );
   const isCurrentMatchDay = matchHeroRewardState.matchDate === getBeijingBusinessDateString();
-  if (!isCurrentMatchDay) {
-    matchHeroRewardOptions.innerHTML = '<span class="muted match-hero-reward-history-hint">历史比赛仅可撤销已添加的英雄奖励。</span>';
-    if (applyMatchHeroRewardBtn) applyMatchHeroRewardBtn.disabled = true;
-    return;
-  }
+  const entries = isCurrentMatchDay
+    ? currentEntries
+    : activeAssignments
+      .filter((row) => row.player_id === matchHeroRewardState.playerId && row.hero_name)
+      .map((row) => ({
+        heroName: row.hero_name,
+        displayName: getHeroDisplayName(row.hero_name),
+      }));
   matchHeroRewardOptions.innerHTML = entries.map((entry) => {
-    const isUsed = Boolean(usedAssignments[entry.heroName]);
-    const isUnset = entry.points === null || entry.points <= 0;
-    const isSelected = matchHeroRewardState.selectedHeroName === entry.heroName;
-    const statusLabel = !featureAvailable ? "已关闭" : (isUsed ? "已使用" : (isUnset ? "未设分" : formatSignedScore(entry.points)));
+    const assignment = activeAssignments.find((row) => row.hero_name === entry.heroName) || null;
+    const isOwned = assignment?.player_id === matchHeroRewardState.playerId;
+    const isUsedByOtherPlayer = Boolean(assignment && !isOwned);
+    const isDisabled = matchHeroRewardState.busy
+      || (isCurrentMatchDay ? (!featureAvailable || isUsedByOtherPlayer) : !isOwned);
     return `
       <button
         type="button"
-        class="player-double-option match-hero-reward-option${isSelected ? " player-double-option-active" : ""}"
+        class="match-hero-reward-option${assignment ? " match-hero-reward-option-active" : ""}"
         data-role="match-hero-reward-option"
         data-hero-name="${escapeHtml(entry.heroName)}"
-        data-hero-index="${entry.index}"
-        ${!featureAvailable || isUsed || isUnset || matchHeroRewardState.busy ? "disabled" : ""}
-        title="${escapeHtml(!featureAvailable ? "每日奖励英雄功能当前未开启" : (isUsed ? "这个英雄已在本场比赛使用" : (isUnset ? "管理员尚未设置该英雄的奖励分数" : `${entry.displayName} ${formatSignedScore(entry.points)} 分`)))}"
+        data-adjustment-id="${escapeHtml(isOwned ? assignment?.id || "" : "")}"
+        aria-label="${escapeHtml(isOwned ? `撤销${entry.displayName}英雄奖励` : `选择${entry.displayName}英雄奖励`)}"
+        ${isDisabled ? "disabled" : ""}
       >
-        <span>${escapeHtml(entry.displayName)}</span>
-        <strong>${escapeHtml(statusLabel)}</strong>
+        ${escapeHtml(entry.displayName)}
       </button>
     `;
   }).join("");
-  if (applyMatchHeroRewardBtn) {
-    applyMatchHeroRewardBtn.disabled = matchHeroRewardState.busy || !matchHeroRewardState.selectedHeroName;
-  }
-}
-
-function renderMatchHeroRewardApplied() {
-  if (!matchHeroRewardApplied || !matchHeroRewardState) return;
-  const rows = matchHeroRewardState.appliedRewards || [];
-  matchHeroRewardApplied.hidden = !rows.length;
-  matchHeroRewardApplied.innerHTML = rows.length
-    ? `
-      <span class="match-hero-reward-applied-title">本场已添加</span>
-      <div class="match-hero-reward-applied-list">
-        ${rows.map((row) => {
-          const localAssignment = getLocalMatchHeroRewardAssignmentByAdjustmentId(matchHeroRewardState.matchId, row.id);
-          const heroLabel = localAssignment?.heroName ? getHeroDisplayName(localAssignment.heroName) : "英雄奖励";
-          return `
-            <div class="match-hero-reward-applied-row">
-              <span>${escapeHtml(heroLabel)} <strong>${escapeHtml(formatSignedScore(row.points_delta))}</strong></span>
-              <button type="button" class="button-secondary match-hero-reward-revoke-btn" data-role="revoke-match-hero-reward" data-adjustment-id="${escapeHtml(row.id || "")}" ${matchHeroRewardState.busy ? "disabled" : ""}>撤销</button>
-            </div>
-          `;
-        }).join("")}
-      </div>
-    `
-    : "";
 }
 
 async function loadMatchHeroRewardAdjustments() {
@@ -5996,9 +5885,8 @@ async function loadMatchHeroRewardAdjustments() {
   const expectedPlayerId = matchHeroRewardState.playerId;
   const { data, error } = await db
     .from("hero_reward_adjustments")
-    .select("id, match_id, player_id, points_delta, created_at")
+    .select("id, match_id, player_id, hero_name, reward_date, points_delta, created_at")
     .eq("match_id", expectedMatchId)
-    .eq("player_id", expectedPlayerId)
     .is("revoked_at", null)
     .order("created_at", { ascending: true })
     .limit(100);
@@ -6008,7 +5896,7 @@ async function loadMatchHeroRewardAdjustments() {
     ...row,
     points_delta: Number(row.points_delta ?? 0),
   }));
-  renderMatchHeroRewardApplied();
+  renderMatchHeroRewardOptions();
 }
 
 async function toggleMatchHeroRewardPopover(trigger) {
@@ -6038,32 +5926,39 @@ async function toggleMatchHeroRewardPopover(trigger) {
   matchHeroRewardState = {
     ...context,
     triggerElement: trigger,
-    selectedHeroName: "",
     busy: false,
     appliedRewards: [],
   };
-  if (!trigger?.isConnected || !mountMatchHeroRewardPopover(trigger, context)) {
+  try {
+    await loadMatchHeroRewardAdjustments();
+  } catch (error) {
+    closeMatchHeroRewardPopover();
+    showGlobalToast(buildMatchOperationFailureMessage("本场英雄奖励载入失败", error), true);
+    return;
+  }
+  const isCurrentMatchDay = context.matchDate === getBeijingBusinessDateString();
+  const hasOwnedSelection = matchHeroRewardState.appliedRewards
+    .some((row) => row.player_id === context.playerId && row.hero_name);
+  if (!isCurrentMatchDay && !hasOwnedSelection) {
+    closeMatchHeroRewardPopover();
+    showGlobalToast("这名选手在本场没有英雄奖励记录。", true);
+    return;
+  }
+  if (!trigger?.isConnected || !mountMatchHeroRewardPopover(trigger)) {
     closeMatchHeroRewardPopover();
     showGlobalToast("无法打开英雄奖励选择，请刷新页面后重试。", true);
     return;
   }
-  setMessageNode(matchHeroRewardMessage, "");
   renderMatchHeroRewardOptions();
-  renderMatchHeroRewardApplied();
-  try {
-    await loadMatchHeroRewardAdjustments();
-  } catch (error) {
-    setMessageNode(matchHeroRewardMessage, buildMatchOperationFailureMessage("本场英雄奖励载入失败", error), true);
-  }
 }
 
-async function applySelectedMatchHeroReward() {
+async function applyMatchHeroRewardSelection(heroName) {
   if (!ensureScorerAccess("仅记分员或管理员可添加英雄奖励。") || !matchHeroRewardState) return;
   const state = { ...matchHeroRewardState };
   const entry = getDailyBonusHeroEntries(dailyBonusHeroSettings)
-    .find((candidate) => candidate.heroName === state.selectedHeroName) || null;
-  if (!entry || entry.points === null || entry.points <= 0) {
-    setMessageNode(matchHeroRewardMessage, "请选择已设置分数的英雄。", true);
+    .find((candidate) => candidate.heroName === heroName) || null;
+  if (!entry) {
+    showGlobalToast("未找到这个每日奖励英雄，请刷新页面后重试。", true);
     return;
   }
   if (
@@ -6071,36 +5966,33 @@ async function applySelectedMatchHeroReward() {
     || state.matchDate !== dailyBonusHeroSettings.businessDate
     || state.matchDate !== getBeijingBusinessDateString()
   ) {
-    setMessageNode(matchHeroRewardMessage, "英雄奖励只可添加到当前凌晨 2 点刷新后的比赛日。", true);
+    showGlobalToast("英雄奖励只可添加到当前凌晨 2 点刷新后的比赛日。", true);
     return;
   }
-  if (readMatchHeroRewardAssignments()[state.matchId]?.[entry.heroName]) {
-    setMessageNode(matchHeroRewardMessage, "这个英雄已经在本场比赛使用。", true);
-    renderMatchHeroRewardOptions();
+  if ((state.appliedRewards || []).some((row) => row.hero_name === entry.heroName)) {
+    showGlobalToast("这个英雄已经在本场比赛使用。", true);
     return;
   }
 
   matchHeroRewardState.busy = true;
   renderMatchHeroRewardOptions();
-  setMessageNode(matchHeroRewardMessage, `正在为 ${state.playerName} 添加英雄奖励...`);
   try {
-    const { data, error } = await db.rpc("apply_hero_reward_score", {
+    const { error } = await db.rpc("apply_hero_reward_score", {
       p_season_id: state.seasonId,
       p_player_id: state.playerId,
       p_match_id: state.matchId,
       p_hero_index: entry.index + 1,
+      p_hero_name: entry.heroName,
     });
     if (error) throw error;
-    rememberMatchHeroRewardAssignment(state.matchId, entry.heroName, {
-      playerId: state.playerId,
-      adjustmentId: data,
-    });
     scoreDetailSeasonCache.clear();
-    showGlobalToast(`${state.playerName} 获得 ${entry.displayName} ${formatSignedScore(entry.points)} 分`);
-    appendAdminActionLog(`为 ${state.playerName} 添加英雄奖励 ${formatSignedScore(entry.points)} 分，挂在 ${state.matchDate} 第 ${state.matchNo || "?"} 场。`);
+    const awardedPoints = Number(entry.points ?? 0);
+    showGlobalToast(awardedPoints > 0
+      ? `${state.playerName} 获得 ${entry.displayName} ${formatSignedScore(awardedPoints)} 分`
+      : `${state.playerName} 已选择 ${entry.displayName}，奖励分数待设置`);
+    appendAdminActionLog(`为 ${state.playerName} 选择了 ${entry.displayName} 英雄奖励，挂在 ${state.matchDate} 第 ${state.matchNo || "?"} 场，当前计分 ${formatSignedScore(awardedPoints)}。`);
     if (matchHeroRewardState?.matchId === state.matchId && matchHeroRewardState?.playerId === state.playerId) {
       matchHeroRewardState.busy = false;
-      matchHeroRewardState.selectedHeroName = "";
       await loadMatchHeroRewardAdjustments();
       renderMatchHeroRewardOptions();
     }
@@ -6110,7 +6002,7 @@ async function applySelectedMatchHeroReward() {
       matchHeroRewardState.busy = false;
       renderMatchHeroRewardOptions();
     }
-    setMessageNode(matchHeroRewardMessage, buildMatchOperationFailureMessage("添加英雄奖励失败", error), true);
+    showGlobalToast(buildMatchOperationFailureMessage("添加英雄奖励失败", error), true);
   }
 }
 
@@ -6120,8 +6012,9 @@ async function revokeMatchHeroReward(adjustmentId) {
   const normalizedId = String(adjustmentId || "").trim();
   const reward = (state.appliedRewards || []).find((row) => row.id === normalizedId);
   if (!reward) return;
+  const heroLabel = reward.hero_name ? getHeroDisplayName(reward.hero_name) : "英雄奖励";
   const confirmed = await confirmAction(
-    `确认撤销 ${state.playerName} 在本场的英雄奖励 ${formatSignedScore(reward.points_delta)} 分吗？`,
+    `确认撤销 ${state.playerName} 在本场选择的 ${heroLabel} 吗？`,
     { title: "撤销英雄奖励", confirmLabel: "撤销", danger: true }
   );
   if (
@@ -6133,17 +6026,15 @@ async function revokeMatchHeroReward(adjustmentId) {
 
   matchHeroRewardState.busy = true;
   renderMatchHeroRewardOptions();
-  renderMatchHeroRewardApplied();
   try {
     const { error } = await db.rpc("revoke_hero_reward_score", {
       p_adjustment_id: normalizedId,
       p_reason: `${getCurrentAccessActorLabel()} 从比赛卡片撤销英雄奖励`,
     });
     if (error) throw error;
-    forgetMatchHeroRewardAssignmentByAdjustmentId(normalizedId);
     scoreDetailSeasonCache.clear();
-    showGlobalToast(`已撤销 ${state.playerName} 的英雄奖励`);
-    appendAdminActionLog(`撤销了 ${state.playerName} 在 ${state.matchDate} 第 ${state.matchNo || "?"} 场的英雄奖励 ${formatSignedScore(reward.points_delta)} 分。`);
+    showGlobalToast(`已撤销 ${state.playerName} 选择的 ${heroLabel}`);
+    appendAdminActionLog(`撤销了 ${state.playerName} 在 ${state.matchDate} 第 ${state.matchNo || "?"} 场选择的 ${heroLabel}，撤销时计分 ${formatSignedScore(reward.points_delta)}。`);
     if (matchHeroRewardState?.matchId === state.matchId && matchHeroRewardState?.playerId === state.playerId) {
       matchHeroRewardState.busy = false;
       await loadMatchHeroRewardAdjustments();
@@ -6154,9 +6045,8 @@ async function revokeMatchHeroReward(adjustmentId) {
     if (matchHeroRewardState) {
       matchHeroRewardState.busy = false;
       renderMatchHeroRewardOptions();
-      renderMatchHeroRewardApplied();
     }
-    setMessageNode(matchHeroRewardMessage, buildMatchOperationFailureMessage("撤销英雄奖励失败", error), true);
+    showGlobalToast(buildMatchOperationFailureMessage("撤销英雄奖励失败", error), true);
   }
 }
 
@@ -22353,38 +22243,15 @@ signupPlayerGrid.addEventListener("click", async (event) => {
 });
 
 recentMatchesList.addEventListener("click", async (event) => {
-  const closeHeroRewardButton = event.target.closest('[data-role="close-match-hero-reward"]');
-  if (closeHeroRewardButton) {
-    event.preventDefault();
-    event.stopPropagation();
-    closeMatchHeroRewardPopover({ restoreFocus: true });
-    return;
-  }
-
   const heroRewardOption = event.target.closest('[data-role="match-hero-reward-option"]');
   if (heroRewardOption) {
     event.preventDefault();
     event.stopPropagation();
     if (heroRewardOption.disabled || !matchHeroRewardState || matchHeroRewardState.busy) return;
-    matchHeroRewardState.selectedHeroName = heroRewardOption.dataset.heroName || "";
-    renderMatchHeroRewardOptions();
-    return;
-  }
-
-  const applyHeroRewardButton = event.target.closest('[data-role="apply-match-hero-reward"]');
-  if (applyHeroRewardButton) {
-    event.preventDefault();
-    event.stopPropagation();
-    if (!applyHeroRewardButton.disabled) await applySelectedMatchHeroReward();
-    return;
-  }
-
-  const revokeHeroRewardButton = event.target.closest('[data-role="revoke-match-hero-reward"]');
-  if (revokeHeroRewardButton) {
-    event.preventDefault();
-    event.stopPropagation();
-    if (!revokeHeroRewardButton.disabled) {
-      await revokeMatchHeroReward(revokeHeroRewardButton.dataset.adjustmentId || "");
+    if (heroRewardOption.dataset.adjustmentId) {
+      await revokeMatchHeroReward(heroRewardOption.dataset.adjustmentId);
+    } else {
+      await applyMatchHeroRewardSelection(heroRewardOption.dataset.heroName || "");
     }
     return;
   }
@@ -23158,6 +23025,13 @@ document.addEventListener("keydown", (event) => {
 
 document.addEventListener("click", (event) => {
   const clickTarget = event.target instanceof Element ? event.target : null;
+  if (
+    matchHeroRewardPopover
+    && !clickTarget?.closest('[data-role="match-hero-reward-popover"]')
+    && !clickTarget?.closest('[data-role="match-hero-reward"]')
+  ) {
+    closeMatchHeroRewardPopover();
+  }
   if (!clickTarget?.closest(".leaderboard-score-wrap")) {
     clearLeaderboardScoreCompositionState({ clearFocus: false });
   }

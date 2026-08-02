@@ -10200,128 +10200,52 @@ button.daily-bonus-close-btn.button-secondary {
 
 .match-hero-reward-popover {
   display: grid;
+  width: 100%;
   min-width: 0;
-  gap: 7px;
-  margin-top: 6px;
-  padding: 8px;
-  border: 1px solid rgba(124, 165, 209, 0.16);
-  border-radius: 10px;
-  background: rgba(10, 25, 43, 0.76);
-}
-
-.match-hero-reward-popover-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-  color: var(--text-dim);
-  font-size: 11px;
-}
-
-.match-hero-reward-popover-head strong {
-  color: var(--text);
-}
-
-.match-hero-reward-popover-head > span {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.match-hero-reward-close-btn {
-  min-height: 24px;
-  padding: 3px 7px;
-  border-radius: 7px;
-  font-size: 11px;
+  margin-top: 9px;
+  padding-top: 8px;
+  border-top: 1px solid rgba(124, 165, 209, 0.16);
 }
 
 .match-hero-reward-options {
-  gap: 6px;
+  display: grid;
+  width: 100%;
+  gap: 4px;
 }
 
 .match-hero-reward-option {
-  display: inline-flex;
+  display: flex;
   align-items: center;
-  gap: 6px;
+  justify-content: flex-start;
+  width: 100%;
+  min-height: 30px;
+  padding: 5px 9px;
+  border: 1px solid rgba(124, 165, 209, 0.16);
+  border-radius: 7px;
+  background: rgba(14, 31, 54, 0.62);
+  color: var(--text);
+  box-shadow: none;
+  font-size: 12px;
+  text-align: left;
 }
 
-.match-hero-reward-option strong {
-  color: #8fe0d8;
-  font-variant-numeric: tabular-nums;
+.match-hero-reward-option:hover:not(:disabled),
+.match-hero-reward-option:focus-visible {
+  border-color: rgba(240, 195, 106, 0.32);
+  background: rgba(104, 73, 27, 0.28);
+  box-shadow: none;
+  transform: none;
+}
+
+.match-hero-reward-option-active {
+  border-color: rgba(240, 195, 106, 0.4);
+  background: rgba(104, 73, 27, 0.42);
+  color: #fff1c8;
 }
 
 .match-hero-reward-option:disabled {
   cursor: not-allowed;
   opacity: 0.46;
-}
-
-.match-hero-reward-applied {
-  display: grid;
-  gap: 6px;
-  padding-top: 7px;
-  border-top: 1px solid rgba(244, 244, 245, 0.1);
-}
-
-.match-hero-reward-applied-title {
-  color: rgba(218, 226, 236, 0.72);
-  font-size: 11px;
-  font-weight: 700;
-}
-
-.match-hero-reward-applied-list {
-  display: grid;
-  gap: 5px;
-}
-
-.match-hero-reward-applied-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-  padding: 6px 8px;
-  border: 1px solid rgba(99, 213, 208, 0.14);
-  border-radius: 8px;
-  background: rgba(20, 44, 58, 0.32);
-  color: #eef4f8;
-  font-size: 12px;
-}
-
-.match-hero-reward-applied-row > span {
-  min-width: 0;
-  overflow-wrap: anywhere;
-}
-
-.match-hero-reward-applied-row strong {
-  color: #8fe0d8;
-}
-
-.match-hero-reward-revoke-btn {
-  min-height: 26px;
-  padding: 4px 8px;
-  border-radius: 7px;
-  font-size: 11px;
-}
-
-.match-hero-reward-actions {
-  display: flex;
-  justify-content: flex-end;
-}
-
-.match-hero-reward-actions button {
-  min-height: 28px;
-  padding: 4px 9px;
-  border-radius: 7px;
-  font-size: 11px;
-}
-
-.match-hero-reward-message {
-  margin: 0;
-  font-size: 11px;
-}
-
-.match-hero-reward-message:empty {
-  display: none;
 }
 
 @media (max-width: 760px) {
