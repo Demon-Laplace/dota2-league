@@ -5862,6 +5862,20 @@ button:disabled {
   color: #bfd6ec;
 }
 
+button.match-player-score-delta-action {
+  min-height: 0;
+  cursor: pointer;
+  font: inherit;
+  transition: border-color 0.16s ease, box-shadow 0.16s ease, transform 0.16s ease;
+}
+
+button.match-player-score-delta-action:hover,
+button.match-player-score-delta-action:focus-visible {
+  border-color: rgba(143, 224, 216, 0.64);
+  box-shadow: 0 0 0 2px rgba(99, 213, 208, 0.12);
+  transform: translateY(-1px);
+}
+
 .match-effect-logs {
   display: grid;
   gap: 6px;
@@ -9939,6 +9953,26 @@ button.score-detail-summary-filter-active:focus-visible {
   line-height: 1.2;
 }
 
+button.daily-bonus-hero-chip-action {
+  appearance: none;
+  cursor: pointer;
+  font: inherit;
+  text-align: left;
+  transition: border-color 0.16s ease, background-color 0.16s ease, transform 0.16s ease;
+}
+
+button.daily-bonus-hero-chip-action:hover:not(:disabled),
+button.daily-bonus-hero-chip-action:focus-visible:not(:disabled) {
+  border-color: rgba(143, 224, 216, 0.52);
+  background: rgba(23, 67, 77, 0.68);
+  transform: translateY(-1px);
+}
+
+button.daily-bonus-hero-chip-action:disabled {
+  cursor: wait;
+  opacity: 0.62;
+}
+
 .daily-bonus-hero-points {
   color: #8fe0d8;
   font-variant-numeric: tabular-nums;
@@ -9987,7 +10021,6 @@ button.daily-bonus-close-btn.button-secondary {
 }
 
 .daily-bonus-heroes-management,
-.daily-bonus-points-block,
 .daily-bonus-preview-block,
 .daily-bonus-field {
   display: grid;
@@ -10119,7 +10152,6 @@ button.daily-bonus-close-btn.button-secondary {
 }
 
 .daily-bonus-count-field input,
-.daily-bonus-point-field input,
 .daily-bonus-seed-block input {
   min-height: 32px;
   padding: 5px 8px;
@@ -10131,27 +10163,6 @@ button.daily-bonus-close-btn.button-secondary {
   justify-content: space-between;
   flex-wrap: wrap;
   gap: 6px 12px;
-}
-
-.daily-bonus-points-inputs {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(104px, 1fr));
-  gap: 6px;
-}
-
-.daily-bonus-point-field {
-  display: grid;
-  gap: 3px;
-}
-
-.daily-bonus-point-field span {
-  color: rgba(218, 226, 236, 0.68);
-  font-size: 11px;
-}
-
-.daily-bonus-point-field input {
-  width: 100%;
-  min-width: 0;
 }
 
 .daily-bonus-seed-block,
@@ -10192,6 +10203,111 @@ button.daily-bonus-close-btn.button-secondary {
   display: none;
 }
 
+.match-hero-reward-dialog {
+  width: min(520px, calc(100vw - 28px));
+  max-height: min(82vh, 620px);
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto auto auto;
+  gap: 12px;
+  padding: 16px;
+  overflow: hidden;
+}
+
+.match-hero-reward-dialog .section-head {
+  align-items: flex-start;
+  margin: 0;
+}
+
+.match-hero-reward-dialog .section-head h2,
+.match-hero-reward-dialog .section-head p {
+  margin: 0;
+}
+
+.match-hero-reward-dialog .section-head p {
+  margin-top: 4px;
+  font-size: 11px;
+}
+
+.match-hero-reward-options {
+  align-content: start;
+  max-height: none;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 2px;
+}
+
+.match-hero-reward-option {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.match-hero-reward-option strong {
+  color: #8fe0d8;
+  font-variant-numeric: tabular-nums;
+}
+
+.match-hero-reward-option:disabled {
+  cursor: not-allowed;
+  opacity: 0.46;
+}
+
+.match-hero-reward-applied {
+  display: grid;
+  gap: 6px;
+  padding-top: 9px;
+  border-top: 1px solid rgba(244, 244, 245, 0.1);
+}
+
+.match-hero-reward-applied-title {
+  color: rgba(218, 226, 236, 0.72);
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.match-hero-reward-applied-list {
+  display: grid;
+  gap: 5px;
+  max-height: 120px;
+  overflow-y: auto;
+}
+
+.match-hero-reward-applied-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 6px 8px;
+  border: 1px solid rgba(99, 213, 208, 0.14);
+  border-radius: 8px;
+  background: rgba(20, 44, 58, 0.32);
+  color: #eef4f8;
+  font-size: 12px;
+}
+
+.match-hero-reward-applied-row strong {
+  color: #8fe0d8;
+}
+
+.match-hero-reward-revoke-btn {
+  min-height: 26px;
+  padding: 4px 8px;
+  border-radius: 7px;
+  font-size: 11px;
+}
+
+.match-hero-reward-actions {
+  justify-content: flex-end;
+}
+
+#matchHeroRewardMessage {
+  margin: 0;
+}
+
+#matchHeroRewardMessage:empty {
+  display: none;
+}
+
 @media (max-width: 760px) {
   .recent-matches-head-actions {
     width: 100%;
@@ -10208,9 +10324,6 @@ button.daily-bonus-close-btn.button-secondary {
     max-height: min(88vh, 860px);
   }
 
-  .daily-bonus-points-inputs {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
 }
 
 @media (max-width: 560px) {
@@ -10231,6 +10344,12 @@ button.daily-bonus-close-btn.button-secondary {
 
   .daily-bonus-seed-actions button {
     width: 100%;
+  }
+
+  .match-hero-reward-dialog {
+    width: calc(100vw - 20px);
+    max-height: 88vh;
+    padding: 14px;
   }
 }
 

@@ -711,6 +711,7 @@ const HARDCORE_TAG_QUANTILE = 0.35;
 const HARDCORE_TAG_SHOW_THRESHOLD = 0.35;
 const LEADERBOARD_COMPACT_STORAGE_KEY = "nd_dota_leaderboard_compact_v1";
 const RECENT_MATCH_SEASON_OPEN_STORAGE_KEY = "nd_dota_recent_match_seasons_open_v1";
+const MATCH_HERO_REWARD_ASSIGNMENTS_STORAGE_KEY = "nd_dota_match_hero_reward_assignments_v1";
 const SEASON_PLAYER_POWER_CACHE_STORAGE_KEY = "nd_dota_season_player_power_cache_v1";
 const HOME_LEADERBOARD_CACHE_STORAGE_KEY = "nd_dota_home_leaderboard_cache_v1";
 const HOME_PLAYER_DIRECTORY_CACHE_STORAGE_KEY = "nd_dota_home_player_directory_cache_v1";
@@ -847,6 +848,14 @@ function getLatestSchemaMigrationHint(error) {
     || message.includes("admin_delete_player_permanently")
   ) {
     return "请先在 Supabase 执行最新 SQL，至少应用 20260603120000_player_visibility_management.sql。";
+  }
+  if (
+    message.includes("hero_reward_adjustments")
+    || message.includes("apply_hero_reward_score")
+    || message.includes("revoke_hero_reward_score")
+    || message.includes("set_daily_bonus_hero_reward_point")
+  ) {
+    return "请先应用最新数据库迁移 20260802200000_match_day_hero_rewards.sql。";
   }
   if (message.includes("manual_score_adjustments") || message.includes("revoke_manual_score_adjustment")) {
     return "请先在 Supabase 执行最新 SQL，至少应用已修改过的 20260501000000_core_schema.sql 和 20260509110000_manual_score_anchor_to_match_day_tail.sql。";
@@ -1160,13 +1169,20 @@ const dailyBonusHeroesBackdrop = document.getElementById("dailyBonusHeroesBackdr
 const closeDailyBonusHeroesBtn = document.getElementById("closeDailyBonusHeroesBtn");
 const dailyBonusHeroesEnabledInput = document.getElementById("dailyBonusHeroesEnabledInput");
 const dailyBonusHeroesCountInput = document.getElementById("dailyBonusHeroesCountInput");
-const dailyBonusHeroesPointsInputs = document.getElementById("dailyBonusHeroesPointsInputs");
 const saveDailyBonusHeroesBtn = document.getElementById("saveDailyBonusHeroesBtn");
 const dailyBonusHeroesSeedInput = document.getElementById("dailyBonusHeroesSeedInput");
 const applyDailyBonusHeroesSeedBtn = document.getElementById("applyDailyBonusHeroesSeedBtn");
 const randomizeDailyBonusHeroesBtn = document.getElementById("randomizeDailyBonusHeroesBtn");
 const dailyBonusHeroesPreview = document.getElementById("dailyBonusHeroesPreview");
 const dailyBonusHeroesMessage = document.getElementById("dailyBonusHeroesMessage");
+const matchHeroRewardModal = document.getElementById("matchHeroRewardModal");
+const matchHeroRewardBackdrop = document.getElementById("matchHeroRewardBackdrop");
+const closeMatchHeroRewardBtn = document.getElementById("closeMatchHeroRewardBtn");
+const matchHeroRewardSubtitle = document.getElementById("matchHeroRewardSubtitle");
+const matchHeroRewardOptions = document.getElementById("matchHeroRewardOptions");
+const matchHeroRewardApplied = document.getElementById("matchHeroRewardApplied");
+const applyMatchHeroRewardBtn = document.getElementById("applyMatchHeroRewardBtn");
+const matchHeroRewardMessage = document.getElementById("matchHeroRewardMessage");
 const adminRecalculateScoresBtn = document.getElementById("adminRecalculateScoresBtn");
 const adminClearScorerRememberBtn = document.getElementById("adminClearScorerRememberBtn");
 const adminSeasonInitialScoreInput = document.getElementById("adminSeasonInitialScoreInput");
@@ -1403,6 +1419,8 @@ let adminManualScoreSelectedIds = new Set();
 let manualScoreHistoryEntries = [];
 let manualScoreHistoryStatus = "idle";
 let manualScoreTotalsByPlayerId = new Map();
+let heroRewardTotalsByPlayerId = new Map();
+let matchHeroRewardState = null;
 let leaderboardPlayers = [];
 let leaderboardDisplaySeasonName = "";
 let leaderboardDisplaySeasonId = null;
@@ -3944,7 +3962,7 @@ async function loadPrizeDistributionLeaderboardRows(seasonId) {
   }
   await loadParticipationPointsTable(seasonId);
 
-  const [leaderboardResult, manualTotalsResult, bonusTotalsResult] = await Promise.allSettled([
+  const [leaderboardResult, manualTotalsResult, heroRewardTotalsResult, bonusTotalsResult] = await Promise.allSettled([
     db
       .from("v_leaderboard")
       .select("season_id, player_id, display_name, matches_played, wins, losses, win_rate, score_total")
@@ -3954,6 +3972,7 @@ async function loadPrizeDistributionLeaderboardRows(seasonId) {
       .order("matches_played", { ascending: false })
       .order("display_name", { ascending: true }),
     loadManualScoreTotalsBySeason(seasonId),
+    loadHeroRewardTotalsBySeason(seasonId),
     loadBonusScoreTotalsBySeason(seasonId),
   ]);
 
@@ -3969,6 +3988,12 @@ async function loadPrizeDistributionLeaderboardRows(seasonId) {
     : new Map();
   if (manualTotalsResult.status !== "fulfilled") {
     console.error("加载人工积分汇总失败：", manualTotalsResult.reason);
+  }
+  const heroRewardTotals = heroRewardTotalsResult.status === "fulfilled"
+    ? heroRewardTotalsResult.value
+    : new Map();
+  if (heroRewardTotalsResult.status !== "fulfilled") {
+    console.error("加载英雄奖励汇总失败：", heroRewardTotalsResult.reason);
   }
 
   const bonusTotals = bonusTotalsResult.status === "fulfilled"
@@ -3998,6 +4023,7 @@ async function loadPrizeDistributionLeaderboardRows(seasonId) {
       bonus_score: bonusScore,
       win_rate: gamesPlayed ? Number(((wins / gamesPlayed) * 100).toFixed(2)) : 0,
       manual_score: Number(manualTotals.get(playerId) ?? 0),
+      hero_reward_score: Number(heroRewardTotals.get(playerId) ?? 0),
       reward_points: 0,
       reward_minimum: SEASON_BASE_SPONSOR_AMOUNT,
       reward_extra_points: 0,
@@ -5065,6 +5091,7 @@ function applyParticipationPointsToLeaderboardPlayers(players = [], seasonId = l
     const participationScore = getParticipationPointsForMatches(gamesPlayed, seasonId);
     const playerId = player.player_id || player.id || "";
     const manualScore = Number(player.manual_score ?? manualScoreTotalsByPlayerId.get(playerId) ?? 0);
+    const heroRewardScore = Number(player.hero_reward_score ?? heroRewardTotalsByPlayerId.get(playerId) ?? 0);
     return {
       ...player,
       win_loss_score: resultScore,
@@ -5072,7 +5099,8 @@ function applyParticipationPointsToLeaderboardPlayers(players = [], seasonId = l
       bonus_score: bonusScore,
       participation_score: participationScore,
       manual_score: manualScore,
-      score: resultScore + bonusScore + participationScore + manualScore,
+      hero_reward_score: heroRewardScore,
+      score: resultScore + bonusScore + participationScore + manualScore + heroRewardScore,
     };
   });
 }
@@ -5089,6 +5117,25 @@ async function loadManualScoreTotalsBySeason(seasonId) {
   if (error) {
     throw error;
   }
+  const totals = new Map();
+  (data || []).forEach((row) => {
+    const playerId = String(row?.player_id || "").trim();
+    if (!playerId) return;
+    totals.set(playerId, Number(totals.get(playerId) ?? 0) + Number(row?.points_delta ?? 0));
+  });
+  return totals;
+}
+
+async function loadHeroRewardTotalsBySeason(seasonId) {
+  if (!seasonId) return new Map();
+  const { data, error } = await db
+    .from("hero_reward_adjustments")
+    .select("player_id, points_delta")
+    .eq("season_id", seasonId)
+    .is("revoked_at", null)
+    .limit(5000);
+
+  if (error) throw error;
   const totals = new Map();
   (data || []).forEach((row) => {
     const playerId = String(row?.player_id || "").trim();
@@ -5251,16 +5298,18 @@ function buildLeaderboardScoreTooltip(player) {
   const bonusScore = Number(player.bonus_score ?? 0);
   const participationScore = Number(player.participation_score ?? 0);
   const manualScore = Number(player.manual_score ?? 0);
-  const totalScore = Number(player.score ?? (resultScore + bonusScore + participationScore + manualScore));
+  const heroRewardScore = Number(player.hero_reward_score ?? 0);
+  const totalScore = Number(player.score ?? (resultScore + bonusScore + participationScore + manualScore + heroRewardScore));
 
   return {
-    text: `胜负积分 ${formatScore(resultScore)}，加成积分 ${formatScore(bonusScore)}，场次积分 ${formatScore(participationScore)}，人工积分 ${formatScore(manualScore)}，总积分 ${formatScore(totalScore)}`,
+    text: `胜负积分 ${formatScore(resultScore)}，加成积分 ${formatScore(bonusScore)}，场次积分 ${formatScore(participationScore)}，人工积分 ${formatScore(manualScore)}，英雄奖励 ${formatScore(heroRewardScore)}，总积分 ${formatScore(totalScore)}`,
     html: [
       `<span class="leaderboard-hovercard-title">积分构成</span>`,
       `<span class="leaderboard-hovercard-row"><span class="leaderboard-hovercard-row-label">胜负积分</span><strong class="leaderboard-hovercard-row-value">${escapeHtml(formatScore(resultScore))}</strong></span>`,
       `<span class="leaderboard-hovercard-row"><span class="leaderboard-hovercard-row-label">加成积分</span><strong class="leaderboard-hovercard-row-value">${escapeHtml(formatScore(bonusScore))}</strong></span>`,
       `<span class="leaderboard-hovercard-row"><span class="leaderboard-hovercard-row-label">场次积分</span><strong class="leaderboard-hovercard-row-value">${escapeHtml(formatScore(participationScore))}</strong></span>`,
       `<span class="leaderboard-hovercard-row"><span class="leaderboard-hovercard-row-label">人工积分</span><strong class="leaderboard-hovercard-row-value">${escapeHtml(formatScore(manualScore))}</strong></span>`,
+      `<span class="leaderboard-hovercard-row"><span class="leaderboard-hovercard-row-label">英雄奖励</span><strong class="leaderboard-hovercard-row-value">${escapeHtml(formatScore(heroRewardScore))}</strong></span>`,
       `<span class="leaderboard-hovercard-row leaderboard-hovercard-row-total"><span class="leaderboard-hovercard-row-label">总积分</span><strong class="leaderboard-hovercard-row-value">${escapeHtml(formatScore(totalScore))}</strong></span>`,
     ].join(""),
   };
@@ -5472,8 +5521,10 @@ function normalizeDailyBonusHeroSettings(rawSettings = {}) {
   );
   const rawPoints = Array.isArray(rawSettings?.rewardPoints) ? rawSettings.rewardPoints : [];
   const rewardPoints = Array.from({ length: heroCount }, (_unused, index) => {
-    const value = Number(rawPoints[index] ?? 1);
-    return Number.isFinite(value) ? value : 1;
+    const rawValue = rawPoints[index];
+    if (rawValue === null || rawValue === undefined || String(rawValue).trim() === "") return null;
+    const value = Number(rawValue);
+    return Number.isFinite(value) && value > 0 && value <= 10000 ? value : null;
   });
   const hasSeed = rawSettings?.seed !== null
     && rawSettings?.seed !== undefined
@@ -5484,6 +5535,7 @@ function normalizeDailyBonusHeroSettings(rawSettings = {}) {
     enabled: Boolean(rawSettings?.enabled),
     heroCount,
     rewardPoints,
+    rewardPointsDate: String(rawSettings?.rewardPointsDate || ""),
     businessDate: String(rawSettings?.businessDate || getBeijingBusinessDateString()),
     seed: Number.isInteger(seedValue) && seedValue >= 0 && seedValue <= 4294967295
       ? seedValue
@@ -5512,19 +5564,32 @@ function getDailyBonusHeroEntries(settings = dailyBonusHeroSettings) {
     [shuffledHeroes[index], shuffledHeroes[swapIndex]] = [shuffledHeroes[swapIndex], shuffledHeroes[index]];
   }
   return shuffledHeroes.slice(0, normalized.heroCount).map((heroName, index) => ({
+    index,
     heroName,
     displayName: getHeroDisplayName(heroName),
-    points: normalized.rewardPoints[index] ?? 1,
+    points: normalized.rewardPoints[index] ?? null,
   }));
 }
 
-function buildDailyBonusHeroChipsHtml(settings = dailyBonusHeroSettings) {
-  return getDailyBonusHeroEntries(settings).map((entry) => `
-    <span class="daily-bonus-hero-chip" title="${escapeHtml(entry.heroName)}">
+function buildDailyBonusHeroChipsHtml(settings = dailyBonusHeroSettings, { interactive = false } = {}) {
+  return getDailyBonusHeroEntries(settings).map((entry) => {
+    const tagName = interactive ? "button" : "span";
+    const actionAttributes = interactive
+      ? `type="button" data-role="set-daily-hero-points" data-hero-index="${entry.index}"${dailyBonusHeroMutationPending ? " disabled" : ""}`
+      : "";
+    const pointsHtml = entry.points === null
+      ? ""
+      : `<strong class="daily-bonus-hero-points">${escapeHtml(formatSignedScore(entry.points))}</strong>`;
+    const title = interactive
+      ? `设置${entry.displayName}的英雄奖励分数`
+      : entry.heroName;
+    return `
+    <${tagName} class="daily-bonus-hero-chip${interactive ? " daily-bonus-hero-chip-action" : ""}" ${actionAttributes} title="${escapeHtml(title)}">
       <span>${escapeHtml(entry.displayName)}</span>
-      <strong class="daily-bonus-hero-points">${escapeHtml(formatSignedScore(entry.points))}</strong>
-    </span>
-  `).join("");
+      ${pointsHtml}
+    </${tagName}>
+  `;
+  }).join("");
 }
 
 function renderDailyBonusHeroes() {
@@ -5536,28 +5601,8 @@ function renderDailyBonusHeroes() {
   );
   dailyBonusHeroes.hidden = !shouldShow;
   dailyBonusHeroesList.innerHTML = shouldShow
-    ? buildDailyBonusHeroChipsHtml(dailyBonusHeroSettings)
+    ? buildDailyBonusHeroChipsHtml(dailyBonusHeroSettings, { interactive: isCurrentRoleScorer() })
     : "";
-}
-
-function getDailyBonusHeroPointDraftValues() {
-  if (!dailyBonusHeroesPointsInputs) return [];
-  return [...dailyBonusHeroesPointsInputs.querySelectorAll('input[data-role="daily-bonus-point"]')]
-    .map((input) => Number(input.value));
-}
-
-function renderDailyBonusHeroPointInputs(count, pointValues = []) {
-  if (!dailyBonusHeroesPointsInputs) return;
-  const safeCount = Math.max(1, Math.min(Math.trunc(Number(count)) || 1, DOTA_HEROES.length));
-  dailyBonusHeroesPointsInputs.innerHTML = Array.from({ length: safeCount }, (_unused, index) => {
-    const value = Number(pointValues[index] ?? dailyBonusHeroSettings?.rewardPoints?.[index] ?? 1);
-    return `
-      <label class="daily-bonus-point-field">
-        <span>${escapeHtml(formatCopyText("dailyBonusHeroes.positionLabel", { index: index + 1 }, `第 ${index + 1} 个英雄`))}</span>
-        <input data-role="daily-bonus-point" data-index="${index}" type="number" step="0.5" min="-10000" max="10000" inputmode="decimal" value="${escapeHtml(formatScore(Number.isFinite(value) ? value : 1))}" />
-      </label>
-    `;
-  }).join("");
 }
 
 function renderDailyBonusHeroPreview() {
@@ -5580,10 +5625,6 @@ function renderDailyBonusHeroManagement() {
       ? ""
       : String(dailyBonusHeroSettings.seed);
   }
-  renderDailyBonusHeroPointInputs(
-    dailyBonusHeroSettings.heroCount,
-    dailyBonusHeroSettings.rewardPoints
-  );
   renderDailyBonusHeroPreview();
 }
 
@@ -5599,11 +5640,7 @@ function setDailyBonusHeroManagementBusy(isBusy) {
   ].forEach((element) => {
     if (element) element.disabled = dailyBonusHeroMutationPending || !isCurrentRoleScorer();
   });
-  dailyBonusHeroesPointsInputs
-    ?.querySelectorAll('input[data-role="daily-bonus-point"]')
-    .forEach((input) => {
-      input.disabled = dailyBonusHeroMutationPending || !isCurrentRoleScorer();
-    });
+  renderDailyBonusHeroes();
 }
 
 async function loadDailyBonusHeroSettings() {
@@ -5645,22 +5682,12 @@ async function saveDailyBonusHeroSettings() {
     setMessageNode(dailyBonusHeroesMessage, `每日英雄个数需为 1 至 ${DOTA_HEROES.length}。`, true);
     return;
   }
-  const rewardPoints = getDailyBonusHeroPointDraftValues();
-  if (
-    rewardPoints.length !== heroCount
-    || rewardPoints.some((value) => !Number.isFinite(value) || Math.abs(value) > 10000)
-  ) {
-    setMessageNode(dailyBonusHeroesMessage, "请为每个位置填写 -10000 至 10000 之间的奖励分数。", true);
-    return;
-  }
-
   setDailyBonusHeroManagementBusy(true);
   setMessageNode(dailyBonusHeroesMessage, "正在保存...");
   try {
     const { data, error } = await db.rpc("set_daily_bonus_hero_settings", {
       p_enabled: Boolean(dailyBonusHeroesEnabledInput?.checked),
       p_hero_count: heroCount,
-      p_reward_points: rewardPoints,
     });
     if (error) throw error;
     dailyBonusHeroSettings = normalizeDailyBonusHeroSettings(data || {});
@@ -5670,6 +5697,50 @@ async function saveDailyBonusHeroSettings() {
     showGlobalToast("每日奖励英雄设置已保存");
   } catch (error) {
     setMessageNode(dailyBonusHeroesMessage, `保存失败：${error?.message || "未知错误"}`, true);
+  } finally {
+    setDailyBonusHeroManagementBusy(false);
+  }
+}
+
+async function setDailyBonusHeroRewardPoint(heroIndex) {
+  if (!ensureScorerAccess("仅记分员或管理员可设置英雄奖励分数。")) return;
+  const normalizedIndex = Math.trunc(Number(heroIndex));
+  const entry = getDailyBonusHeroEntries(dailyBonusHeroSettings)[normalizedIndex] || null;
+  if (!entry) {
+    showGlobalToast("未找到这个每日奖励英雄，请刷新页面后重试。", true);
+    return;
+  }
+
+  const result = await openSystemPrompt({
+    title: copyText("dailyBonusHeroes.setRewardTitle", "设置英雄奖励"),
+    message: `${entry.displayName} · ${dailyBonusHeroSettings.businessDate}`,
+    input: true,
+    inputLabel: copyText("dailyBonusHeroes.setRewardInputLabel", "奖励分数"),
+    placeholder: copyText("dailyBonusHeroes.setRewardPlaceholder", "输入 0 至 10000，0 表示取消奖励"),
+    defaultValue: entry.points === null ? "" : formatScore(entry.points),
+    confirmLabel: "保存",
+  });
+  if (!result.confirmed) return;
+
+  const points = Number(String(result.value || "").trim());
+  if (!Number.isFinite(points) || points < 0 || points > 10000) {
+    showGlobalToast("请输入 0 至 10000 之间的奖励分数。", true);
+    return;
+  }
+
+  setDailyBonusHeroManagementBusy(true);
+  try {
+    const { data, error } = await db.rpc("set_daily_bonus_hero_reward_point", {
+      p_hero_index: normalizedIndex + 1,
+      p_points: points,
+    });
+    if (error) throw error;
+    dailyBonusHeroSettings = normalizeDailyBonusHeroSettings(data || {});
+    renderDailyBonusHeroes();
+    renderDailyBonusHeroManagement();
+    showGlobalToast(points === 0 ? `已取消${entry.displayName}的英雄奖励` : `${entry.displayName}已设为 ${formatSignedScore(points)} 分`);
+  } catch (error) {
+    showGlobalToast(buildMatchOperationFailureMessage("设置英雄奖励失败", error), true);
   } finally {
     setDailyBonusHeroManagementBusy(false);
   }
@@ -5705,6 +5776,334 @@ async function rerollDailyBonusHeroes({ automatic = false } = {}) {
     setMessageNode(dailyBonusHeroesMessage, `更换失败：${error?.message || "未知错误"}`, true);
   } finally {
     setDailyBonusHeroManagementBusy(false);
+  }
+}
+
+function readMatchHeroRewardAssignments() {
+  try {
+    const parsed = JSON.parse(window.localStorage.getItem(MATCH_HERO_REWARD_ASSIGNMENTS_STORAGE_KEY) || "{}");
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return {};
+    const currentBusinessDate = getBeijingBusinessDateString();
+    return Object.fromEntries(
+      Object.entries(parsed)
+        .map(([matchId, assignments]) => {
+          if (!assignments || typeof assignments !== "object" || Array.isArray(assignments)) return null;
+          const validAssignments = Object.fromEntries(
+            Object.entries(assignments).filter(([_heroName, assignment]) => (
+              assignment
+              && typeof assignment === "object"
+              && String(assignment.businessDate || "") === currentBusinessDate
+            ))
+          );
+          return Object.keys(validAssignments).length ? [matchId, validAssignments] : null;
+        })
+        .filter(Boolean)
+    );
+  } catch {
+    return {};
+  }
+}
+
+function writeMatchHeroRewardAssignments(assignments = {}) {
+  try {
+    window.localStorage.setItem(MATCH_HERO_REWARD_ASSIGNMENTS_STORAGE_KEY, JSON.stringify(assignments));
+  } catch {
+    // Local hero mutual exclusion is best-effort and must not block an audited score adjustment.
+  }
+}
+
+function rememberMatchHeroRewardAssignment(matchId, heroName, assignment = {}) {
+  const normalizedMatchId = String(matchId || "").trim();
+  const normalizedHeroName = String(heroName || "").trim();
+  if (!normalizedMatchId || !normalizedHeroName) return;
+  const assignments = readMatchHeroRewardAssignments();
+  assignments[normalizedMatchId] = assignments[normalizedMatchId] || {};
+  assignments[normalizedMatchId][normalizedHeroName] = {
+    playerId: String(assignment.playerId || ""),
+    adjustmentId: String(assignment.adjustmentId || ""),
+    businessDate: getBeijingBusinessDateString(),
+    createdAt: new Date().toISOString(),
+  };
+  writeMatchHeroRewardAssignments(assignments);
+}
+
+function forgetMatchHeroRewardAssignmentByAdjustmentId(adjustmentId) {
+  const normalizedId = String(adjustmentId || "").trim();
+  if (!normalizedId) return;
+  const assignments = readMatchHeroRewardAssignments();
+  let changed = false;
+  Object.entries(assignments).forEach(([matchId, heroAssignments]) => {
+    Object.entries(heroAssignments || {}).forEach(([heroName, assignment]) => {
+      if (String(assignment?.adjustmentId || "") !== normalizedId) return;
+      delete assignments[matchId][heroName];
+      changed = true;
+    });
+    if (!Object.keys(assignments[matchId] || {}).length) {
+      delete assignments[matchId];
+    }
+  });
+  if (changed) writeMatchHeroRewardAssignments(assignments);
+}
+
+function getLocalMatchHeroRewardAssignmentByAdjustmentId(matchId, adjustmentId) {
+  const normalizedId = String(adjustmentId || "").trim();
+  const heroAssignments = readMatchHeroRewardAssignments()[String(matchId || "").trim()] || {};
+  const match = Object.entries(heroAssignments)
+    .find(([_heroName, assignment]) => String(assignment?.adjustmentId || "") === normalizedId);
+  return match ? { heroName: match[0], ...match[1] } : null;
+}
+
+function findRecentMatchHeroRewardContext(matchId, playerId) {
+  const normalizedMatchId = String(matchId || "").trim();
+  const normalizedPlayerId = String(playerId || "").trim();
+  for (const group of recentMatchDayGroupsData || []) {
+    for (const match of group?.matches || []) {
+      if (String(match?.match_id || "") !== normalizedMatchId) continue;
+      const player = parseRecentMatchPlayers(match.players)
+        .find((entry) => String(entry?.player_id || "") === normalizedPlayerId);
+      if (!player) return null;
+      return {
+        matchId: normalizedMatchId,
+        matchNo: Number(match.match_no ?? 0),
+        matchDate: String(match.match_date || group.match_date || ""),
+        seasonId: String(match.season_id || group.season_id || ""),
+        playerId: normalizedPlayerId,
+        playerName: stripPlayerNameMeta(player.display_name || "未知选手") || "未知选手",
+      };
+    }
+  }
+  return null;
+}
+
+function canApplyHeroRewardToMatch(match = {}, group = {}) {
+  const seasonId = match?.season_id || group?.season_id || activeSeason?.id || "";
+  return Boolean(
+    isCurrentRoleScorer()
+    && canModifyMatchRecordsForSeason(seasonId)
+    && ["submitted", "approved"].includes(String(match?.status || ""))
+  );
+}
+
+function renderMatchHeroRewardOptions() {
+  if (!matchHeroRewardOptions || !matchHeroRewardState) return;
+  const entries = getDailyBonusHeroEntries(dailyBonusHeroSettings);
+  const usedAssignments = readMatchHeroRewardAssignments()[matchHeroRewardState.matchId] || {};
+  const featureAvailable = Boolean(
+    dailyBonusHeroSettings?.enabled
+    && matchHeroRewardState.matchDate === dailyBonusHeroSettings.businessDate
+    && matchHeroRewardState.matchDate === getBeijingBusinessDateString()
+  );
+  const isCurrentMatchDay = matchHeroRewardState.matchDate === getBeijingBusinessDateString();
+  if (!isCurrentMatchDay) {
+    matchHeroRewardOptions.innerHTML = '<span class="muted match-hero-reward-history-hint">历史比赛仅可撤销已添加的英雄奖励。</span>';
+    if (applyMatchHeroRewardBtn) applyMatchHeroRewardBtn.disabled = true;
+    return;
+  }
+  matchHeroRewardOptions.innerHTML = entries.map((entry) => {
+    const isUsed = Boolean(usedAssignments[entry.heroName]);
+    const isUnset = entry.points === null || entry.points <= 0;
+    const isSelected = matchHeroRewardState.selectedHeroName === entry.heroName;
+    const statusLabel = !featureAvailable ? "已关闭" : (isUsed ? "已使用" : (isUnset ? "未设分" : formatSignedScore(entry.points)));
+    return `
+      <button
+        type="button"
+        class="manual-score-player-chip match-hero-reward-option${isSelected ? " manual-score-player-chip-active" : ""}"
+        data-role="match-hero-reward-option"
+        data-hero-name="${escapeHtml(entry.heroName)}"
+        data-hero-index="${entry.index}"
+        ${!featureAvailable || isUsed || isUnset || matchHeroRewardState.busy ? "disabled" : ""}
+        title="${escapeHtml(!featureAvailable ? "每日奖励英雄功能当前未开启" : (isUsed ? "这个英雄已在本场比赛使用" : (isUnset ? "管理员尚未设置该英雄的奖励分数" : `${entry.displayName} ${formatSignedScore(entry.points)} 分`)))}"
+      >
+        <span>${escapeHtml(entry.displayName)}</span>
+        <strong>${escapeHtml(statusLabel)}</strong>
+      </button>
+    `;
+  }).join("");
+  if (applyMatchHeroRewardBtn) {
+    applyMatchHeroRewardBtn.disabled = matchHeroRewardState.busy || !matchHeroRewardState.selectedHeroName;
+  }
+}
+
+function renderMatchHeroRewardApplied() {
+  if (!matchHeroRewardApplied || !matchHeroRewardState) return;
+  const rows = matchHeroRewardState.appliedRewards || [];
+  matchHeroRewardApplied.hidden = !rows.length;
+  matchHeroRewardApplied.innerHTML = rows.length
+    ? `
+      <span class="match-hero-reward-applied-title">本场已添加</span>
+      <div class="match-hero-reward-applied-list">
+        ${rows.map((row) => {
+          const localAssignment = getLocalMatchHeroRewardAssignmentByAdjustmentId(matchHeroRewardState.matchId, row.id);
+          const heroLabel = localAssignment?.heroName ? getHeroDisplayName(localAssignment.heroName) : "英雄奖励";
+          return `
+            <div class="match-hero-reward-applied-row">
+              <span>${escapeHtml(heroLabel)} <strong>${escapeHtml(formatSignedScore(row.points_delta))}</strong></span>
+              <button type="button" class="button-secondary match-hero-reward-revoke-btn" data-role="revoke-match-hero-reward" data-adjustment-id="${escapeHtml(row.id || "")}" ${matchHeroRewardState.busy ? "disabled" : ""}>撤销</button>
+            </div>
+          `;
+        }).join("")}
+      </div>
+    `
+    : "";
+}
+
+async function loadMatchHeroRewardAdjustments() {
+  if (!matchHeroRewardState?.matchId || !matchHeroRewardState?.playerId) return;
+  const expectedMatchId = matchHeroRewardState.matchId;
+  const expectedPlayerId = matchHeroRewardState.playerId;
+  const { data, error } = await db
+    .from("hero_reward_adjustments")
+    .select("id, match_id, player_id, points_delta, created_at")
+    .eq("match_id", expectedMatchId)
+    .eq("player_id", expectedPlayerId)
+    .is("revoked_at", null)
+    .order("created_at", { ascending: true })
+    .limit(100);
+  if (error) throw error;
+  if (!matchHeroRewardState || matchHeroRewardState.matchId !== expectedMatchId || matchHeroRewardState.playerId !== expectedPlayerId) return;
+  matchHeroRewardState.appliedRewards = (data || []).map((row) => ({
+    ...row,
+    points_delta: Number(row.points_delta ?? 0),
+  }));
+  renderMatchHeroRewardApplied();
+}
+
+async function openMatchHeroRewardModal(matchId, playerId) {
+  if (!ensureScorerAccess("仅记分员或管理员可添加英雄奖励。")) return;
+  try {
+    await loadDailyBonusHeroSettings();
+  } catch (error) {
+    showGlobalToast(`每日奖励英雄载入失败：${getErrorMessage(error)}`, true);
+    return;
+  }
+  const context = findRecentMatchHeroRewardContext(matchId, playerId);
+  if (!context) {
+    showGlobalToast("未找到对应的比赛选手记录，请刷新页面后重试。", true);
+    return;
+  }
+  matchHeroRewardState = {
+    ...context,
+    selectedHeroName: "",
+    busy: false,
+    appliedRewards: [],
+  };
+  if (matchHeroRewardSubtitle) {
+    const matchLabel = context.matchNo > 0 ? `第 ${context.matchNo} 场` : "本场比赛";
+    matchHeroRewardSubtitle.textContent = `${context.playerName} · ${context.matchDate} ${matchLabel}`;
+  }
+  setMessageNode(matchHeroRewardMessage, "");
+  renderMatchHeroRewardOptions();
+  renderMatchHeroRewardApplied();
+  setManagedDialogOpen("matchHeroReward", true, {
+    initialFocus: matchHeroRewardOptions?.querySelector("button:not(:disabled)") || closeMatchHeroRewardBtn || undefined,
+  });
+  try {
+    await loadMatchHeroRewardAdjustments();
+  } catch (error) {
+    setMessageNode(matchHeroRewardMessage, buildMatchOperationFailureMessage("本场英雄奖励载入失败", error), true);
+  }
+}
+
+async function applySelectedMatchHeroReward() {
+  if (!ensureScorerAccess("仅记分员或管理员可添加英雄奖励。") || !matchHeroRewardState) return;
+  const state = { ...matchHeroRewardState };
+  const entry = getDailyBonusHeroEntries(dailyBonusHeroSettings)
+    .find((candidate) => candidate.heroName === state.selectedHeroName) || null;
+  if (!entry || entry.points === null || entry.points <= 0) {
+    setMessageNode(matchHeroRewardMessage, "请选择已设置分数的英雄。", true);
+    return;
+  }
+  if (
+    !dailyBonusHeroSettings?.enabled
+    || state.matchDate !== dailyBonusHeroSettings.businessDate
+    || state.matchDate !== getBeijingBusinessDateString()
+  ) {
+    setMessageNode(matchHeroRewardMessage, "英雄奖励只可添加到当前凌晨 2 点刷新后的比赛日。", true);
+    return;
+  }
+  if (readMatchHeroRewardAssignments()[state.matchId]?.[entry.heroName]) {
+    setMessageNode(matchHeroRewardMessage, "这个英雄已经在本场比赛使用。", true);
+    renderMatchHeroRewardOptions();
+    return;
+  }
+
+  matchHeroRewardState.busy = true;
+  renderMatchHeroRewardOptions();
+  setMessageNode(matchHeroRewardMessage, `正在为 ${state.playerName} 添加英雄奖励...`);
+  try {
+    const { data, error } = await db.rpc("apply_hero_reward_score", {
+      p_season_id: state.seasonId,
+      p_player_id: state.playerId,
+      p_match_id: state.matchId,
+      p_hero_index: entry.index + 1,
+    });
+    if (error) throw error;
+    rememberMatchHeroRewardAssignment(state.matchId, entry.heroName, {
+      playerId: state.playerId,
+      adjustmentId: data,
+    });
+    scoreDetailSeasonCache.clear();
+    showGlobalToast(`${state.playerName} 获得 ${entry.displayName} ${formatSignedScore(entry.points)} 分`);
+    appendAdminActionLog(`为 ${state.playerName} 添加英雄奖励 ${formatSignedScore(entry.points)} 分，挂在 ${state.matchDate} 第 ${state.matchNo || "?"} 场。`);
+    if (matchHeroRewardState?.matchId === state.matchId && matchHeroRewardState?.playerId === state.playerId) {
+      matchHeroRewardState.busy = false;
+      matchHeroRewardState.selectedHeroName = "";
+      await loadMatchHeroRewardAdjustments();
+      renderMatchHeroRewardOptions();
+    }
+    await requestImmediateRefresh({ leaderboard: true, recentMatches: true });
+  } catch (error) {
+    if (matchHeroRewardState?.matchId === state.matchId && matchHeroRewardState?.playerId === state.playerId) {
+      matchHeroRewardState.busy = false;
+      renderMatchHeroRewardOptions();
+    }
+    setMessageNode(matchHeroRewardMessage, buildMatchOperationFailureMessage("添加英雄奖励失败", error), true);
+  }
+}
+
+async function revokeMatchHeroReward(adjustmentId) {
+  if (!ensureScorerAccess("仅记分员或管理员可撤销英雄奖励。") || !matchHeroRewardState) return;
+  const state = { ...matchHeroRewardState };
+  const normalizedId = String(adjustmentId || "").trim();
+  const reward = (state.appliedRewards || []).find((row) => row.id === normalizedId);
+  if (!reward) return;
+  const confirmed = await confirmAction(
+    `确认撤销 ${state.playerName} 在本场的英雄奖励 ${formatSignedScore(reward.points_delta)} 分吗？`,
+    { title: "撤销英雄奖励", confirmLabel: "撤销", danger: true }
+  );
+  if (
+    !confirmed
+    || !matchHeroRewardState
+    || matchHeroRewardState.matchId !== state.matchId
+    || matchHeroRewardState.playerId !== state.playerId
+  ) return;
+
+  matchHeroRewardState.busy = true;
+  renderMatchHeroRewardOptions();
+  renderMatchHeroRewardApplied();
+  try {
+    const { error } = await db.rpc("revoke_hero_reward_score", {
+      p_adjustment_id: normalizedId,
+      p_reason: `${getCurrentAccessActorLabel()} 从比赛卡片撤销英雄奖励`,
+    });
+    if (error) throw error;
+    forgetMatchHeroRewardAssignmentByAdjustmentId(normalizedId);
+    scoreDetailSeasonCache.clear();
+    showGlobalToast(`已撤销 ${state.playerName} 的英雄奖励`);
+    appendAdminActionLog(`撤销了 ${state.playerName} 在 ${state.matchDate} 第 ${state.matchNo || "?"} 场的英雄奖励 ${formatSignedScore(reward.points_delta)} 分。`);
+    if (matchHeroRewardState?.matchId === state.matchId && matchHeroRewardState?.playerId === state.playerId) {
+      matchHeroRewardState.busy = false;
+      await loadMatchHeroRewardAdjustments();
+      renderMatchHeroRewardOptions();
+    }
+    await requestImmediateRefresh({ leaderboard: true, recentMatches: true });
+  } catch (error) {
+    if (matchHeroRewardState) {
+      matchHeroRewardState.busy = false;
+      renderMatchHeroRewardOptions();
+      renderMatchHeroRewardApplied();
+    }
+    setMessageNode(matchHeroRewardMessage, buildMatchOperationFailureMessage("撤销英雄奖励失败", error), true);
   }
 }
 
@@ -5908,6 +6307,7 @@ const managedDialogEntries = [
   { modal: playerRelationModal, close: () => setManagedDialogOpen("playerRelation", false) },
   { modal: adminBackgroundPickerModal, close: () => setManagedDialogOpen("adminBackgroundPicker", false) },
   { modal: dailyBonusHeroesModal, close: () => setManagedDialogOpen("dailyBonusHeroes", false) },
+  { modal: matchHeroRewardModal, close: () => setManagedDialogOpen("matchHeroReward", false) },
 ].filter((entry) => entry.modal);
 
 const seasonRolloverEntries = [...document.querySelectorAll('[data-role="season-rollover-block"]')]
@@ -6009,6 +6409,8 @@ function getManagedDialogModal(key = "") {
       return adminBackgroundPickerModal;
     case "dailyBonusHeroes":
       return dailyBonusHeroesModal;
+    case "matchHeroReward":
+      return matchHeroRewardModal;
     default:
       return null;
   }
@@ -6040,6 +6442,15 @@ function setManagedDialogOpen(key = "", isOpen = false, options = {}) {
     } else if (key === "adminBackgroundPicker") {
       adminPlayerBackgroundSettingsOpen = false;
       renderAdminPlayerBackgroundSettings();
+    } else if (key === "matchHeroReward") {
+      matchHeroRewardState = null;
+      if (matchHeroRewardOptions) matchHeroRewardOptions.innerHTML = "";
+      if (matchHeroRewardApplied) {
+        matchHeroRewardApplied.innerHTML = "";
+        matchHeroRewardApplied.hidden = true;
+      }
+      if (matchHeroRewardSubtitle) matchHeroRewardSubtitle.textContent = "";
+      setMessageNode(matchHeroRewardMessage, "");
     }
   }
 }
@@ -6294,12 +6705,20 @@ async function getScoreDetailSeasonData(seasonId) {
     .is("revoked_at", null)
     .order("created_at", { ascending: true })
     .limit(5000);
+  const heroRewardAdjustmentsQuery = db
+    .from("hero_reward_adjustments")
+    .select("id, season_id, match_id, player_id, points_delta, metadata, created_at")
+    .eq("season_id", seasonId)
+    .is("revoked_at", null)
+    .order("created_at", { ascending: true })
+    .limit(5000);
 
-  const [matchesResult, participantsResult, scoreLedgerResult, manualAdjustmentsResult] = await Promise.all([
+  const [matchesResult, participantsResult, scoreLedgerResult, manualAdjustmentsResult, heroRewardAdjustmentsResult] = await Promise.all([
     matchesQuery,
     participantsQuery,
     scoreLedgerQuery,
     manualAdjustmentsQuery,
+    heroRewardAdjustmentsQuery,
   ]);
 
   if (matchesResult.error) {
@@ -6310,6 +6729,9 @@ async function getScoreDetailSeasonData(seasonId) {
   }
   if (manualAdjustmentsResult.error) {
     throw manualAdjustmentsResult.error;
+  }
+  if (heroRewardAdjustmentsResult.error) {
+    throw heroRewardAdjustmentsResult.error;
   }
 
   const seasonData = {
@@ -6324,11 +6746,21 @@ async function getScoreDetailSeasonData(seasonId) {
       metadata: row.metadata && typeof row.metadata === "object" ? row.metadata : {},
     })),
     matchDays: [],
-    manualAdjustments: (manualAdjustmentsResult.data || []).map((row) => ({
-      ...row,
-      points_delta: Number(row.points_delta ?? 0),
-      metadata: row.metadata && typeof row.metadata === "object" ? row.metadata : {},
-    })),
+    manualAdjustments: [
+      ...(manualAdjustmentsResult.data || []).map((row) => ({
+        ...row,
+        points_delta: Number(row.points_delta ?? 0),
+        metadata: row.metadata && typeof row.metadata === "object" ? row.metadata : {},
+      })),
+      ...(heroRewardAdjustmentsResult.data || []).map((row) => ({
+        ...row,
+        points_delta: Number(row.points_delta ?? 0),
+        metadata: {
+          ...(row.metadata && typeof row.metadata === "object" ? row.metadata : {}),
+          score_category: "hero_reward",
+        },
+      })),
+    ],
     participantIds: new Set(
       participantsResult.error
         ? []
@@ -6351,8 +6783,13 @@ function getManualAdjustmentAnchorMatchNo(entry) {
   return Number.isFinite(value) && value > 0 ? value : null;
 }
 
+function isHeroRewardAdjustment(entry) {
+  return String(entry?.metadata?.score_category || "") === "hero_reward";
+}
+
 function buildManualAdjustmentScoreEntry(adjustment, matchDate, playerName) {
   const delta = Number(adjustment?.points_delta ?? 0);
+  const isHeroReward = isHeroRewardAdjustment(adjustment);
   const anchorMatchNo = getManualAdjustmentAnchorMatchNo(adjustment);
   const note = getManualAdjustmentNoteText(adjustment?.reason, "");
   const matchDateLabel = formatLongDisplayDate(matchDate) || matchDate || "当前比赛日";
@@ -6362,20 +6799,20 @@ function buildManualAdjustmentScoreEntry(adjustment, matchDate, playerName) {
 
   return {
     id: `manual-${adjustment.id || `${matchDate}-${playerName}`}`,
-    kind: "manual_adjustment",
+    kind: isHeroReward ? "hero_reward_adjustment" : "manual_adjustment",
     delta,
-    title: delta >= 0 ? "人工加分" : "人工扣分",
+    title: isHeroReward ? "英雄奖励" : (delta >= 0 ? "人工加分" : "人工扣分"),
     subtitle: anchorLabel,
-    meta: formatLocalTime(adjustment?.created_at) || "人工积分调整",
-    note,
+    meta: formatLocalTime(adjustment?.created_at) || (isHeroReward ? "英雄奖励" : "人工积分调整"),
+    note: isHeroReward ? "" : note,
     badges: [
-      { label: "人工积分", tone: "team" },
+      { label: isHeroReward ? "英雄奖励" : "人工积分", tone: "team" },
       { label: formatSignedScore(delta), tone: delta >= 0 ? "win" : "lose" },
     ],
-    revocable: Boolean(adjustment?.id),
+    revocable: !isHeroReward && Boolean(adjustment?.id),
     adjustmentId: adjustment?.id || "",
     playerName,
-    actionLabel: `${delta >= 0 ? "人工加分" : "人工扣分"} ${formatSignedScore(delta)}`,
+    actionLabel: `${isHeroReward ? "英雄奖励" : (delta >= 0 ? "人工加分" : "人工扣分")} ${formatSignedScore(delta)}`,
   };
 }
 
@@ -6676,7 +7113,8 @@ function buildScoreDetailEntries(player, seasonData) {
   const bonusScore = Number(player.bonus_score ?? 0);
   const participationScore = Number(player.participation_score ?? 0);
   const manualScore = Number(player.manual_score ?? 0);
-  const currentScore = Number(player.score ?? (winLossScore + bonusScore + participationScore + manualScore));
+  const heroRewardScore = Number(player.hero_reward_score ?? 0);
+  const currentScore = Number(player.score ?? (winLossScore + bonusScore + participationScore + manualScore + heroRewardScore));
   const positiveDelta = seasonPositiveDelta + Math.max(participationScore, 0);
   const negativeDelta = seasonNegativeDelta + Math.min(participationScore, 0);
 
@@ -6689,6 +7127,7 @@ function buildScoreDetailEntries(player, seasonData) {
     bonusScore,
     participationScore,
     manualScore,
+    heroRewardScore,
     totalDelta: currentScore - initialScore,
     positiveDelta,
     negativeDelta,
@@ -6711,7 +7150,7 @@ function renderScoreDetailContent(player, detail) {
   const filteredEntries = detail.entries.filter((entry) => {
     const entryKind = String(entry?.kind || "");
     if (isSummaryFilter) {
-      return entryKind === "summary_full_match" || entryKind === "manual_adjustment";
+      return entryKind === "summary_full_match" || entryKind === "manual_adjustment" || entryKind === "hero_reward_adjustment";
     }
     if (isPositiveFilter) {
       if (entryKind === "summary_full_match" || entryKind === "summary_archived_negative") return false;
@@ -6725,10 +7164,10 @@ function renderScoreDetailContent(player, detail) {
   });
 
   scoreDetailSummary.innerHTML = `
-    <div class="score-detail-summary-card" title="${escapeHtml(`胜负积分 ${formatScore(detail.winLossScore)} · 加成积分 ${formatScore(detail.bonusScore)} · 场次分 ${formatScore(detail.participationScore)} · 人工积分 ${formatScore(detail.manualScore)}`)}">
+    <div class="score-detail-summary-card" title="${escapeHtml(`胜负积分 ${formatScore(detail.winLossScore)} · 加成积分 ${formatScore(detail.bonusScore)} · 场次分 ${formatScore(detail.participationScore)} · 人工积分 ${formatScore(detail.manualScore)} · 英雄奖励 ${formatScore(detail.heroRewardScore)}`)}">
       <span class="score-detail-summary-label">当前积分</span>
       <strong class="score-detail-summary-value">${formatScore(detail.currentScore)}</strong>
-      <span class="score-detail-summary-breakdown">${escapeHtml(`胜负 ${formatScore(detail.winLossScore)} · 加成 ${formatScore(detail.bonusScore)} · 场次 ${formatScore(detail.participationScore)} · 人工 ${formatScore(detail.manualScore)}`)}</span>
+      <span class="score-detail-summary-breakdown">${escapeHtml(`胜负 ${formatScore(detail.winLossScore)} · 加成 ${formatScore(detail.bonusScore)} · 场次 ${formatScore(detail.participationScore)} · 人工 ${formatScore(detail.manualScore)} · 英雄 ${formatScore(detail.heroRewardScore)}`)}</span>
     </div>
     <button type="button" class="score-detail-summary-card score-detail-summary-filter${isSummaryFilter ? " score-detail-summary-filter-active" : ""}" data-filter-mode="summary" aria-pressed="${isSummaryFilter ? "true" : "false"}">
       <span class="score-detail-summary-label">净变化</span>
@@ -13659,15 +14098,19 @@ function buildPlayerKdaSummaryHtml(entry = {}) {
   return `<span class="match-player-kda-badge">KDA ${getDisplayValue(normalized.kills)}/${getDisplayValue(normalized.deaths)}/${getDisplayValue(normalized.assists)}</span>`;
 }
 
-function buildMatchPlayerScoreDeltaHtml(entry = {}) {
+function buildMatchPlayerScoreDeltaHtml(entry = {}, context = {}) {
   const delta = Number(entry?.score_change ?? 0);
+  const tagName = context.canApplyReward ? "button" : "span";
+  const actionAttributes = context.canApplyReward
+    ? `type="button" data-role="match-hero-reward" data-match-id="${escapeHtml(context.matchId || "")}" data-player-id="${escapeHtml(entry.player_id || "")}" aria-label="为${escapeHtml(stripPlayerNameMeta(entry.display_name || "该选手") || "该选手")}添加英雄奖励" title="选择当日英雄奖励"`
+    : "";
   if (!Number.isFinite(delta)) {
-    return '<span class="match-player-score-delta-badge match-player-score-delta-neutral">0</span>';
+    return `<${tagName} class="match-player-score-delta-badge match-player-score-delta-neutral${context.canApplyReward ? " match-player-score-delta-action" : ""}" ${actionAttributes}>0</${tagName}>`;
   }
   const toneClass = delta > 0
     ? "match-player-score-delta-positive"
     : (delta < 0 ? "match-player-score-delta-negative" : "match-player-score-delta-neutral");
-  return `<span class="match-player-score-delta-badge ${toneClass}">${escapeHtml(formatScore(Math.abs(delta)))}</span>`;
+  return `<${tagName} class="match-player-score-delta-badge ${toneClass}${context.canApplyReward ? " match-player-score-delta-action" : ""}" ${actionAttributes}>${escapeHtml(formatScore(Math.abs(delta)))}</${tagName}>`;
 }
 
 function buildSingleDoubleOptionsHtml(formType, player, allSelectedPlayers, itemEntry) {
@@ -17659,6 +18102,7 @@ function renderRecentMatches(groups) {
           </p>
         `).join("")}</div>`
         : "";
+      const canApplyHeroReward = canApplyHeroRewardToMatch(match, group);
       const renderPlayerList = (teamPlayers) => teamPlayers.map((player) => `
         <li>
           <span class="recent-match-player">
@@ -17672,7 +18116,10 @@ function renderRecentMatches(groups) {
               })}
               ${buildPlayerKdaSummaryHtml(player)}
             </span>
-            ${buildMatchPlayerScoreDeltaHtml(player)}
+            ${buildMatchPlayerScoreDeltaHtml(player, {
+              canApplyReward: canApplyHeroReward,
+              matchId: match.match_id,
+            })}
           </span>
         </li>
       `).join("");
@@ -18040,10 +18487,12 @@ async function loadLeaderboard() {
 
   let result = { data: [], error: null };
   let manualScoreTotals = new Map();
+  let heroRewardTotals = new Map();
   let bonusScoreTotals = new Map();
   manualScoreTotalsByPlayerId = new Map();
+  heroRewardTotalsByPlayerId = new Map();
   if (targetSeasonId) {
-    const [leaderboardResult, manualTotalsResult, bonusTotalsResult] = await Promise.allSettled([
+    const [leaderboardResult, manualTotalsResult, heroRewardTotalsResult, bonusTotalsResult] = await Promise.allSettled([
       db
         .from("v_leaderboard")
         .select("season_id, player_id, display_name, matches_played, wins, losses, win_rate, score_total")
@@ -18053,6 +18502,7 @@ async function loadLeaderboard() {
         .order("matches_played", { ascending: false })
         .order("display_name", { ascending: true }),
       loadManualScoreTotalsBySeason(targetSeasonId),
+      loadHeroRewardTotalsBySeason(targetSeasonId),
       loadBonusScoreTotalsBySeason(targetSeasonId),
     ]);
 
@@ -18066,6 +18516,12 @@ async function loadLeaderboard() {
       manualScoreTotals = manualTotalsResult.value;
     } else {
       console.error("加载人工积分汇总失败：", manualTotalsResult.reason);
+    }
+
+    if (heroRewardTotalsResult.status === "fulfilled") {
+      heroRewardTotals = heroRewardTotalsResult.value;
+    } else {
+      console.error("加载英雄奖励汇总失败：", heroRewardTotalsResult.reason);
     }
 
     if (bonusTotalsResult.status === "fulfilled") {
@@ -18090,6 +18546,7 @@ async function loadLeaderboard() {
   }
 
   manualScoreTotalsByPlayerId = manualScoreTotals;
+  heroRewardTotalsByPlayerId = heroRewardTotals;
   if (targetSeasonId) {
     await loadParticipationPointsTable(targetSeasonId);
   }
@@ -18120,6 +18577,7 @@ async function loadLeaderboard() {
         return Number(((wins / gamesPlayed) * 100).toFixed(2));
       })(),
       manual_score: Number(manualScoreTotals.get(playerId) ?? 0),
+      hero_reward_score: Number(heroRewardTotals.get(playerId) ?? 0),
       reward_points: 0,
       reward_minimum: SEASON_BASE_SPONSOR_AMOUNT,
       reward_extra_points: 0,
@@ -20697,6 +21155,19 @@ function subscribeRealtime() {
     )
     .on(
       "postgres_changes",
+      { event: "*", schema: "public", table: "hero_reward_adjustments" },
+      () => {
+        scoreDetailSeasonCache.clear();
+        scheduleRefresh({ leaderboard: true });
+        if (matchHeroRewardState) {
+          void loadMatchHeroRewardAdjustments().catch((error) => {
+            console.warn("实时更新本场英雄奖励失败。", error);
+          });
+        }
+      }
+    )
+    .on(
+      "postgres_changes",
       { event: "*", schema: "public", table: "daily_bonus_hero_settings" },
       () => {
         void loadDailyBonusHeroSettings().catch((error) => {
@@ -21185,13 +21656,18 @@ if (adminBackgroundPickerBtn) {
 });
 if (dailyBonusHeroesCountInput) {
   dailyBonusHeroesCountInput.addEventListener("change", () => {
-    const currentValues = getDailyBonusHeroPointDraftValues();
     const nextCount = Math.max(
       1,
       Math.min(Math.trunc(Number(dailyBonusHeroesCountInput.value)) || 1, DOTA_HEROES.length)
     );
-    renderDailyBonusHeroPointInputs(nextCount, currentValues);
-    setDailyBonusHeroManagementBusy(dailyBonusHeroMutationPending);
+    dailyBonusHeroesCountInput.value = String(nextCount);
+  });
+}
+if (dailyBonusHeroesList) {
+  dailyBonusHeroesList.addEventListener("click", (event) => {
+    const button = event.target.closest('[data-role="set-daily-hero-points"]');
+    if (!button || button.disabled) return;
+    void setDailyBonusHeroRewardPoint(button.dataset.heroIndex);
   });
 }
 if (saveDailyBonusHeroesBtn) {
@@ -21207,6 +21683,26 @@ if (applyDailyBonusHeroesSeedBtn) {
 if (randomizeDailyBonusHeroesBtn) {
   randomizeDailyBonusHeroesBtn.addEventListener("click", () => {
     void rerollDailyBonusHeroes({ automatic: true });
+  });
+}
+if (matchHeroRewardOptions) {
+  matchHeroRewardOptions.addEventListener("click", (event) => {
+    const button = event.target.closest('[data-role="match-hero-reward-option"]');
+    if (!button || button.disabled || !matchHeroRewardState || matchHeroRewardState.busy) return;
+    matchHeroRewardState.selectedHeroName = button.dataset.heroName || "";
+    renderMatchHeroRewardOptions();
+  });
+}
+if (matchHeroRewardApplied) {
+  matchHeroRewardApplied.addEventListener("click", (event) => {
+    const button = event.target.closest('[data-role="revoke-match-hero-reward"]');
+    if (!button || button.disabled) return;
+    void revokeMatchHeroReward(button.dataset.adjustmentId || "");
+  });
+}
+if (applyMatchHeroRewardBtn) {
+  applyMatchHeroRewardBtn.addEventListener("click", () => {
+    void applySelectedMatchHeroReward();
   });
 }
 if (adminBackgroundOptions) {
@@ -21836,6 +22332,17 @@ signupPlayerGrid.addEventListener("click", async (event) => {
 });
 
 recentMatchesList.addEventListener("click", async (event) => {
+  const heroRewardButton = event.target.closest('[data-role="match-hero-reward"]');
+  if (heroRewardButton) {
+    event.preventDefault();
+    event.stopPropagation();
+    await openMatchHeroRewardModal(
+      heroRewardButton.dataset.matchId || "",
+      heroRewardButton.dataset.playerId || ""
+    );
+    return;
+  }
+
   const toggleAttendanceButton = event.target.closest('[data-role="toggle-match-day-attendance"]');
   if (toggleAttendanceButton) {
     event.preventDefault();
@@ -22171,6 +22678,7 @@ if (itemInventoryLogsList) {
   [playerRelationBackdrop, () => setManagedDialogOpen("playerRelation", false)],
   [adminBackgroundPickerBackdrop, () => setManagedDialogOpen("adminBackgroundPicker", false)],
   [dailyBonusHeroesBackdrop, () => setManagedDialogOpen("dailyBonusHeroes", false)],
+  [matchHeroRewardBackdrop, () => setManagedDialogOpen("matchHeroReward", false)],
 ].forEach(([node, handler]) => {
   if (node) {
     node.addEventListener("click", handler);
@@ -22198,6 +22706,7 @@ if (itemInventoryLogsList) {
   [closePlayerRelationBtn, () => setManagedDialogOpen("playerRelation", false)],
   [closeAdminBackgroundPickerBtn, () => setManagedDialogOpen("adminBackgroundPicker", false)],
   [closeDailyBonusHeroesBtn, () => setManagedDialogOpen("dailyBonusHeroes", false)],
+  [closeMatchHeroRewardBtn, () => setManagedDialogOpen("matchHeroReward", false)],
 ].forEach(([node, handler]) => {
   if (node) {
     node.addEventListener("click", handler);
@@ -23023,6 +23532,7 @@ function applyRolePermissions() {
   }
   if (!canScore) {
     setManagedDialogOpen("dailyBonusHeroes", false);
+    setManagedDialogOpen("matchHeroReward", false);
     setManagedDialogOpen("itemInventoryLogs", false);
     setManagedDialogOpen("scorerSeasonRule", false);
     setManagedDialogOpen("scorerPower", false);
@@ -23032,6 +23542,10 @@ function applyRolePermissions() {
     setManagedDialogOpen("scorerActionLogs", false);
   }
   setDailyBonusHeroManagementBusy(dailyBonusHeroMutationPending);
+  renderDailyBonusHeroes();
+  if (recentMatchDayGroupsData.length) {
+    renderRecentMatches(recentMatchDayGroupsData);
+  }
 
   syncGitHubRepositoryStorageAutoRefresh();
   renderRoleMembers();
