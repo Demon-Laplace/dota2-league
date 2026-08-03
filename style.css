@@ -3076,7 +3076,7 @@ button:disabled {
 
 #leaderboardPowerViewModal,
 #leaderboardParticipationViewModal {
-  place-items: start center;
+  place-items: center;
   overflow-x: hidden;
   overflow-y: auto;
   overscroll-behavior: contain;
@@ -5974,6 +5974,7 @@ button:disabled {
 
   #leaderboardPowerViewModal,
   #leaderboardParticipationViewModal {
+    place-items: start center;
     padding: 9px;
   }
 
