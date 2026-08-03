@@ -1490,6 +1490,8 @@ let dailyBonusHeroSettings = null;
 let dailyBonusHeroLoadPromise = null;
 const dailyBonusHeroMatchDayCache = new Map();
 let dailyBonusHeroMutationPending = false;
+let dailyBonusHeroScoreEditor = null;
+let dailyBonusHeroScoreEditorState = null;
 let recentMatchDragState = null;
 let recentMatchLoadedSeasonIds = new Set();
 let recentMatchLoadingSeasonIds = new Set();
@@ -5623,7 +5625,7 @@ function buildDailyBonusHeroChipsHtml(settings = dailyBonusHeroSettings, { inter
   return getDailyBonusHeroEntries(settings).map((entry) => {
     const tagName = interactive ? "button" : "span";
     const actionAttributes = interactive
-      ? `type="button" data-role="set-daily-hero-points" data-hero-index="${entry.index}"${dailyBonusHeroMutationPending ? " disabled" : ""}`
+      ? `type="button" data-role="set-daily-hero-points" data-hero-index="${entry.index}" aria-haspopup="dialog" aria-expanded="false"${dailyBonusHeroMutationPending ? " disabled" : ""}`
       : "";
     const pointsHtml = entry.points === null
       ? ""
@@ -5647,6 +5649,7 @@ function renderDailyBonusHeroes() {
     && dailyBonusHeroSettings.seed !== null
     && dailyBonusHeroSettings.heroCount > 0
   );
+  if (!shouldShow || !isCurrentRoleScorer()) closeDailyBonusHeroScoreEditor();
   dailyBonusHeroes.hidden = !shouldShow;
   dailyBonusHeroesList.innerHTML = shouldShow
     ? buildDailyBonusHeroChipsHtml(dailyBonusHeroSettings, { interactive: isCurrentRoleScorer() })
@@ -5700,7 +5703,6 @@ async function loadDailyBonusHeroSettings() {
     renderDailyBonusHeroes();
     if (dailyBonusHeroesModal && !dailyBonusHeroesModal.hidden) {
       renderDailyBonusHeroManagement();
-      setDailyBonusHeroManagementBusy(false);
     }
     return dailyBonusHeroSettings;
   })();
@@ -5714,14 +5716,27 @@ async function loadDailyBonusHeroSettings() {
 
 async function openDailyBonusHeroManagement() {
   if (!ensureScorerAccess("仅记分员或管理员可管理每日奖励英雄。")) return;
-  setMessageNode(dailyBonusHeroesMessage, "");
-  await loadDailyBonusHeroSettings();
-  dailyBonusHeroSettings = await syncDailyBonusHeroMatchDay(dailyBonusHeroSettings);
-  renderDailyBonusHeroManagement();
-  setDailyBonusHeroManagementBusy(false);
+  if (dailyBonusHeroesModal && !dailyBonusHeroesModal.hidden) return;
+  closeDailyBonusHeroScoreEditor();
+  setMessageNode(dailyBonusHeroesMessage, dailyBonusHeroSettings ? "" : "正在载入...");
+  if (dailyBonusHeroSettings) renderDailyBonusHeroManagement();
+  setDailyBonusHeroManagementBusy(true);
   setManagedDialogOpen("dailyBonusHeroes", true, {
-    initialFocus: dailyBonusHeroesEnabledInput || closeDailyBonusHeroesBtn || undefined,
+    initialFocus: closeDailyBonusHeroesBtn || undefined,
   });
+  try {
+    await loadDailyBonusHeroSettings();
+    dailyBonusHeroSettings = await syncDailyBonusHeroMatchDay(dailyBonusHeroSettings);
+    if (dailyBonusHeroesModal?.hidden) return;
+    renderDailyBonusHeroManagement();
+    setMessageNode(dailyBonusHeroesMessage, "");
+  } catch (error) {
+    if (!dailyBonusHeroesModal?.hidden) {
+      setMessageNode(dailyBonusHeroesMessage, `载入失败：${error?.message || "未知错误"}`, true);
+    }
+  } finally {
+    setDailyBonusHeroManagementBusy(false);
+  }
 }
 
 async function saveDailyBonusHeroSettings() {
@@ -5755,36 +5770,24 @@ async function saveDailyBonusHeroSettings() {
   }
 }
 
-async function setDailyBonusHeroRewardPoint(heroIndex) {
-  if (!ensureScorerAccess("仅记分员或管理员可设置英雄奖励分数。")) return;
+async function setDailyBonusHeroRewardPoint(heroIndex, pointsInputValue) {
+  if (!ensureScorerAccess("仅记分员或管理员可设置英雄奖励分数。")) return false;
+  const points = Number(String(pointsInputValue ?? "").trim());
+  if (!Number.isFinite(points) || points < 0 || points > 10000) {
+    showGlobalToast("请输入 0 至 10000 之间的奖励分数。", true);
+    return false;
+  }
   try {
     dailyBonusHeroSettings = await syncDailyBonusHeroMatchDay(dailyBonusHeroSettings);
   } catch (error) {
     showGlobalToast(buildMatchOperationFailureMessage("每日奖励英雄同步失败", error), true);
-    return;
+    return false;
   }
   const normalizedIndex = Math.trunc(Number(heroIndex));
   const entry = getDailyBonusHeroEntries(dailyBonusHeroSettings)[normalizedIndex] || null;
   if (!entry) {
     showGlobalToast("未找到这个每日奖励英雄，请刷新页面后重试。", true);
-    return;
-  }
-
-  const result = await openSystemPrompt({
-    title: copyText("dailyBonusHeroes.setRewardTitle", "设置英雄奖励"),
-    message: `${entry.displayName} · ${dailyBonusHeroSettings.businessDate}`,
-    input: true,
-    inputLabel: copyText("dailyBonusHeroes.setRewardInputLabel", "奖励分数"),
-    placeholder: copyText("dailyBonusHeroes.setRewardPlaceholder", "输入 0 至 10000，0 表示取消奖励"),
-    defaultValue: entry.points === null ? "" : formatScore(entry.points),
-    confirmLabel: "保存",
-  });
-  if (!result.confirmed) return;
-
-  const points = Number(String(result.value || "").trim());
-  if (!Number.isFinite(points) || points < 0 || points > 10000) {
-    showGlobalToast("请输入 0 至 10000 之间的奖励分数。", true);
-    return;
+    return false;
   }
 
   setDailyBonusHeroManagementBusy(true);
@@ -5804,8 +5807,10 @@ async function setDailyBonusHeroRewardPoint(heroIndex) {
     scoreDetailSeasonCache.clear();
     await requestImmediateRefresh({ leaderboard: true });
     showGlobalToast(points === 0 ? `已取消${entry.displayName}的英雄奖励` : `${entry.displayName}已设为 ${formatSignedScore(points)} 分`);
+    return true;
   } catch (error) {
     showGlobalToast(buildMatchOperationFailureMessage("设置英雄奖励失败", error), true);
+    return false;
   } finally {
     setDailyBonusHeroManagementBusy(false);
   }
@@ -5961,6 +5966,81 @@ function renderMatchHeroRewardOptions() {
       </button>
     `;
   }).join("");
+}
+
+function closeDailyBonusHeroScoreEditor({ restoreFocus = false } = {}) {
+  const trigger = dailyBonusHeroScoreEditorState?.triggerElement;
+  if (trigger instanceof HTMLElement) {
+    trigger.setAttribute("aria-expanded", "false");
+  }
+  dailyBonusHeroScoreEditor?.remove();
+  dailyBonusHeroScoreEditor = null;
+  dailyBonusHeroScoreEditorState = null;
+  if (restoreFocus && trigger instanceof HTMLElement && trigger.isConnected) {
+    trigger.focus();
+  }
+}
+
+function openDailyBonusHeroScoreEditor(trigger, heroIndex) {
+  if (!ensureScorerAccess("仅记分员或管理员可设置英雄奖励分数。")) return;
+  const normalizedIndex = Math.trunc(Number(heroIndex));
+  const entry = getDailyBonusHeroEntries(dailyBonusHeroSettings)[normalizedIndex] || null;
+  if (!entry || !dailyBonusHeroes) {
+    showGlobalToast("未找到这个每日奖励英雄，请刷新页面后重试。", true);
+    return;
+  }
+  if (dailyBonusHeroScoreEditorState?.heroIndex === normalizedIndex) {
+    closeDailyBonusHeroScoreEditor({ restoreFocus: true });
+    return;
+  }
+
+  closeDailyBonusHeroScoreEditor();
+  const editor = document.createElement("form");
+  editor.className = "daily-bonus-score-editor";
+  editor.dataset.role = "daily-bonus-score-editor";
+  editor.setAttribute("role", "dialog");
+  editor.setAttribute("aria-label", `设置${entry.displayName}的英雄奖励分数`);
+  editor.innerHTML = `
+    <strong class="daily-bonus-score-editor-name">${escapeHtml(entry.displayName)}</strong>
+    <label class="daily-bonus-score-editor-field">
+      <input type="number" min="0" max="10000" step="0.01" inputmode="decimal" autocomplete="off" aria-label="奖励分数" placeholder="分数" value="${escapeHtml(entry.points === null ? "" : formatScore(entry.points))}" />
+    </label>
+    <button class="daily-bonus-score-editor-save" type="submit">保存</button>
+    <button class="daily-bonus-score-editor-close" type="button" aria-label="关闭分数设置">×</button>
+  `;
+  const state = {
+    heroIndex: normalizedIndex,
+    triggerElement: trigger,
+    editor,
+  };
+  dailyBonusHeroScoreEditor = editor;
+  dailyBonusHeroScoreEditorState = state;
+  dailyBonusHeroes.append(editor);
+  trigger.setAttribute("aria-expanded", "true");
+
+  const input = editor.querySelector("input");
+  const closeButton = editor.querySelector(".daily-bonus-score-editor-close");
+  closeButton?.addEventListener("click", () => closeDailyBonusHeroScoreEditor({ restoreFocus: true }));
+  editor.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    if (dailyBonusHeroScoreEditorState !== state) return;
+    const controls = [...editor.querySelectorAll("input, button")];
+    controls.forEach((control) => { control.disabled = true; });
+    const saved = await setDailyBonusHeroRewardPoint(normalizedIndex, input?.value ?? "");
+    if (dailyBonusHeroScoreEditorState !== state) return;
+    if (saved) {
+      closeDailyBonusHeroScoreEditor();
+      return;
+    }
+    controls.forEach((control) => { control.disabled = false; });
+    input?.focus();
+    input?.select();
+  });
+  window.requestAnimationFrame(() => {
+    if (dailyBonusHeroScoreEditorState !== state) return;
+    input?.focus();
+    input?.select();
+  });
 }
 
 async function loadMatchHeroRewardAdjustments({ render = true } = {}) {
@@ -21713,7 +21793,7 @@ if (dailyBonusHeroesList) {
   dailyBonusHeroesList.addEventListener("click", (event) => {
     const button = event.target.closest('[data-role="set-daily-hero-points"]');
     if (!button || button.disabled) return;
-    void setDailyBonusHeroRewardPoint(button.dataset.heroIndex);
+    openDailyBonusHeroScoreEditor(button, button.dataset.heroIndex);
   });
 }
 if (saveDailyBonusHeroesBtn) {
@@ -23073,6 +23153,10 @@ if (scoreDetailSummary) {
 }
 
 document.addEventListener("keydown", (event) => {
+  if (event.key === "Escape" && dailyBonusHeroScoreEditor) {
+    closeDailyBonusHeroScoreEditor({ restoreFocus: true });
+    return;
+  }
   if (event.key === "Escape" && matchHeroRewardPopover) {
     closeMatchHeroRewardPopover({ restoreFocus: true });
     return;
@@ -23140,6 +23224,13 @@ document.addEventListener("keydown", (event) => {
 
 document.addEventListener("click", (event) => {
   const clickTarget = event.target instanceof Element ? event.target : null;
+  if (
+    dailyBonusHeroScoreEditor
+    && !clickTarget?.closest('[data-role="daily-bonus-score-editor"]')
+    && !clickTarget?.closest('[data-role="set-daily-hero-points"]')
+  ) {
+    closeDailyBonusHeroScoreEditor();
+  }
   if (
     matchHeroRewardPopover
     && !clickTarget?.closest('[data-role="match-hero-reward-popover"]')
@@ -23586,6 +23677,7 @@ function applyRolePermissions() {
   }
   if (!canScore) {
     setManagedDialogOpen("dailyBonusHeroes", false);
+    closeDailyBonusHeroScoreEditor();
     closeMatchHeroRewardPopover();
     setManagedDialogOpen("itemInventoryLogs", false);
     setManagedDialogOpen("scorerSeasonRule", false);

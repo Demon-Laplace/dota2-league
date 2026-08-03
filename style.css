@@ -9882,6 +9882,7 @@ button.score-detail-summary-filter-active:focus-visible {
 }
 
 .daily-bonus-heroes {
+  position: relative;
   display: flex;
   align-items: center;
   height: 34px;
@@ -9910,7 +9911,7 @@ button.score-detail-summary-filter-active:focus-visible {
 .daily-bonus-preview {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 0;
 }
 
 .daily-bonus-heroes-list {
@@ -9931,7 +9932,7 @@ button.score-detail-summary-filter-active:focus-visible {
 .daily-bonus-heroes-list .daily-bonus-hero-chip {
   flex: 0 0 auto;
   min-height: 24px;
-  padding: 3px 6px;
+  padding: 3px 9px;
 }
 
 .daily-bonus-hero-chip {
@@ -9939,13 +9940,17 @@ button.score-detail-summary-filter-active:focus-visible {
   align-items: baseline;
   gap: 5px;
   min-height: 25px;
-  padding: 4px 7px;
-  border: 1px solid rgba(99, 213, 208, 0.2);
-  border-radius: 7px;
-  background: rgba(20, 44, 58, 0.42);
+  padding: 4px 9px;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
   color: #eef4f8;
   font-size: 12px;
   line-height: 1.2;
+}
+
+.daily-bonus-hero-chip + .daily-bonus-hero-chip {
+  border-left: 1px solid rgba(143, 224, 216, 0.18);
 }
 
 button.daily-bonus-hero-chip-action {
@@ -9953,14 +9958,13 @@ button.daily-bonus-hero-chip-action {
   cursor: pointer;
   font: inherit;
   text-align: left;
-  transition: border-color 0.16s ease, background-color 0.16s ease, transform 0.16s ease;
+  transition: color 0.14s ease, opacity 0.14s ease;
 }
 
 button.daily-bonus-hero-chip-action:hover:not(:disabled),
 button.daily-bonus-hero-chip-action:focus-visible:not(:disabled) {
-  border-color: rgba(143, 224, 216, 0.52);
-  background: rgba(23, 67, 77, 0.68);
-  transform: translateY(-1px);
+  background: transparent;
+  color: #8fe0d8;
 }
 
 button.daily-bonus-hero-chip-action:disabled {
@@ -9972,6 +9976,86 @@ button.daily-bonus-hero-chip-action:disabled {
   color: #8fe0d8;
   font-variant-numeric: tabular-nums;
   font-weight: 700;
+}
+
+.daily-bonus-score-editor {
+  position: absolute;
+  top: calc(100% + 7px);
+  right: 0;
+  z-index: 24;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  min-width: 250px;
+  padding: 7px 8px 7px 11px;
+  border: 1px solid rgba(143, 224, 216, 0.22);
+  border-radius: 8px;
+  background: rgba(8, 20, 33, 0.97);
+  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.32);
+  transform-origin: top right;
+  animation: daily-bonus-score-editor-reveal 120ms ease-out both;
+}
+
+.daily-bonus-score-editor-name {
+  min-width: 0;
+  margin-right: auto;
+  color: #eef4f8;
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.daily-bonus-score-editor-field input {
+  width: 66px;
+  min-height: 27px;
+  padding: 3px 2px;
+  border: 0;
+  border-bottom: 1px solid rgba(143, 224, 216, 0.34);
+  border-radius: 0;
+  background: transparent;
+  font-size: 12px;
+  text-align: center;
+}
+
+.daily-bonus-score-editor-field input:focus {
+  border-bottom-color: #8fe0d8;
+  box-shadow: none;
+  outline: none;
+}
+
+button.daily-bonus-score-editor-save,
+button.daily-bonus-score-editor-close {
+  min-height: 27px;
+  padding: 3px 5px;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+  font-size: 11px;
+}
+
+button.daily-bonus-score-editor-save {
+  color: #8fe0d8;
+  font-weight: 700;
+}
+
+button.daily-bonus-score-editor-close {
+  color: rgba(226, 232, 240, 0.58);
+  font-size: 17px;
+  line-height: 1;
+}
+
+button.daily-bonus-score-editor-save:hover:not(:disabled),
+button.daily-bonus-score-editor-save:focus-visible,
+button.daily-bonus-score-editor-close:hover:not(:disabled),
+button.daily-bonus-score-editor-close:focus-visible {
+  color: #fff;
+  background: transparent;
+  box-shadow: none;
+  transform: none;
+}
+
+@keyframes daily-bonus-score-editor-reveal {
+  from { opacity: 0; transform: translateY(-3px) scale(0.98); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
 }
 
 .daily-bonus-heroes-dialog {
@@ -9999,6 +10083,20 @@ button.daily-bonus-hero-chip-action:disabled {
 .daily-bonus-dialog-title-row h2 {
   margin: 0;
   font-size: 18px;
+}
+
+.daily-bonus-dialog-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex: 0 0 auto;
+}
+
+.daily-bonus-dialog-actions button {
+  min-height: 29px;
+  padding: 4px 9px;
+  border-radius: 7px;
+  font-size: 11px;
 }
 
 .daily-bonus-dialog-head > p {
@@ -10178,16 +10276,11 @@ button.daily-bonus-close-btn.button-secondary {
   gap: 6px;
 }
 
-.daily-bonus-seed-actions button,
-.daily-bonus-save-row button {
+.daily-bonus-seed-actions button {
   min-height: 32px;
   padding: 5px 9px;
   border-radius: 7px;
   font-size: 11px;
-}
-
-.daily-bonus-save-row {
-  justify-content: flex-end;
 }
 
 #dailyBonusHeroesMessage {
@@ -10212,15 +10305,16 @@ button.daily-bonus-close-btn.button-secondary {
 .match-hero-reward-options {
   display: grid;
   width: 100%;
-  gap: 4px;
+  gap: 0;
 }
 
 .match-hero-reward-loading {
   display: block;
   width: 100%;
   min-height: 30px;
-  border: 1px solid rgba(124, 165, 209, 0.12);
-  border-radius: 7px;
+  border: 0;
+  border-bottom: 1px solid rgba(124, 165, 209, 0.12);
+  border-radius: 0;
   background: linear-gradient(
     100deg,
     rgba(14, 31, 54, 0.48) 20%,
@@ -10260,28 +10354,39 @@ button.daily-bonus-close-btn.button-secondary {
   justify-content: flex-start;
   width: 100%;
   min-height: 30px;
-  padding: 5px 9px;
-  border: 1px solid rgba(124, 165, 209, 0.16);
-  border-radius: 7px;
-  background: rgba(14, 31, 54, 0.62);
+  padding: 6px 9px 6px 12px;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
   color: var(--text);
   box-shadow: none;
   font-size: 12px;
   text-align: left;
 }
 
+.match-hero-reward-option + .match-hero-reward-option {
+  border-top: 1px solid rgba(124, 165, 209, 0.1);
+}
+
 .match-hero-reward-option:hover:not(:disabled),
 .match-hero-reward-option:focus-visible {
-  border-color: rgba(240, 195, 106, 0.32);
-  background: rgba(104, 73, 27, 0.28);
+  background: linear-gradient(90deg, rgba(104, 73, 27, 0.24), transparent 72%);
   box-shadow: none;
   transform: none;
 }
 
 .match-hero-reward-option-active {
-  border-color: rgba(240, 195, 106, 0.4);
-  background: rgba(104, 73, 27, 0.42);
+  background: linear-gradient(90deg, rgba(104, 73, 27, 0.32), transparent 78%);
   color: #fff1c8;
+}
+
+.match-hero-reward-option-active::before {
+  width: 5px;
+  height: 5px;
+  margin-right: 7px;
+  border-radius: 50%;
+  background: #f0c36a;
+  content: "";
 }
 
 .match-hero-reward-option:disabled {
@@ -10301,6 +10406,13 @@ button.daily-bonus-close-btn.button-secondary {
     max-width: none;
   }
 
+  .daily-bonus-score-editor {
+    right: auto;
+    left: 0;
+    width: min(100%, 320px);
+    min-width: 0;
+  }
+
   .daily-bonus-heroes-dialog {
     max-height: min(88vh, 860px);
   }
@@ -10316,6 +10428,10 @@ button.daily-bonus-close-btn.button-secondary {
   .daily-bonus-primary-settings,
   .daily-bonus-seed-block {
     grid-template-columns: minmax(0, 1fr);
+  }
+
+  .daily-bonus-dialog-title-row {
+    align-items: flex-start;
   }
 
   .daily-bonus-seed-actions {
