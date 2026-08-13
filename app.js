@@ -9024,9 +9024,7 @@ async function loadItemCatalogUsageSummary() {
     itemCatalogUsageSummaryStatus = "idle";
     renderItemCatalogManagement("scorer");
     renderItemCatalogManagement("admin");
-    if (leaderboardPlayers.length) {
-      renderLeaderboard(leaderboardPlayers);
-    }
+    refreshLeaderboardGamesHovercards();
     return;
   }
 
@@ -9037,9 +9035,7 @@ async function loadItemCatalogUsageSummary() {
     itemCatalogUsageSummaryStatus = "idle";
     renderItemCatalogManagement("scorer");
     renderItemCatalogManagement("admin");
-    if (leaderboardPlayers.length) {
-      renderLeaderboard(leaderboardPlayers);
-    }
+    refreshLeaderboardGamesHovercards();
     return;
   }
 
@@ -9058,6 +9054,7 @@ async function loadItemCatalogUsageSummary() {
     itemCatalogUsageSummaryStatus = "loading";
     renderItemCatalogManagement("scorer");
     renderItemCatalogManagement("admin");
+    refreshLeaderboardGamesHovercards();
   }
 
   itemCatalogUsageSummaryPendingKey = requestKey;
@@ -9076,9 +9073,7 @@ async function loadItemCatalogUsageSummary() {
       itemCatalogUsageSummaryStatus = "error";
       renderItemCatalogManagement("scorer");
       renderItemCatalogManagement("admin");
-      if (leaderboardPlayers.length) {
-        renderLeaderboard(leaderboardPlayers);
-      }
+      refreshLeaderboardGamesHovercards();
       return;
     }
 
@@ -9086,9 +9081,7 @@ async function loadItemCatalogUsageSummary() {
     itemCatalogUsageSummaryStatus = "ready";
     renderItemCatalogManagement("scorer");
     renderItemCatalogManagement("admin");
-    if (leaderboardPlayers.length) {
-      renderLeaderboard(leaderboardPlayers);
-    }
+    refreshLeaderboardGamesHovercards();
   })().finally(() => {
     if (itemCatalogUsageSummaryPendingKey === requestKey) {
       itemCatalogUsageSummaryPendingKey = "";
@@ -9100,7 +9093,11 @@ async function loadItemCatalogUsageSummary() {
 }
 
 function ensureItemCatalogUsageSummaryLoaded() {
-  if (itemCatalogUsageSummaryStatus === "ready" || itemCatalogUsageSummaryPendingPromise) {
+  if (
+    itemCatalogUsageSummaryStatus === "ready"
+    || itemCatalogUsageSummaryStatus === "error"
+    || itemCatalogUsageSummaryPendingPromise
+  ) {
     return itemCatalogUsageSummaryPendingPromise;
   }
   return loadItemCatalogUsageSummary();
@@ -15272,6 +15269,25 @@ function buildLeaderboardGamesTooltip(player) {
   };
 }
 
+function refreshLeaderboardGamesHovercards() {
+  if (!leaderboardBody) return;
+
+  const playersById = new Map(
+    leaderboardPlayers.map((player) => [String(player.player_id || player.id || ""), player])
+  );
+  leaderboardBody.querySelectorAll('[data-role="games-detail"][data-player-id]').forEach((gamesDetail) => {
+    const player = playersById.get(String(gamesDetail.dataset.playerId || ""));
+    if (!player) return;
+
+    const tooltip = buildLeaderboardGamesTooltip(player);
+    gamesDetail.setAttribute("aria-label", tooltip.text);
+    const hovercard = gamesDetail.querySelector(".leaderboard-games-hovercard");
+    if (hovercard) {
+      hovercard.innerHTML = tooltip.html;
+    }
+  });
+}
+
 function updateRewardMinimumHint() {
   const selectedPlayer = seasonPlayers.find((player) => player.id === rewardSelectedPlayerId);
   if (!selectedPlayer) {
@@ -16394,7 +16410,7 @@ function renderLeaderboard(data) {
         </span>
       </td>
       <td>
-        <span class="leaderboard-stat-wrap leaderboard-games-stat-wrap ${hoverDirectionClass}" data-role="games-detail" tabindex="0" aria-label="${escapeHtml(gamesTooltip.text)}">
+        <span class="leaderboard-stat-wrap leaderboard-games-stat-wrap ${hoverDirectionClass}" data-role="games-detail" data-player-id="${escapeHtml(playerId)}" tabindex="0" aria-label="${escapeHtml(gamesTooltip.text)}">
           <span class="leaderboard-stat${gamesPlayed > 5 ? " leaderboard-stat-active" : ""}">${gamesPlayed}</span>
           <span class="leaderboard-stat-hovercard leaderboard-games-hovercard">${gamesTooltip.html}</span>
         </span>
@@ -22989,6 +23005,9 @@ if (leaderboardBody) {
       ? event.target.closest('[data-role="games-detail"]')
       : null;
     if (!gamesDetail) return;
+    if (event.type === "pointerover" && event.relatedTarget instanceof Node && gamesDetail.contains(event.relatedTarget)) {
+      return;
+    }
     void ensureItemCatalogUsageSummaryLoaded();
   };
   leaderboardBody.addEventListener("pointerover", requestGamesDetail);
