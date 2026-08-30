@@ -18407,7 +18407,7 @@ async function loadPlayersForSeason(seasonId) {
       player_id,
       rank_no,
       join_status,
-      players (
+      players!inner (
         display_name
       )
     `)
@@ -18423,10 +18423,13 @@ async function loadPlayersForSeason(seasonId) {
   }
 
   backfillPlayers = (data || [])
-    .filter((row) => row.join_status === "active" || row.join_status === "captain")
+    .filter((row) => (
+      (row.join_status === "active" || row.join_status === "captain")
+      && Boolean(String(row.players?.display_name || "").trim())
+    ))
     .map((row) => ({
       id: row.player_id,
-      display_name: row.players?.display_name || "未知选手",
+      display_name: row.players.display_name,
       player_rank: normalizeSeasonRankNo(row.rank_no),
     }))
     .sort((a, b) => a.display_name.localeCompare(b.display_name, "zh-CN"));
