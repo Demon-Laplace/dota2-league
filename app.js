@@ -828,8 +828,10 @@ function getLatestSchemaMigrationHint(error) {
     message.includes("重置效果只可用于本场胜方的积分变动")
     || message.includes("仅当胜负积分低于赛季初始分时")
     || message.includes("当前胜负积分已回到赛季初始分，无需使用重置效果道具")
+    || message.includes("仅当总积分低于 100 分时")
+    || message.includes("当前总积分已为 100 分")
   ) {
-    return "请先在 Supabase 执行最新 SQL，至少应用 20260501135000_allow_reset_item_on_losing_side_noop.sql。";
+    return "请先在 Supabase 执行最新 SQL，至少应用 20260901120000_set_reset_item_total_score_to_100.sql。";
   }
   if (message.includes("v_player_teammate_stats") || message.includes("v_player_opponent_stats")) {
     return "请先在 Supabase 执行最新 SQL，至少应用 20260512103000_add_player_relationship_stats_views.sql。";
@@ -4040,7 +4042,7 @@ async function getPrizeDistributionContext() {
   const leaderboardRows = await loadPrizeDistributionLeaderboardRows(targetSeasonId);
 
   if (targetSeasonId === activeSeason?.id) {
-    syncSeasonRewardTotalFromSummary();
+    syncSeasonRewardTotalFromLogs();
     return {
       seasonId: targetSeasonId,
       seasonName: targetSeason?.name || leaderboardDisplaySeasonName || activeSeason?.name || "",
@@ -8450,7 +8452,7 @@ function formatItemScoreMultiplierLabel(multiplier = 0, specialToken = "") {
 
 function formatItemScoreEffectText(multiplier = 0, baseDirection = 1, specialToken = "") {
   if (isResetToInitialWinScoreMultiplier(multiplier, specialToken)) {
-    return "积分重置";
+    return "总积分重置至100";
   }
   const normalizedMultiplier = normalizeItemScoreMultiplierValue(multiplier, 0);
   if (normalizedMultiplier === 0) {
@@ -8597,14 +8599,14 @@ function validateResetEffectUsage(winnerTeam, doubleDownPayload = [], players = 
     return "";
   }
 
-  const initialScore = getSeasonInitialScore();
+  const resetTargetScore = 100;
   const currentSeasonLeaderboard = leaderboardDisplaySeasonId === activeSeason?.id
     ? leaderboardPlayers
     : [];
   const leaderboardScoreByPlayerId = new Map(
     currentSeasonLeaderboard.map((player) => [
       player.player_id || player.id,
-      Number(player.result_score ?? initialScore),
+      Number(player.score ?? resetTargetScore),
     ])
   );
   const playerNameById = new Map(
@@ -8619,10 +8621,10 @@ function validateResetEffectUsage(winnerTeam, doubleDownPayload = [], players = 
       continue;
     }
 
-    const currentCompetitiveScore = leaderboardScoreByPlayerId.get(effect.targetPlayerId) ?? initialScore;
-    if (currentCompetitiveScore >= initialScore) {
+    const currentTotalScore = leaderboardScoreByPlayerId.get(effect.targetPlayerId) ?? resetTargetScore;
+    if (currentTotalScore >= resetTargetScore) {
       const playerName = playerNameById.get(effect.targetPlayerId) || "该选手";
-      return `${playerName} 当前胜负积分不低于赛季初始分，不能使用“${effect.itemLabel}”。`;
+      return `${playerName} 当前总积分不低于 100 分，不能使用“${effect.itemLabel}”。`;
     }
   }
 
@@ -14654,33 +14656,14 @@ async function migrateStoredSignupFeePaidStateToDatabase() {
   writeStoredSignupFeePaidPlayerIds(activeSeason.id, []);
 }
 
-function syncSeasonRewardTotalFromSummary(summary = null) {
-  const rewardSummary = Array.isArray(summary) ? summary : buildSeasonRewardSummary();
-  if (!Array.isArray(rewardSummary)) {
-    seasonPlayerRewardTotal = 0;
-    externalRewardTotal = 0;
-    return false;
-  }
-
-  const summaryPlayerIds = new Set(
-    rewardSummary
-      .map((player) => player?.id || "")
-      .filter(Boolean)
-  );
-
-  seasonPlayerRewardTotal = rewardSummary.reduce(
-    (sum, player) => sum + Math.max(Number(player?.total ?? 0), 0),
+function syncSeasonRewardTotalFromLogs() {
+  const logs = Array.isArray(rewardLogs) ? rewardLogs : [];
+  seasonPlayerRewardTotal = logs.reduce(
+    (sum, log) => sum + Math.max(Number(log?.amount ?? 0), 0),
     0
   );
-  externalRewardTotal = rewardLogs.reduce((sum, log) => {
-    const playerId = log?.player_id || "";
-    if (playerId && summaryPlayerIds.has(playerId)) {
-      return sum;
-    }
-    return sum + Math.max(Number(log?.amount ?? 0), 0);
-  }, 0);
-
-  return rewardSummary.length > 0;
+  externalRewardTotal = 0;
+  return logs.length > 0;
 }
 
 function syncSeasonRewardTotalFromStats(rows = [], options = {}) {
@@ -15308,7 +15291,7 @@ function renderRewardLogs() {
     && (!log.is_cancelled || log.cancelled_at)
   ));
 
-  syncSeasonRewardTotalFromSummary(rewardSummary);
+  syncSeasonRewardTotalFromLogs();
   refreshSeasonRewardTotal();
 
   if (!isRewardPanelOpen) {
@@ -15430,7 +15413,7 @@ function applyRewardLogsToLocalViews() {
     }
   });
 
-  syncSeasonRewardTotalFromSummary();
+  syncSeasonRewardTotalFromLogs();
   refreshSeasonRewardTotal();
   renderRewardLogs();
 
@@ -16211,7 +16194,7 @@ function renderLeaderboard(data) {
   }
 
   if (isActiveSeasonLeaderboard) {
-    if (!syncSeasonRewardTotalFromSummary()) {
+    if (!syncSeasonRewardTotalFromLogs()) {
       seasonPlayerRewardTotal = sortedData.reduce(
         (sum, player) => sum + Number(player.reward_points ?? 0),
         0
@@ -16607,7 +16590,7 @@ async function loadRewardLogs() {
       miscDonationTotals.set(log.player_id, Number(miscDonationTotals.get(log.player_id) ?? 0) + amount);
     }
   });
-  syncSeasonRewardTotalFromSummary();
+  syncSeasonRewardTotalFromLogs();
   refreshSeasonRewardTotal();
   renderRewardLogs();
   updateLeaderboardRewardTotals({
@@ -24874,9 +24857,6 @@ async function init() {
     isAccessUiHidden = readAccessUiHiddenFlag();
     applyStaticSiteCopy();
     hydrateLifetimeRewardTotalsCache();
-    await loadAdminBackgroundImageOptions();
-    await loadSharedBackgroundImageSettings();
-    await applyFirstAvailableBackgroundImage();
     renderLastUpdatedTime();
     renderBrandMonthBadge();
     setMatchFormOpen(false);
@@ -24899,25 +24879,24 @@ async function init() {
     renderMatchDayStatus();
     renderRoleMembers();
     applyRolePermissions();
-    await runInitStep("同步登录状态", async () => {
-      const { data, error } = await db.auth.getSession();
-      if (error) throw error;
-      await handleAuthSession(data.session);
-    });
-    await runInitStep("加载当前赛季", loadActiveSeason);
-    await runInitStep("加载场次积分表", () => loadParticipationPointsTable(activeSeason?.id));
-    hydrateWarmHomeCacheForActiveSeason();
-    const primaryHomeLoadPromise = Promise.all([
-      runInitStep("加载基础数据", loadPrimaryHomeData),
-      runInitStep("加载积分榜", loadLeaderboard),
-      runInitStep("加载道具目录", () => loadItemCatalog({ loadUsageSummary: false })),
-      runInitStep("加载每日奖励英雄", loadDailyBonusHeroSettings),
+    await Promise.all([
+      runInitStep("同步登录状态", async () => {
+        const { data, error } = await db.auth.getSession();
+        if (error) throw error;
+        await handleAuthSession(data.session);
+      }),
+      runInitStep("加载当前赛季", loadActiveSeason),
     ]);
-    await primaryHomeLoadPromise;
-    await runInitStep("加载最近比赛", loadRecentMatches);
-    runWhenBrowserIdle(() => {
-      void refreshAutomaticBackgroundImage({ allowChampionLookup: true });
-    }, DEFERRED_HOME_DATA_TIMEOUT_MS);
+    hydrateWarmHomeCacheForActiveSeason();
+    await Promise.all([
+      runInitStep("加载积分榜", loadLeaderboard),
+      runInitStep("加载赛季赞助", loadRewardLogs),
+      (async () => {
+        await runInitStep("加载道具目录", () => loadItemCatalog({ loadUsageSummary: false }));
+        await runInitStep("加载最近比赛", loadRecentMatches);
+      })(),
+    ]);
+    applyRewardLogsToLocalViews();
     dismissLoadingScreen();
     await runInitStep("建立实时订阅", async () => {
       subscribeRealtime();
@@ -24927,10 +24906,20 @@ async function init() {
       deferredInitPromise = new Promise((resolve) => {
         runWhenBrowserIdle(() => {
           Promise.all([
+            runInitStep("加载基础数据", async () => {
+              await loadPrimaryHomeData();
+              applyRewardLogsToLocalViews();
+            }),
             runInitStep("加载报名队列", loadQueue),
-            runInitStep("加载赛季赞助", loadRewardLogs),
+            runInitStep("加载每日奖励英雄", loadDailyBonusHeroSettings),
             runInitStep("加载赛季完结状态", loadSeasonEndConfirmations),
             runInitStep("加载本地操作记录", loadSeasonActionLogs),
+            runInitStep("加载背景", async () => {
+              await loadAdminBackgroundImageOptions();
+              await loadSharedBackgroundImageSettings();
+              await applyFirstAvailableBackgroundImage();
+              await refreshAutomaticBackgroundImage({ allowChampionLookup: true });
+            }),
           ]).then(() => {
             if (failedSteps.length) {
               setMessage(`部分数据加载失败：${failedSteps.join("、")}。其它可用内容已继续显示，请刷新后再试。`, true);
