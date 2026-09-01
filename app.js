@@ -1576,6 +1576,7 @@ const ITEM_MATCH_ICON_OPTIONS = [
   { value: "●", label: "黑色圆形" },
   { value: "◆", label: "菱形" },
   { value: "✦", label: "星芒" },
+  { value: "⚔", label: "交叉双剑" },
 ];
 const DEFAULT_ITEM_MATCH_ICON = ITEM_MATCH_ICON_OPTIONS[0].value;
 const LEGACY_MATCH_ITEM_IDS = {
