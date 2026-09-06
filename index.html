@@ -8,6 +8,7 @@
   <link rel="preconnect" href="https://klxkkwwszqtgeuozwtkw.supabase.co" crossorigin />
   <link rel="preload" as="image" href="./assets/Dota2_logo.png" fetchpriority="high" />
   <link rel="stylesheet" href="style.css?v=20260905-item-sponsorship-v1" />
+  <link rel="stylesheet" href="modern-ui.css?v=20260906-modern-league-v1" />
 </head>
   <body>
   <div id="loadingScreen" class="loading-screen" aria-live="polite">
@@ -49,6 +50,7 @@
     </div>
   </div>
   <main class="container">
+    <a class="skip-to-standings" href="#leaderboardCard">跳至积分榜</a>
     <div class="page-head">
       <div class="league-brand">
         <div class="league-brand-mark">
@@ -72,6 +74,11 @@
         <button id="seasonRewardTotal" class="season-total" type="button" aria-expanded="false" data-copy="header.seasonRewardTotalDefault"></button>
       </div>
     </div>
+    <nav class="league-section-nav" aria-label="页面导航">
+      <a href="#leaderboardCard">积分榜</a>
+      <a href="#recentMatchesSection">比赛记录</a>
+      <span class="league-section-nav-caption">DOTA 2 / LEAGUE</span>
+    </nav>
     <p class="sub" hidden><span data-copy="meta.betaNoticePrefix"></span><span id="lastUpdatedText">读取中...</span></p>
     <section id="scorerPanel" class="season-panel admin-panel" hidden>
       <div class="section-head">
