@@ -4698,6 +4698,18 @@ button:disabled {
   font-size: 12px;
 }
 
+.item-target-choice {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.item-sponsorship-toggle {
+  flex: 0 0 auto;
+  padding: 4px 8px;
+  min-height: 30px;
+}
+
 .player-double-option-active {
   border-color: rgba(240, 195, 106, 0.4);
   background: rgba(104, 73, 27, 0.42);
