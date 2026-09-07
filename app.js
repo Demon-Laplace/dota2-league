@@ -490,6 +490,9 @@ function getPreviousSeasonChampionCacheEntry() {
   const previousSeason = getPreviousSeasonForLeaderboard();
   if (!previousSeason?.code) return null;
 
+  const snapshot = (window.__DOTA2_CHAMPIONS__ || []).find((entry) => entry.seasonCode === previousSeason.code);
+  if (snapshot) return snapshot;
+
   const fixedEntry = FIXED_SEASON_CHAMPIONS.find((entry) => entry.seasonCode === previousSeason.code);
   if (fixedEntry?.championName) {
     return {
@@ -524,6 +527,20 @@ function getFinalDayAutomaticBackgroundKey(dateText = getBeijingBusinessDateStri
 
 function getPreferredBackgroundOption() {
   const settings = readBackgroundImageSettings();
+  if (historicalBackgroundSeason) {
+    const champion = (window.__DOTA2_CHAMPIONS__ || []).find((entry) => entry.seasonCode === historicalBackgroundSeason.code);
+    const option = champion && (
+      getPlayerBackgroundMappedOption(champion.playerId, settings)
+      || getPlayerBackgroundMappedOption(getPlayerIdByDisplayName(champion.championName), settings)
+    );
+    // A historical visit is local presentation, never a shared preference change.
+    // Unmapped champions use the normal background, not the previous visit's champion.
+    const normalOption = backgroundBeforeHistory?.url ? backgroundBeforeHistory
+      : getAdminBackgroundOptionById(settings.manualBackgroundId)
+        || getAdminBackgroundOptionById(settings.fallbackBackgroundId)
+        || getAdminBackgroundOptionById(DEFAULT_BACKGROUND_IMAGE_ID);
+    return { option: option || normalOption, source: "history" };
+  }
   const finalDayOption = getAdminBackgroundOptionById(settings.finalDayBackgroundId);
   const finalDayAutomaticKey = getFinalDayAutomaticBackgroundKey();
   if (
@@ -567,6 +584,25 @@ function applyPreferredBackgroundImage() {
 
 let backgroundChampionLookupPromise = null;
 let backgroundChampionLookupSeasonKey = "";
+let historicalBackgroundSeason = null;
+let backgroundBeforeHistory = null;
+
+function applySelectedSeasonBackground(season) {
+  if (season?.id !== activeSeason?.id && isEndedSeasonForChampion(season)) {
+    if (!historicalBackgroundSeason) {
+      backgroundBeforeHistory = { id: currentBackgroundImageId, url: currentBackgroundImageUrl };
+    }
+    historicalBackgroundSeason = { id: season.id, code: season.code };
+    applyPreferredBackgroundImage();
+    return;
+  }
+  if (historicalBackgroundSeason) {
+    historicalBackgroundSeason = null;
+    if (backgroundBeforeHistory?.url) applyBackgroundImageOption(backgroundBeforeHistory);
+    else applyPreferredBackgroundImage();
+    backgroundBeforeHistory = null;
+  }
+}
 
 async function markAutomaticBackgroundApplied(resolved) {
   if (!resolved?.option || !["champion", "final_day"].includes(resolved.source)) return;
@@ -640,6 +676,7 @@ async function refreshAutomaticBackgroundImage({ allowChampionLookup = false } =
   await applyResolvedAutomaticBackground(resolved);
   if (
     !allowChampionLookup
+    || resolved.source === "history"
     || (resolved.option && resolved.source !== "fallback")
     || isLastFiveDaysOfMonth()
     || !hasPlayerBackgroundSettings()
@@ -3492,6 +3529,8 @@ async function applyAdminBackgroundDraft() {
     reportSharedBackgroundSettingsError(error);
     return;
   }
+  historicalBackgroundSeason = null;
+  backgroundBeforeHistory = null;
   applyBackgroundImageOption(selectedOption);
   applyBackgroundBrightness(adminBackgroundBrightnessDraft);
   syncAdminBackgroundPreview();
@@ -10448,6 +10487,7 @@ async function selectLeaderboardSeason(seasonId) {
   }
 
   leaderboardManualSeasonId = targetSeason.id;
+  applySelectedSeasonBackground(targetSeason);
   renderBrandMonthBadge();
   hideLeaderboardSeasonSelect();
   if (leaderboardSeasonSelect) {

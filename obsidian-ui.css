@@ -1,0 +1,165 @@
+/* Obsidian & copper art study. Geometry belongs to modern-ui.css. */
+:root {
+  --bg-deep: #111212;
+  --bg-mid: #1b1c1b;
+  --surface: rgba(23, 24, 23, .96);
+  --surface-muted: rgba(33, 34, 32, .88);
+  --surface-elevated: #252623;
+  --surface-hover: #30312d;
+  --panel: var(--surface);
+  --panel-strong: #1d1e1c;
+  --panel-soft: var(--surface-muted);
+  --border: rgba(226, 216, 198, .12);
+  --border-strong: rgba(226, 216, 198, .25);
+  --text: #e8e4dc;
+  --text-soft: #bcb9b0;
+  --text-dim: #96968c;
+  --copper: #c0785e;
+  --copper-bright: #e3a088;
+  --copper-soft: rgba(184, 94, 67, .15);
+  --gold: #c8ae74;
+  --gold-soft: rgba(200, 174, 116, .10);
+  --blue: #c0785e;
+  --blue-strong: #a9563d;
+  --blue-soft: var(--copper-soft);
+  --teal: #8bb6a1;
+  --teal-soft: rgba(139, 182, 161, .13);
+  --danger: #d58d80;
+  --danger-soft: rgba(213, 141, 128, .13);
+  --ring: rgba(227, 160, 136, .65);
+  --shadow: 0 22px 70px #0009;
+  --stone-grain: url("assets/obsidian-grain.svg");
+}
+
+/* Neutral light falloff preserves the hero artwork's own palette and brightness control. */
+body { background: var(--bg-deep); }
+body::before { filter: brightness(var(--app-bg-brightness)); }
+body::after {
+  background: linear-gradient(180deg, #1011100d, #10111055 55%, #1011109e),
+    radial-gradient(ellipse at 55% 22%, transparent 25%, #0005 100%);
+  transition: opacity 220ms ease;
+}
+body.home-stealth-mode::after { opacity: .35; }
+
+/* Carved title and a hammered-copper mark, confined to the existing brand footprint. */
+.league-brand-mark {
+  background: linear-gradient(135deg, #292824, #141513);
+  box-shadow: inset 0 0 0 1px #c0785e66, inset 0 2px #e3a08833;
+  clip-path: polygon(0 0, 78% 0, 100% 22%, 100% 100%, 22% 100%, 0 78%);
+}
+.league-brand-logo { filter: saturate(.72); }
+.league-brand-kicker { color: var(--copper-bright); letter-spacing: .22em; }
+.league-brand-title-main {
+  font-weight: 800; letter-spacing: .015em; color: #e8e4dc;
+  text-shadow: 0 1px 0 #fff2, 0 3px 12px #0008;
+}
+.league-brand-title-sub { color: var(--gold); }
+.league-section-nav { border-top-color: #c0785e55; border-bottom-color: var(--border); }
+.league-section-nav button:hover:not(:disabled),
+.league-section-nav button:focus-visible,
+.league-section-nav button[aria-expanded="true"] {
+  color: var(--copper-bright); box-shadow: inset 0 -2px var(--copper); background: transparent;
+}
+#leagueBackgroundBtn[aria-pressed="true"] { color: var(--copper-bright); }
+
+/* Static grain is restricted to stone surfaces, never placed over text or artwork. */
+.card, .season-panel {
+  background-color: var(--surface); background-image: var(--stone-grain);
+  box-shadow: inset 0 1px 0 #ded4be19, 0 6px 20px #0002;
+}
+.section-head h2 { color: var(--text); font-weight: 750; letter-spacing: .035em; }
+.section-head h3 { color: var(--text); }
+.section-head h2::before { background: var(--copper); box-shadow: none; }
+.leaderboard-table { font-family: "Bahnschrift", "Segoe UI", var(--font-ui); }
+.leaderboard-table thead th { color: var(--text-dim); }
+.leaderboard-table tbody td { border-bottom-color: #d3c5a614; }
+.leaderboard-table tbody tr:hover { background: #c6b48c0b; }
+.leaderboard-row-top1 { background: linear-gradient(90deg, #c8ae7419, #c8ae7403); }
+.leaderboard-row-top1 td:first-child { box-shadow: inset 2px 0 var(--gold); }
+.leaderboard-player-name, .leaderboard-score { text-shadow: none; }
+.leaderboard-row-top1 .leaderboard-player-name, .leaderboard-row-top1 .leaderboard-score { color: var(--gold); }
+
+.recent-match-card {
+  background: var(--stone-grain), #1e201d;
+  border-color: #b7ab933b; border-radius: 3px;
+  box-shadow: inset 0 1px 0 #efe1c312, 0 3px 9px #0003;
+}
+.recent-match-card .recent-match-round-badge {
+  background: #11130fe0; border-bottom-color: #b7ab9329;
+  letter-spacing: .045em;
+}
+.recent-match-card .recent-match-result-a { color: var(--teal); }
+.recent-match-card .recent-match-result-b { color: var(--danger); }
+.recent-match-team li { border-radius: 2px; }
+.recent-match-team-name { background: none; color: var(--text-soft); box-shadow: none; }
+.recent-match-team li :is(.positive, .negative) { box-shadow: none; }
+.recent-match-season-title-block strong, .match-day-summary strong { color: var(--text); }
+.daily-bonus-heroes { color: var(--gold); }
+
+/* Actions use copper; gold is reserved for scores, rewards and honors. */
+button:not([class]), .recent-match-tool-primary {
+  background: #8a4633; color: #fff0e8; border-color: #c0785e88; box-shadow: inset 0 1px #fff1;
+}
+button:not([class]):hover:not(:disabled), .recent-match-tool-primary:hover:not(:disabled) {
+  background: #a05740; color: #fff5ee;
+}
+.button-secondary, .season-chip, .recent-match-tool:not(.recent-match-tool-primary) {
+  background: #b6a78a09; border-color: var(--border); color: var(--text-soft); border-radius: 4px;
+  box-shadow: none;
+}
+.button-secondary:hover:not(:disabled), .season-chip:hover:not(:disabled), .recent-match-tool:not(.recent-match-tool-primary):hover:not(:disabled) {
+  background: #b6a78a12; border-color: #c0785e88; color: var(--text);
+}
+.button-danger { background: #7c343323; color: #e3a095; border-color: #b663554a; box-shadow: none; }
+input, select, textarea { background: #131511; color: var(--text); border-color: var(--border-strong); border-radius: 4px; }
+input:hover, select:hover, textarea:hover { background: #1c1e19; }
+button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible {
+  outline-color: var(--copper-bright);
+}
+body :is(.access-scorer-chip, .manual-score-player-chip, .reward-player-chip,
+  .signup-player-chip, .match-player-chip, .item-target-chip, .player-double-option, .item-catalog-player-chip-btn) {
+  background: #282a24; color: var(--text-soft); border-color: #c7b99724; border-radius: 3px;
+}
+body :is(.access-scorer-chip, .manual-score-player-chip, .reward-player-chip,
+  .signup-player-chip, .match-player-chip, .item-target-chip, .player-double-option, .item-catalog-player-chip-btn):hover:not(:disabled) {
+  background: #34362e; border-color: #c0785e80; color: var(--text);
+}
+body :is(.access-scorer-chip, .manual-score-player-chip, .reward-player-chip,
+  .signup-player-chip, .match-player-chip, .item-target-chip, .player-double-option, .item-catalog-player-chip-btn):is(
+  .access-scorer-chip-active, .manual-score-player-chip-active, .reward-player-chip-active,
+  .signup-player-chip-active, .match-player-chip-selected, .item-target-chip-active,
+  .player-double-option-active, .item-catalog-player-chip-selected)[class] {
+  background: #462c23; border-color: #b9775b; color: #f0c4ac; box-shadow: inset 0 1px #e7bb9314;
+}
+
+.hero-picker-dialog,
+.hero-picker-dialog:is(.system-prompt-dialog, .access-dialog, .relation-stats-dialog, .leaderboard-champions-sheet) {
+  background: var(--stone-grain), #1c1e1a;
+  border-color: #bda67f59; border-radius: 6px; box-shadow: var(--shadow), inset 0 1px #eee2ca12;
+}
+.hero-picker-backdrop { background: #080907b3; }
+.league-nav-player-list, .team-double-options, .hero-search-suggestions,
+.leaderboard-player-hovercard, .leaderboard-stat-hovercard, .leaderboard-player-tag-popover {
+  background: #252720; border-color: #bda67f55; border-radius: 4px; color: var(--text);
+}
+.league-brand-season-select, .league-brand-season-select:hover, .league-brand-season-select:focus-visible,
+.league-brand-season-select option { background: #23251f; color: var(--text); }
+.league-brand-season-select option:checked { background: #462c23; color: #f0c4ac; }
+.league-nav-season select { background-color: #23251f; }
+.league-section-nav button { background: none; border-color: transparent; color: var(--text-soft); box-shadow: none; }
+.league-section-nav .league-nav-player-list button:is(:hover, :focus-visible) { background: #33352b; color: var(--copper-bright); box-shadow: none; }
+
+.relation-chart-surface { background: #141611; }
+.relation-ladder-chart .relation-ladder-subject, .relation-ladder-chart .relation-ladder-node { background: #2b2e25; color: var(--text); }
+.relation-ladder-chart .relation-ladder-node:is(:hover, :focus-visible, :active) { background: #383b30; }
+.relation-stats-table thead th { background: #1c1e1a; }
+.relation-summary-badge { background: #303229; }
+#leaderboardPowerViewList .season-rank-column { background: #22251e; border-color: #bda67f4a; border-radius: 4px; }
+#leaderboardPowerViewList .season-rank-column:nth-child(even) { background: #2b2e24; }
+.leaderboard-champion-mark { background: linear-gradient(135deg, #e2d1a0, #967748); box-shadow: none; }
+.leaderboard-champion-name { color: var(--text); }
+.leaderboard-lifetime-reward-mark { background: var(--gold-soft); border-color: #c8ae7444; color: var(--gold); }
+.match-form-panel { background: #22251f; border-color: var(--border); }
+.loading-screen { background: #111212; }
+
+@media (prefers-reduced-motion: reduce) { body::after { transition: none; } }
