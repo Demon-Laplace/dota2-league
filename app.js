@@ -984,7 +984,6 @@ const lastUpdatedText = document.getElementById("lastUpdatedText");
 const brandMonthBadge = document.getElementById("brandMonthBadge");
 const leaderboardSeasonSelect = document.getElementById("leaderboardSeasonSelect");
 const loadingBrandMonth = document.getElementById("loadingBrandMonth");
-const homeStealthToggle = document.getElementById("homeStealthToggle");
 const leagueBackgroundBtn = document.getElementById("leagueBackgroundBtn");
 const leagueRelationBtn = document.getElementById("leagueRelationBtn");
 const signupPlayerGrid = document.getElementById("signupPlayerGrid");
@@ -4967,9 +4966,6 @@ function setHomeStealthMode(isEnabled) {
   if (leagueBackgroundBtn) {
     leagueBackgroundBtn.textContent = isHomeStealthMode ? "返回页面" : "欣赏背景";
     leagueBackgroundBtn.setAttribute("aria-pressed", String(isHomeStealthMode));
-  }
-  if (homeStealthToggle) {
-    homeStealthToggle.dataset.active = isHomeStealthMode ? "true" : "false";
   }
 }
 
@@ -21406,13 +21402,6 @@ if (leagueRelationBtn) {
       console.error("打开胜率网络失败：", error);
       setMessage(`打开胜率网络失败：${error.message || "未知错误"}`, true);
     });
-  });
-}
-if (homeStealthToggle) {
-  homeStealthToggle.addEventListener("dblclick", (event) => {
-    event.preventDefault();
-    event.stopPropagation();
-    setHomeStealthMode(!isHomeStealthMode);
   });
 }
 if (brandMonthBadge) {

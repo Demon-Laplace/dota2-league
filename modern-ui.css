@@ -36,7 +36,7 @@
   --font-brand: var(--font-ui);
 }
 
-html { scroll-behavior: smooth; scroll-padding-top: 24px; }
+html { scroll-behavior: smooth; scroll-padding-top: 24px; scrollbar-gutter: stable; }
 body { background: #101214; line-height: 1.55; }
 body::after {
   background: linear-gradient(180deg, rgba(16,18,20,.2), rgba(16,18,20,.68) 65%);
@@ -192,13 +192,22 @@ body .item-catalog-player-chip-negative :is(.item-catalog-player-name, .item-cat
 /* Public navigation stays reachable when the scoreboard is hidden. */
 .league-section-nav { flex-wrap: wrap; column-gap: 24px; row-gap: 0; }
 .league-section-nav button { flex-shrink: 0; }
-body.home-stealth-mode .league-section-nav button:not(#leagueBackgroundBtn) { display: none; }
+body.home-stealth-mode .league-section-nav button:not(#leagueBackgroundBtn) { visibility: hidden; pointer-events: none; }
 #leagueBackgroundBtn { margin-left: auto; }
 #leagueBackgroundBtn[aria-pressed="true"] { color: var(--gold); }
 @media (max-width: 560px) {
   .league-section-nav { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0 8px; }
   #leagueBackgroundBtn { margin-left: 0; }
-  body.home-stealth-mode .league-section-nav { display: flex; justify-content: flex-end; }
+}
+
+/* Hidden content retains its geometry; native [hidden] state remains untouched. */
+#leaderboardPowerViewList .season-rank-column {
+  padding: 10px; border: 1px solid var(--border-strong); border-radius: 6px;
+  background: #20252a;
+}
+#leaderboardPowerViewList .season-rank-column:nth-child(even) { background: #292e33; }
+#leaderboardPowerViewList .season-rank-head {
+  border-bottom: 1px solid var(--border-strong); padding-bottom: 9px; margin-bottom: 8px;
 }
 
 /* Relationship views share the page palette, without nested gradient cards. */

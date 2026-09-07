@@ -228,34 +228,6 @@ h1 {
   height: 78px;
 }
 
-.home-stealth-trigger {
-  position: absolute;
-  inset: -8px;
-  z-index: 2;
-  width: auto;
-  min-width: 0;
-  height: auto;
-  min-height: 0;
-  padding: 0;
-  border: 0;
-  border-radius: 999px;
-  background: transparent;
-  box-shadow: none;
-  opacity: 0;
-  cursor: default;
-}
-
-.home-stealth-trigger:hover,
-.home-stealth-trigger:active,
-.home-stealth-trigger:focus-visible {
-  background: transparent;
-  border-color: transparent;
-  box-shadow: none;
-  filter: none;
-  outline: none;
-  transform: none;
-}
-
 .league-brand-logo {
   display: block;
   width: 72px;
@@ -6111,7 +6083,8 @@ body.home-stealth-mode #adminModeBtn,
 body.home-stealth-mode #seasonRewardTotal,
 body.home-stealth-mode #brandMonthBadge,
 body.home-stealth-mode #leaderboardSeasonSelect {
-  display: none !important;
+  visibility: hidden;
+  pointer-events: none;
 }
 
 .leaderboard-head {

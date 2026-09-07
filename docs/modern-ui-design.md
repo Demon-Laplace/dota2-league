@@ -46,9 +46,16 @@ Do not merge or deploy to main until the visual direction has been reviewed.
 ## Public navigation and relationship view follow-up
 
 - Added win-rate relationships and background viewing to the four public navigation entries.
-- Kept the original player win-rate click and logo double-click shortcuts. Background mode exposes a clearly labeled return button and synchronizes its pressed state across both entry points.
+- Kept the original player win-rate click shortcut. Removed the legacy logo double-click trigger; background viewing now uses the labeled navigation toggle only.
 - Navigation wraps into two rows on phones. Administrative actions remain in their permission-controlled panels.
 - Flattened relationship summary groups, network panels and table controls; retained teal/gold relationship semantics without nested gradients or glows. Preserved node positioning on hover and keyboard focus.
 - Unified champion and lifetime sponsorship accents with the modern palette.
 - Verified both relationship entry points, network data rendering, table switching, background hide/restore and mobile rendering in Edge. Public regression checks reported no page errors or horizontal page overflow.
 - No database, scoring, sponsorship or authorization changes. Authenticated editing workflows remain untested.
+
+## Stable background viewing and power group separation
+
+- Background mode uses visibility rather than removing layout boxes, preserving header, navigation and document geometry. Hidden controls cannot receive pointer or keyboard input; previously hidden administrative panels remain hidden.
+- Desktop and mobile browser checks confirmed identical background-toggle bounds before and after toggling. Reserved scrollbar space prevents width changes.
+- Public power groups now have stronger outlines, alternating muted surfaces and a header divider.
+- Champion static publication is not implemented in this revision: the existing archive function defaults to main and its raw leaderboard export omits the frontend's additional scoring components. A separate settlement snapshot pipeline must use the complete scoring rules, allow explicit regeneration after corrections, and respect the review branch before production deployment.
