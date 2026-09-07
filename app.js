@@ -778,6 +778,7 @@ const FIXED_SEASON_CHAMPIONS = [
   { seasonCode: "2026-03", championName: "苏神" },
   { seasonCode: "2026-04", championName: "海参" },
 ];
+const HISTORY_WITHOUT_DATA_SEASON_ID_PREFIX = "history-without-data:";
 const ACCESS_ROLE_LABELS = {
   admin: copyText("runtime.accessRoleLabels.admin", "管理员"),
   scorekeeper: copyText("runtime.accessRoleLabels.scorekeeper", "记分员"),
@@ -10386,7 +10387,9 @@ function getBrandMonthBadgeSeason() {
 function renderBrandMonthBadge(season = getBrandMonthBadgeSeason()) {
   const text = getSeasonMonthBadgeText(season) || getFallbackMonthBadgeText();
   const selectedSeason = getManualLeaderboardSeason();
-  const title = selectedSeason?.id
+  const title = selectedSeason?.history_without_data
+    ? `当前查看 ${text} 历史赛季`
+    : selectedSeason?.id
     ? `当前查看 ${selectedSeason.name || text} 积分榜`
     : "当前赛季";
 
@@ -10402,7 +10405,17 @@ function renderBrandMonthBadge(season = getBrandMonthBadgeSeason()) {
 
 function getOrderedLeaderboardSeasonOptions() {
   const seen = new Set();
-  return (allSeasons || [])
+  const historySeasonsWithoutData = FIXED_SEASON_CHAMPIONS
+    .filter((entry) => !(allSeasons || []).some((season) => season?.code === entry.seasonCode))
+    .map((entry) => ({
+      id: `${HISTORY_WITHOUT_DATA_SEASON_ID_PREFIX}${entry.seasonCode}`,
+      code: entry.seasonCode,
+      name: `${entry.seasonCode.slice(0, 4)} 年 ${Number(entry.seasonCode.slice(5))} 月赛季`,
+      status: "closed",
+      start_at: `${entry.seasonCode}-01`,
+      history_without_data: true,
+    }));
+  return [...(allSeasons || []), ...historySeasonsWithoutData]
     .filter((season) => {
       if (!season?.id || seen.has(season.id)) return false;
       seen.add(season.id);
@@ -10488,10 +10501,19 @@ async function selectLeaderboardSeason(seasonId) {
 
   leaderboardManualSeasonId = targetSeason.id;
   applySelectedSeasonBackground(targetSeason);
+  document.body.classList.toggle("history-season-no-data", Boolean(targetSeason.history_without_data));
   renderBrandMonthBadge();
   hideLeaderboardSeasonSelect();
   if (leaderboardSeasonSelect) {
     leaderboardSeasonSelect.disabled = true;
+  }
+
+  if (targetSeason.history_without_data) {
+    if (leaderboardSeasonSelect) {
+      leaderboardSeasonSelect.disabled = false;
+      renderLeaderboardSeasonSelectOptions();
+    }
+    return;
   }
 
   try {
@@ -17797,7 +17819,20 @@ function getMatchDayPlayerNames(matches) {
 function getSeasonMetaById(seasonId) {
   if (!seasonId) return null;
   if (activeSeason?.id === seasonId) return activeSeason;
-  return (allSeasons || []).find((season) => season.id === seasonId) || null;
+  const databaseSeason = (allSeasons || []).find((season) => season.id === seasonId) || null;
+  if (databaseSeason) return databaseSeason;
+  if (!String(seasonId).startsWith(HISTORY_WITHOUT_DATA_SEASON_ID_PREFIX)) return null;
+  const seasonCode = String(seasonId).slice(HISTORY_WITHOUT_DATA_SEASON_ID_PREFIX.length);
+  const fixedChampion = FIXED_SEASON_CHAMPIONS.find((entry) => entry.seasonCode === seasonCode);
+  if (!fixedChampion) return null;
+  return {
+    id: `${HISTORY_WITHOUT_DATA_SEASON_ID_PREFIX}${seasonCode}`,
+    code: seasonCode,
+    name: `${seasonCode.slice(0, 4)} 年 ${Number(seasonCode.slice(5))} 月赛季`,
+    status: "closed",
+    start_at: `${seasonCode}-01`,
+    history_without_data: true,
+  };
 }
 
 function getSeasonDisplayName(seasonId) {
@@ -18715,6 +18750,13 @@ async function loadLeaderboard() {
   let targetSeasonId = activeSeason?.id || null;
   let targetSeasonName = activeSeason?.name || "";
   const manualSeason = getManualLeaderboardSeason();
+
+  // The earliest historical entries have no database season. Their normal
+  // season switch only changes the champion background and hides empty data.
+  if (manualSeason?.history_without_data) {
+    renderBrandMonthBadge();
+    return;
+  }
 
   if (manualSeason?.id) {
     targetSeasonId = manualSeason.id;

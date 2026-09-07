@@ -44,3 +44,10 @@ leaving a balanced two-row grid. The two menu arrows are separate, fixed-size
 decorations so they no longer shift their labels off the shared center line.
 The home and loading marks now place the transparent Dota 2 artwork directly on
 the page without a frame, fill or clipped metal backing.
+
+The normal season selector also exposes `2026-04` and `2026-03` as historical
+seasons backed by the published champions (Haishen and Su Shen). Since neither
+season exists in the database, choosing one follows the existing season and
+champion-background path but does not issue an empty leaderboard query. The
+standings and match-record surfaces become invisible, like background view,
+until the visitor selects a database-backed season again.

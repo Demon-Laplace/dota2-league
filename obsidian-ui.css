@@ -317,3 +317,8 @@ input:hover, select:hover, textarea:hover { background: #222020; }
 @media (prefers-reduced-motion: reduce) {
   .league-nav-menu-arrow { transition: none; }
 }
+body.history-season-no-data #leaderboardCard,
+body.history-season-no-data #recentMatchesSection {
+  visibility: hidden;
+  pointer-events: none;
+}
