@@ -986,6 +986,8 @@ const leaderboardSeasonSelect = document.getElementById("leaderboardSeasonSelect
 const loadingBrandMonth = document.getElementById("loadingBrandMonth");
 const leagueBackgroundBtn = document.getElementById("leagueBackgroundBtn");
 const leagueRelationBtn = document.getElementById("leagueRelationBtn");
+const leagueRelationPlayers = document.getElementById("leagueRelationPlayers");
+const leagueSeasonBtn = document.getElementById("leagueSeasonBtn");
 const signupPlayerGrid = document.getElementById("signupPlayerGrid");
 const signupEmpty = document.getElementById("signupEmpty");
 const messageEl = document.getElementById("message");
@@ -10366,14 +10368,13 @@ function renderBrandMonthBadge(season = getBrandMonthBadgeSeason()) {
   const text = getSeasonMonthBadgeText(season) || getFallbackMonthBadgeText();
   const selectedSeason = getManualLeaderboardSeason();
   const title = selectedSeason?.id
-    ? `当前查看 ${selectedSeason.name || text} 积分榜，点击切换赛季`
-    : "点击切换积分榜赛季";
+    ? `当前查看 ${selectedSeason.name || text} 积分榜`
+    : "当前赛季";
 
   if (brandMonthBadge) {
     brandMonthBadge.textContent = text;
     brandMonthBadge.title = title;
     brandMonthBadge.setAttribute("aria-label", title);
-    brandMonthBadge.setAttribute("aria-expanded", leaderboardSeasonSelect && !leaderboardSeasonSelect.hidden ? "true" : "false");
   }
   if (loadingBrandMonth) {
     loadingBrandMonth.textContent = getSeasonMonthBadgeText(activeSeason) || getFallbackMonthBadgeText();
@@ -10422,14 +10423,14 @@ function renderLeaderboardSeasonSelectOptions() {
 function hideLeaderboardSeasonSelect() {
   if (!leaderboardSeasonSelect) return;
   leaderboardSeasonSelect.hidden = true;
-  if (brandMonthBadge) {
-    brandMonthBadge.hidden = false;
-    brandMonthBadge.setAttribute("aria-expanded", "false");
+  if (leagueSeasonBtn) {
+    leagueSeasonBtn.hidden = false;
+    leagueSeasonBtn.setAttribute("aria-expanded", "false");
   }
 }
 
 async function openLeaderboardSeasonSelect() {
-  if (!leaderboardSeasonSelect || !brandMonthBadge) return;
+  if (!leaderboardSeasonSelect || !leagueSeasonBtn) return;
   if (!allSeasons.length) {
     await loadSeasons();
   }
@@ -10438,16 +10439,16 @@ async function openLeaderboardSeasonSelect() {
     .some((option) => !option.hidden && option.value);
   if (!hasSeasonOptions) return;
 
-  const badgeRect = brandMonthBadge.getBoundingClientRect();
+  const badgeRect = leagueSeasonBtn.getBoundingClientRect();
   if (badgeRect.width > 0) {
     leaderboardSeasonSelect.style.width = `${Math.ceil(badgeRect.width)}px`;
   }
   if (badgeRect.height > 0) {
     leaderboardSeasonSelect.style.height = `${Math.ceil(badgeRect.height)}px`;
   }
-  brandMonthBadge.hidden = true;
+  leagueSeasonBtn.hidden = true;
   leaderboardSeasonSelect.hidden = false;
-  brandMonthBadge.setAttribute("aria-expanded", "true");
+  leagueSeasonBtn.setAttribute("aria-expanded", "true");
   leaderboardSeasonSelect.focus();
   if (typeof leaderboardSeasonSelect.showPicker === "function") {
     try {
@@ -21398,14 +21399,39 @@ if (leagueBackgroundBtn) {
 }
 if (leagueRelationBtn) {
   leagueRelationBtn.addEventListener("click", () => {
-    openPlayerRelationModal().catch((error) => {
-      console.error("打开胜率网络失败：", error);
-      setMessage(`打开胜率网络失败：${error.message || "未知错误"}`, true);
-    });
+    if (!leagueRelationPlayers) return;
+    const opening = leagueRelationPlayers.hidden;
+    leagueRelationPlayers.innerHTML = getPlayerRelationPlayerOptions().map((player) =>
+      `<button type="button" data-player-id="${escapeHtml(player.id)}">${escapeHtml(player.display_name || "未知选手")}</button>`
+    ).join("") || '<p class="muted">暂无选手</p>';
+    leagueRelationPlayers.hidden = !opening;
+    leagueRelationBtn.setAttribute("aria-expanded", String(opening));
   });
 }
-if (brandMonthBadge) {
-  brandMonthBadge.addEventListener("click", () => {
+function closeLeagueRelationPlayers() {
+  if (leagueRelationPlayers) leagueRelationPlayers.hidden = true;
+  leagueRelationBtn?.setAttribute("aria-expanded", "false");
+}
+leagueRelationPlayers?.addEventListener("click", (event) => {
+  const button = event.target.closest("button[data-player-id]");
+  if (!button) return;
+  closeLeagueRelationPlayers();
+  openPlayerRelationModal(button.dataset.playerId).catch((error) => {
+      console.error("打开胜率网络失败：", error);
+      setMessage(`打开胜率网络失败：${error.message || "未知错误"}`, true);
+  });
+});
+document.addEventListener("click", (event) => {
+  if (!event.target.closest(".league-nav-dropdown")) closeLeagueRelationPlayers();
+});
+document.addEventListener("keydown", (event) => {
+  if (event.key === "Escape" && leagueRelationPlayers && !leagueRelationPlayers.hidden) {
+    closeLeagueRelationPlayers();
+    leagueRelationBtn?.focus();
+  }
+});
+if (leagueSeasonBtn) {
+  leagueSeasonBtn.addEventListener("click", () => {
     openLeaderboardSeasonSelect().catch((error) => {
       console.error("打开积分榜赛季选择失败：", error);
       setMessage(`打开积分榜赛季选择失败：${error.message || "未知错误"}`, true);
@@ -21431,7 +21457,7 @@ if (leaderboardSeasonSelect) {
     if (event.key === "Escape") {
       event.preventDefault();
       hideLeaderboardSeasonSelect();
-      brandMonthBadge?.focus();
+      leagueSeasonBtn?.focus();
     }
   });
 }

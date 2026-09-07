@@ -192,6 +192,23 @@ body .item-catalog-player-chip-negative :is(.item-catalog-player-name, .item-cat
 /* Public navigation stays reachable when the scoreboard is hidden. */
 .league-section-nav { flex-wrap: wrap; column-gap: 24px; row-gap: 0; }
 .league-section-nav button { flex-shrink: 0; }
+.league-section-nav { position: relative; z-index: 5; }
+.league-nav-dropdown, .league-nav-season { position: relative; min-width: 0; }
+.league-nav-season select { max-width: 100%; margin: 0; }
+.league-nav-player-list {
+  position: absolute; top: 100%; left: 0; width: min(330px, calc(100vw - 40px));
+  max-height: min(360px, 55vh); overflow-y: auto; overscroll-behavior: contain;
+  display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 2px;
+  padding: 8px; border: 1px solid var(--border-strong); border-radius: 6px;
+  background: #22262a; box-shadow: 0 10px 24px #0005;
+}
+.league-nav-player-list[hidden] { display: none; }
+.league-section-nav .league-nav-player-list button {
+  padding: 8px; text-align: left; border-radius: 4px; overflow-wrap: anywhere;
+}
+.league-section-nav .league-nav-player-list button:is(:hover, :focus-visible) {
+  background: var(--surface-hover); box-shadow: none;
+}
 body.home-stealth-mode .league-section-nav button:not(#leagueBackgroundBtn) { visibility: hidden; pointer-events: none; }
 #leagueBackgroundBtn { margin-left: auto; }
 #leagueBackgroundBtn[aria-pressed="true"] { color: var(--gold); }

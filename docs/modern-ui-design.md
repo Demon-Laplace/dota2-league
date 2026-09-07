@@ -55,6 +55,13 @@ Do not merge or deploy to main until the visual direction has been reviewed.
 
 ## Stable background viewing and power group separation
 
+### Season navigation and player submenu
+
+- Moved the existing season picker to the public navigation under Past seasons; the title badge is now display-only.
+- Win-rate navigation opens a compact, scrollable player submenu using the existing player directory, with outside-click and Escape dismissal. Relationship data is loaded only after selecting a player.
+- Preserved the original leaderboard win-rate entry and season selection semantics (historical leaderboard selection; match history remains in the existing dated sections).
+- Edge checks exercised the submenu on desktop/mobile, the original entry, switching to August 2026 and back to the current season, and background geometry. No page errors or horizontal overflow were observed.
+
 - Background mode uses visibility rather than removing layout boxes, preserving header, navigation and document geometry. Hidden controls cannot receive pointer or keyboard input; previously hidden administrative panels remain hidden.
 - Desktop and mobile browser checks confirmed identical background-toggle bounds before and after toggling. Reserved scrollbar space prevents width changes.
 - Public power groups now have stronger outlines, alternating muted surfaces and a header divider.

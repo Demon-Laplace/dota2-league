@@ -8,7 +8,7 @@
   <link rel="preconnect" href="https://klxkkwwszqtgeuozwtkw.supabase.co" crossorigin />
   <link rel="preload" as="image" href="./assets/Dota2_logo.png" fetchpriority="high" />
   <link rel="stylesheet" href="style.css?v=20260907-modern-league-v4" />
-  <link rel="stylesheet" href="modern-ui.css?v=20260907-modern-league-v4" />
+  <link rel="stylesheet" href="modern-ui.css?v=20260907-modern-league-v5" />
 </head>
   <body>
   <div id="loadingScreen" class="loading-screen" aria-live="polite">
@@ -60,8 +60,7 @@
           <p class="league-brand-kicker" data-copy="brand.kicker"></p>
           <h1 class="league-brand-title">
             <span class="league-brand-title-main" data-copy="brand.mainTitle"></span>
-            <button id="brandMonthBadge" class="league-brand-title-sub league-brand-season-trigger" type="button" aria-haspopup="listbox" aria-expanded="false" title="切换积分榜赛季">0000-00</button>
-            <select id="leaderboardSeasonSelect" class="league-brand-title-sub league-brand-season-select" aria-label="选择积分榜赛季" hidden></select>
+            <span id="brandMonthBadge" class="league-brand-title-sub">0000-00</span>
           </h1>
         </div>
       </div>
@@ -74,7 +73,14 @@
       </div>
     </div>
     <nav class="league-section-nav" aria-label="联赛资料">
-      <button id="leagueRelationBtn" type="button" aria-haspopup="dialog" aria-controls="playerRelationModal">胜率网络</button>
+      <div class="league-nav-dropdown">
+        <button id="leagueRelationBtn" type="button" aria-expanded="false" aria-controls="leagueRelationPlayers">胜率网络 ▾</button>
+        <div id="leagueRelationPlayers" class="league-nav-player-list" aria-label="选择胜率网络选手" hidden></div>
+      </div>
+      <div class="league-nav-season">
+        <button id="leagueSeasonBtn" type="button" aria-haspopup="listbox" aria-expanded="false">过往赛季 ▾</button>
+        <select id="leaderboardSeasonSelect" class="league-brand-season-select" aria-label="选择查看的赛季" hidden></select>
+      </div>
       <button id="leaderboardPowerViewBtn" type="button" aria-haspopup="dialog" aria-controls="leaderboardPowerViewModal">战力分配</button>
       <button id="leaderboardParticipationViewBtn" type="button" aria-haspopup="dialog" aria-controls="leaderboardParticipationViewModal">场次积分</button>
       <button id="leaderboardChampionsBtn" type="button" aria-haspopup="dialog" aria-controls="leaderboardChampionsModal">历届冠军</button>
@@ -1290,6 +1296,6 @@
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="src/site-copy.js?v=20260803-minimal-hero-reward-ui-v1"></script>
-  <script src="app.js?v=20260907-modern-league-v4"></script>
+  <script src="app.js?v=20260907-modern-league-v5"></script>
 </body>
 </html>
