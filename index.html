@@ -8,7 +8,7 @@
   <link rel="preconnect" href="https://klxkkwwszqtgeuozwtkw.supabase.co" crossorigin />
   <link rel="preload" as="image" href="./assets/Dota2_logo.png" fetchpriority="high" />
   <link rel="stylesheet" href="style.css?v=20260905-item-sponsorship-v1" />
-  <link rel="stylesheet" href="modern-ui.css?v=20260906-modern-league-v1" />
+  <link rel="stylesheet" href="modern-ui.css?v=20260906-modern-league-v2" />
 </head>
   <body>
   <div id="loadingScreen" class="loading-screen" aria-live="polite">
@@ -74,10 +74,11 @@
         <button id="seasonRewardTotal" class="season-total" type="button" aria-expanded="false" data-copy="header.seasonRewardTotalDefault"></button>
       </div>
     </div>
-    <nav class="league-section-nav" aria-label="页面导航">
-      <a href="#leaderboardCard">积分榜</a>
-      <a href="#recentMatchesSection">比赛记录</a>
-      <span class="league-section-nav-caption">DOTA 2 / LEAGUE</span>
+    <nav class="league-section-nav" aria-label="联赛资料">
+      <button id="leaderboardPowerViewBtn" type="button" aria-haspopup="dialog" aria-controls="leaderboardPowerViewModal">战力分配</button>
+      <button id="leaderboardParticipationViewBtn" type="button" aria-haspopup="dialog" aria-controls="leaderboardParticipationViewModal">场次积分</button>
+      <button id="leaderboardChampionsBtn" type="button" aria-haspopup="dialog" aria-controls="leaderboardChampionsModal">历届冠军</button>
+      <button id="leaderboardLifetimeRewardsBtn" type="button" aria-haspopup="dialog" aria-controls="leaderboardLifetimeRewardsModal">历届赞助</button>
     </nav>
     <p class="sub" hidden><span data-copy="meta.betaNoticePrefix"></span><span id="lastUpdatedText">读取中...</span></p>
     <section id="scorerPanel" class="season-panel admin-panel" hidden>
@@ -309,44 +310,8 @@
           <div class="section-head leaderboard-head">
             <div class="leaderboard-title-block">
               <h2 data-copy="leaderboard.title"></h2>
-              <button
-                id="leaderboardChampionsBtn"
-                class="season-chip leaderboard-copy-btn leaderboard-champions-btn"
-                type="button"
-                data-copy-aria-label="leaderboard.championsAriaLabel"
-                data-copy-title="leaderboard.championsAriaLabel"
-              >
-                <span class="leaderboard-action-icon leaderboard-champion-shield-icon" aria-hidden="true"></span>
-              </button>
-              <button
-                id="leaderboardLifetimeRewardsBtn"
-                class="season-chip leaderboard-copy-btn leaderboard-lifetime-rewards-btn"
-                type="button"
-                aria-label="查看历届赞助总额"
-                title="查看历届赞助总额"
-              >
-                <span class="leaderboard-action-icon leaderboard-coin-icon" aria-hidden="true"></span>
-              </button>
             </div>
             <div class="leaderboard-head-actions">
-              <button
-                id="leaderboardPowerViewBtn"
-                class="season-chip leaderboard-copy-btn leaderboard-power-view-btn"
-                type="button"
-                data-copy-aria-label="leaderboard.powerViewAriaLabel"
-                data-copy-title="leaderboard.powerViewAriaLabel"
-              >
-                <span class="leaderboard-action-icon leaderboard-power-view-icon" aria-hidden="true"></span>
-              </button>
-              <button
-                id="leaderboardParticipationViewBtn"
-                class="season-chip leaderboard-copy-btn leaderboard-participation-view-btn"
-                type="button"
-                data-copy-aria-label="leaderboard.participationViewAriaLabel"
-                data-copy-title="leaderboard.participationViewAriaLabel"
-              >
-                <span class="leaderboard-action-icon leaderboard-participation-view-icon" aria-hidden="true"></span>
-              </button>
               <button
                 id="leaderboardCopyBtn"
                 class="season-chip leaderboard-copy-btn"

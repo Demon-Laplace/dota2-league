@@ -5,11 +5,15 @@ Review branch: `design/modern-league-ui`. This branch is not a production deploy
 ## Direction
 
 Charcoal surfaces, warm gold accents, quiet dividers, and existing Dota artwork.
-The header retains the season selector and sponsorship action. Two anchor links
-provide direct access to standings and match history, especially on mobile.
+The header retains the season selector and sponsorship action. A compact toolbar
+opens power allocation, participation scoring, past champions and lifetime
+sponsorship dialogs using their existing handlers. Their former icon buttons
+are moved out of the standings header, avoiding duplicate entry points.
 Main columns each use one readable surface; seasons, dates and teams no longer
-add additional card shells. Match cards use two columns on large screens and one
-on narrow screens. Existing score colors retain their meaning.
+add additional card shells. Matches use three columns on large screens, two on
+medium screens and one on phones. Each match has one subtle outline and a separate
+round header so adjacent matches remain distinct. Standings rows use compact
+spacing. Existing score colors retain their meaning.
 
 ## Implementation
 
@@ -30,6 +34,10 @@ Both widths loaded 24 standings rows and 21 match elements with no page errors
 or document-wide horizontal overflow. Match-day expansion was exercised.
 The power dialog opened on mobile and retained an internally scrollable body.
 Screenshots were inspected and date spacing and match header overlap corrected.
+The native season selector and seven shared selection control variants use the
+same charcoal and warm-gold styling. Selected, hover and disabled states were
+checked in isolated visual fixtures. The actual login player selector was opened
+and selected without submitting credentials or changing league data.
 Authenticated administrator and scorekeeper workflows have not been exercised;
 their shared visual styles are updated without altering their handlers.
 
