@@ -1075,6 +1075,10 @@ const scorerRenamePlayerChips = document.getElementById("scorerRenamePlayerChips
 const scorerRenamePlayerInput = document.getElementById("scorerRenamePlayerInput");
 const scorerRenamePlayerBtn = document.getElementById("scorerRenamePlayerBtn");
 const scorerDeactivatePlayerBtn = document.getElementById("scorerDeactivatePlayerBtn");
+const scorerInactivePlayersBlock = document.getElementById("scorerInactivePlayersBlock");
+const scorerInactivePlayerChips = document.getElementById("scorerInactivePlayerChips");
+const scorerRestorePlayerBtn = document.getElementById("scorerRestorePlayerBtn");
+const scorerHardDeletePlayerBtn = document.getElementById("scorerHardDeletePlayerBtn");
 const scorerItemNameInput = document.getElementById("scorerItemNameInput");
 const scorerItemDonationInput = document.getElementById("scorerItemDonationInput");
 const scorerItemMatchIconSelect = document.getElementById("scorerItemMatchIconSelect");
@@ -7986,21 +7990,22 @@ function getSelectedInactivePlayer() {
 }
 
 function renderInactivePlayerChips() {
-  if (!adminInactivePlayerChips) return;
-  const canAdmin = isCurrentRoleAdmin();
+  const targets = [scorerInactivePlayerChips, adminInactivePlayerChips].filter(Boolean);
+  if (!targets.length) return;
+  const canRestore = isCurrentRoleScorer();
 
-  if (!canAdmin) {
-    adminInactivePlayerChips.innerHTML = "";
+  if (!canRestore) {
+    targets.forEach((target) => { target.innerHTML = ""; });
     return;
   }
 
   if (inactivePlayersStatus === "loading") {
-    adminInactivePlayerChips.innerHTML = '<p class="muted">已删除名单读取中...</p>';
+    targets.forEach((target) => { target.innerHTML = '<p class="muted">已删除名单读取中...</p>'; });
     return;
   }
 
   if (inactivePlayersStatus === "error") {
-    adminInactivePlayerChips.innerHTML = '<p class="muted">已删除名单暂时不可用。</p>';
+    targets.forEach((target) => { target.innerHTML = '<p class="muted">已删除名单暂时不可用。</p>'; });
     return;
   }
 
@@ -8019,9 +8024,9 @@ function renderInactivePlayerChips() {
       </button>
     `).join("");
 
-  adminInactivePlayerChips.innerHTML = chipsHtml || `<p class="muted">${escapeHtml(copyText("runtime.players.noHiddenPlayers", "当前没有被删除的选手。"))}</p>`;
-  adminInactivePlayerChips.querySelectorAll(".access-scorer-chip").forEach((chip) => {
-    chip.disabled = !canAdmin;
+  targets.forEach((target) => {
+    target.innerHTML = chipsHtml || `<p class="muted">${escapeHtml(copyText("runtime.players.noHiddenPlayers", "当前没有被删除的选手。"))}</p>`;
+    target.querySelectorAll(".access-scorer-chip").forEach((chip) => { chip.disabled = !canRestore; });
   });
 }
 
@@ -8091,6 +8096,15 @@ function renderPlayerManagementOptions() {
   }
   if (adminInactivePlayersBlock) {
     adminInactivePlayersBlock.hidden = !isCurrentRoleAdmin();
+  }
+  if (scorerInactivePlayersBlock) {
+    scorerInactivePlayersBlock.hidden = !isCurrentRoleScorerOnly();
+  }
+  if (scorerRestorePlayerBtn) {
+    scorerRestorePlayerBtn.disabled = !isCurrentRoleScorerOnly() || !adminSelectedInactivePlayer;
+  }
+  if (scorerHardDeletePlayerBtn) {
+    scorerHardDeletePlayerBtn.disabled = !isCurrentRoleScorerOnly() || !adminSelectedInactivePlayer;
   }
   if (adminRestorePlayerBtn) {
     adminRestorePlayerBtn.disabled = !isCurrentRoleAdmin() || !adminSelectedInactivePlayer;
@@ -21452,10 +21466,11 @@ if (adminOpenManualScoreBtn) {
   adminOpenManualScoreBtn.addEventListener("click", () => openManualScoreModal("admin"));
 }
 if (scorerOpenPlayerManagementBtn) {
-  scorerOpenPlayerManagementBtn.addEventListener("click", () => {
+  scorerOpenPlayerManagementBtn.addEventListener("click", async () => {
     if (!isCurrentRoleScorer()) return;
     renderPlayerManagementOptions();
     setManagedDialogOpen("scorerPlayerManagement", true, { initialFocus: scorerQuickAddPlayerInput || undefined });
+    await loadInactivePlayersForAdmin({ force: true });
   });
 }
 if (adminOpenPlayerManagementBtn) {
@@ -22066,6 +22081,16 @@ if (adminDeactivatePlayerBtn) {
 if (adminRestorePlayerBtn) {
   adminRestorePlayerBtn.addEventListener("click", async () => {
     await restoreInactivePlayer(selectedInactivePlayerId || "");
+  });
+}
+if (scorerRestorePlayerBtn) {
+  scorerRestorePlayerBtn.addEventListener("click", async () => {
+    await restoreInactivePlayer(selectedInactivePlayerId || "", { messageTarget: "scorer" });
+  });
+}
+if (scorerHardDeletePlayerBtn) {
+  scorerHardDeletePlayerBtn.addEventListener("click", async () => {
+    await hardDeleteInactivePlayer(selectedInactivePlayerId || "", { messageTarget: "scorer" });
   });
 }
 if (adminHardDeletePlayerBtn) {
@@ -23936,7 +23961,7 @@ async function deactivatePlayer(playerId, { messageTarget = "admin" } = {}) {
   setMessage(successMessage);
   appendAdminActionLog(`${getCurrentAccessActorLabel()} 删除了总表选手 ${resolvedName}（仅前端隐藏）。`);
   await loadSeasonPlayers();
-  if (isCurrentRoleAdmin()) {
+  if (isCurrentRoleScorer()) {
     await loadInactivePlayersForAdmin({ force: true });
   }
   requestImmediateRefresh({
@@ -23948,22 +23973,23 @@ async function deactivatePlayer(playerId, { messageTarget = "admin" } = {}) {
   return true;
 }
 
-async function restoreInactivePlayer(playerId) {
-  if (!ensureAdminAccess("仅管理员可恢复已删除选手。")) return false;
+async function restoreInactivePlayer(playerId, { messageTarget = "admin" } = {}) {
+  if (!ensureScorerAccess("仅记分员或管理员可恢复已删除选手。")) return false;
+  const setPanelMessage = messageTarget === "scorer" ? setScorerPanelMessage : setAdminPanelMessage;
   const selectedPlayer = inactivePlayersDirectory.find((player) => player.id === playerId) || null;
   if (!selectedPlayer) {
-    setAdminPanelMessage(copyText("runtime.players.restoreMissingTarget", "请先选择要恢复的已删除选手。"), true);
+    setPanelMessage(copyText("runtime.players.restoreMissingTarget", "请先选择要恢复的已删除选手。"), true);
     return false;
   }
 
-  setAdminPanelMessage(copyText("runtime.players.restorePending", "正在恢复选手..."));
+  setPanelMessage(copyText("runtime.players.restorePending", "正在恢复选手..."));
   const { data, error } = await db.rpc("admin_restore_player_quick", {
     p_player_id: playerId,
   });
 
   if (error) {
     const migrationHint = getLatestSchemaMigrationHint(error);
-    setAdminPanelMessage(
+    setPanelMessage(
       formatCopyText("runtime.players.restoreFailed", { message: `${error.message}${migrationHint ? `。${migrationHint}` : ""}` }, `恢复选手失败：${error.message}${migrationHint ? `。${migrationHint}` : ""}`),
       true
     );
@@ -23974,7 +24000,7 @@ async function restoreInactivePlayer(playerId) {
   selectedInactivePlayerId = "";
   const resolvedName = data?.display_name || selectedPlayer.display_name || "该选手";
   const successMessage = formatCopyText("runtime.players.restoreSuccess", { name: resolvedName }, `已恢复选手：${resolvedName}`);
-  setAdminPanelMessage(successMessage);
+  setPanelMessage(successMessage);
   setMessage(successMessage);
   appendAdminActionLog(`${getCurrentAccessActorLabel()} 恢复了已删除选手 ${resolvedName}。`);
   await loadSeasonPlayers();
@@ -23988,11 +24014,12 @@ async function restoreInactivePlayer(playerId) {
   return true;
 }
 
-async function hardDeleteInactivePlayer(playerId) {
-  if (!ensureAdminAccess("仅管理员可永久删除选手。")) return false;
+async function hardDeleteInactivePlayer(playerId, { messageTarget = "admin" } = {}) {
+  if (!ensureScorerAccess("仅记分员或管理员可永久删除选手。")) return false;
+  const setPanelMessage = messageTarget === "scorer" ? setScorerPanelMessage : setAdminPanelMessage;
   const selectedPlayer = inactivePlayersDirectory.find((player) => player.id === playerId) || null;
   if (!selectedPlayer) {
-    setAdminPanelMessage(copyText("runtime.players.hardDeleteMissingTarget", "请先选择要永久删除的已删除选手。"), true);
+    setPanelMessage(copyText("runtime.players.hardDeleteMissingTarget", "请先选择要永久删除的已删除选手。"), true);
     return false;
   }
 
@@ -24023,18 +24050,18 @@ async function hardDeleteInactivePlayer(playerId) {
     }
   );
   if (typedName !== playerName) {
-    setAdminPanelMessage(copyText("runtime.players.hardDeleteNameMismatch", "确认文字不匹配，已取消永久删除。"), true);
+    setPanelMessage(copyText("runtime.players.hardDeleteNameMismatch", "确认文字不匹配，已取消永久删除。"), true);
     return false;
   }
 
-  setAdminPanelMessage(copyText("runtime.players.hardDeletePending", "正在永久删除选手..."));
+  setPanelMessage(copyText("runtime.players.hardDeletePending", "正在永久删除选手..."));
   const { data, error } = await db.rpc("admin_delete_player_permanently", {
     p_player_id: playerId,
   });
 
   if (error) {
     const migrationHint = getLatestSchemaMigrationHint(error);
-    setAdminPanelMessage(
+    setPanelMessage(
       formatCopyText("runtime.players.hardDeleteFailed", { message: `${error.message}${migrationHint ? `。${migrationHint}` : ""}` }, `永久删除选手失败：${error.message}${migrationHint ? `。${migrationHint}` : ""}`),
       true
     );
@@ -24045,7 +24072,7 @@ async function hardDeleteInactivePlayer(playerId) {
   selectedInactivePlayerId = "";
   const resolvedName = data?.display_name || playerName;
   const successMessage = formatCopyText("runtime.players.hardDeleteSuccess", { name: resolvedName }, `已从数据库永久删除选手：${resolvedName}`);
-  setAdminPanelMessage(successMessage);
+  setPanelMessage(successMessage);
   setMessage(successMessage);
   appendAdminActionLog(`${getCurrentAccessActorLabel()} 从数据库永久删除了已删除选手 ${resolvedName}。`);
   await loadSeasonPlayers();
@@ -24811,13 +24838,14 @@ if (accessScorerChips) {
   });
 });
 
-if (adminInactivePlayerChips) {
-  adminInactivePlayerChips.addEventListener("click", (event) => {
+[scorerInactivePlayerChips, adminInactivePlayerChips].forEach((container) => {
+  if (!container) return;
+  container.addEventListener("click", (event) => {
     const chip = event.target instanceof HTMLElement ? event.target.closest('[data-role="inactive-player-chip"]') : null;
     if (!(chip instanceof HTMLButtonElement)) return;
     selectInactivePlayer(chip.dataset.playerId || "");
   });
-}
+});
 
 if (authPasswordInput) {
   authPasswordInput.addEventListener("keydown", async (event) => {
