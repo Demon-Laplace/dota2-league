@@ -180,10 +180,14 @@ body :is(.access-scorer-chip, .manual-score-player-chip, .reward-player-chip,
   font-family: var(--font-inscription); font-weight: 900; letter-spacing: .09em;
   text-shadow: 0 2px 8px #0009;
 }
-.league-brand-mark {
-  background: linear-gradient(145deg, #c9937255, #151515 65%);
-  box-shadow: inset 0 0 0 1px #c9937280, inset 3px 3px 0 #0005;
+.league-brand-mark,
+.loading-screen .league-brand-mark {
+  background: transparent;
+  border: 0;
+  box-shadow: none;
+  clip-path: none;
 }
+.league-brand-logo { filter: drop-shadow(0 5px 9px #0008); }
 .league-brand-title-sub { font-variant-numeric: tabular-nums; color: var(--text-soft); letter-spacing: .1em; }
 .league-brand-kicker { color: #d5a287; letter-spacing: .26em; }
 .league-section-nav {
@@ -191,6 +195,15 @@ body :is(.access-scorer-chip, .manual-score-player-chip, .reward-player-chip,
   background: linear-gradient(90deg, #b1795010, transparent 75%);
 }
 .league-section-nav button { letter-spacing: .04em; }
+.league-nav-menu-trigger { display: inline-flex; align-items: center; justify-content: center; gap: 6px; }
+.league-nav-menu-arrow {
+  width: 6px; height: 6px; flex: 0 0 6px; margin-top: -3px;
+  border-right: 1px solid currentColor; border-bottom: 1px solid currentColor;
+  transform: rotate(45deg); transition: transform 140ms ease, margin 140ms ease;
+}
+.league-nav-menu-trigger[aria-expanded="true"] .league-nav-menu-arrow {
+  margin-top: 3px; transform: rotate(225deg);
+}
 .card, .season-panel {
   background-image: linear-gradient(135deg, #caa57c06, transparent 35%), var(--stone-grain);
   box-shadow: inset 0 1px #d0b98233, 0 12px 36px #0002;
@@ -292,4 +305,15 @@ input, select, textarea { background: #171717; }
 input:hover, select:hover, textarea:hover { background: #222020; }
 @media (prefers-reduced-motion: reduce) {
   .recent-match-card, .match-day-group > summary { transition: none; }
+}
+@media (max-width: 560px) {
+  #leagueBackgroundBtn { display: none; }
+  .league-section-nav > :is(.league-nav-dropdown, .league-nav-season) { display: grid; min-width: 0; }
+  .league-section-nav > :is(.league-nav-dropdown, .league-nav-season) > .league-nav-menu-trigger {
+    width: 100%; min-width: 0; padding-inline: 0;
+  }
+  .league-nav-menu-arrow { width: 5px; height: 5px; flex-basis: 5px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .league-nav-menu-arrow { transition: none; }
 }

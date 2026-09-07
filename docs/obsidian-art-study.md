@@ -38,3 +38,9 @@ power badges without replacing cards. No scoring or database writes change.
 Run `node scripts/test-match-power.cjs` for ten isolated regressions. Browser
 verification also delays memberships on a fresh context to check that the
 visible totals recover without reload, and checks warm-cache reload separately.
+
+On narrow screens the background-appreciation action is omitted from navigation,
+leaving a balanced two-row grid. The two menu arrows are separate, fixed-size
+decorations so they no longer shift their labels off the shared center line.
+The home and loading marks now place the transparent Dota 2 artwork directly on
+the page without a frame, fill or clipped metal backing.

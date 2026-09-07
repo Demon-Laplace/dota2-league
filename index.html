@@ -9,7 +9,7 @@
   <link rel="preload" as="image" href="./assets/Dota2_logo.png" fetchpriority="high" />
   <link rel="stylesheet" href="style.css?v=20260907-modern-league-v4" />
   <link rel="stylesheet" href="modern-ui.css?v=20260907-modern-league-v5" />
-  <link rel="stylesheet" href="obsidian-ui.css?v=20260907-obsidian-v2" />
+  <link rel="stylesheet" href="obsidian-ui.css?v=20260907-obsidian-v3" />
 </head>
   <body>
   <div id="loadingScreen" class="loading-screen" aria-live="polite">
@@ -75,11 +75,11 @@
     </div>
     <nav class="league-section-nav" aria-label="联赛资料">
       <div class="league-nav-dropdown">
-        <button id="leagueRelationBtn" type="button" aria-expanded="false" aria-controls="leagueRelationPlayers">胜率网络 ▾</button>
+        <button id="leagueRelationBtn" class="league-nav-menu-trigger" type="button" aria-expanded="false" aria-controls="leagueRelationPlayers"><span>胜率网络</span><span class="league-nav-menu-arrow" aria-hidden="true"></span></button>
         <div id="leagueRelationPlayers" class="league-nav-player-list" aria-label="选择胜率网络选手" hidden></div>
       </div>
       <div class="league-nav-season">
-        <button id="leagueSeasonBtn" type="button" aria-haspopup="listbox" aria-expanded="false">过往赛季 ▾</button>
+        <button id="leagueSeasonBtn" class="league-nav-menu-trigger" type="button" aria-haspopup="listbox" aria-expanded="false"><span>过往赛季</span><span class="league-nav-menu-arrow" aria-hidden="true"></span></button>
         <select id="leaderboardSeasonSelect" class="league-brand-season-select" aria-label="选择查看的赛季" hidden></select>
       </div>
       <button id="leaderboardPowerViewBtn" type="button" aria-haspopup="dialog" aria-controls="leaderboardPowerViewModal">战力分配</button>
