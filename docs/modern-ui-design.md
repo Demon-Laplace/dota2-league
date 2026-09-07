@@ -42,3 +42,13 @@ Authenticated administrator and scorekeeper workflows have not been exercised;
 their shared visual styles are updated without altering their handlers.
 
 Do not merge or deploy to main until the visual direction has been reviewed.
+
+## Public navigation and relationship view follow-up
+
+- Added win-rate relationships and background viewing to the four public navigation entries.
+- Kept the original player win-rate click and logo double-click shortcuts. Background mode exposes a clearly labeled return button and synchronizes its pressed state across both entry points.
+- Navigation wraps into two rows on phones. Administrative actions remain in their permission-controlled panels.
+- Flattened relationship summary groups, network panels and table controls; retained teal/gold relationship semantics without nested gradients or glows. Preserved node positioning on hover and keyboard focus.
+- Unified champion and lifetime sponsorship accents with the modern palette.
+- Verified both relationship entry points, network data rendering, table switching, background hide/restore and mobile rendering in Edge. Public regression checks reported no page errors or horizontal page overflow.
+- No database, scoring, sponsorship or authorization changes. Authenticated editing workflows remain untested.

@@ -189,6 +189,56 @@ body .item-catalog-player-chip-negative :is(.item-catalog-player-name, .item-cat
 .hero-search-option { background: transparent; color: var(--text-soft); }
 .hero-search-option:hover, .hero-search-option:focus-visible { background: #30363b; color: var(--text); }
 
+/* Public navigation stays reachable when the scoreboard is hidden. */
+.league-section-nav { flex-wrap: wrap; column-gap: 24px; row-gap: 0; }
+.league-section-nav button { flex-shrink: 0; }
+body.home-stealth-mode .league-section-nav button:not(#leagueBackgroundBtn) { display: none; }
+#leagueBackgroundBtn { margin-left: auto; }
+#leagueBackgroundBtn[aria-pressed="true"] { color: var(--gold); }
+@media (max-width: 560px) {
+  .league-section-nav { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0 8px; }
+  #leagueBackgroundBtn { margin-left: 0; }
+  body.home-stealth-mode .league-section-nav { display: flex; justify-content: flex-end; }
+}
+
+/* Relationship views share the page palette, without nested gradient cards. */
+.hero-picker-dialog.relation-stats-dialog,
+.hero-picker-dialog.leaderboard-champions-sheet {
+  background: #1b1f23; border-color: var(--border-strong); border-radius: 12px; box-shadow: var(--shadow);
+}
+.relation-stats-title-wrap h2 { font-size: 20px; letter-spacing: 0; }
+.relation-summary-group, .relation-stats-panel {
+  background: none; border: 0; border-radius: 0; padding: 8px 0; box-shadow: none;
+}
+.relation-summary-group-head, .relation-stats-panel-head { border-bottom: 1px solid var(--border); padding-bottom: 8px; }
+.relation-summary-card {
+  background: none; border: 0; border-radius: 0; min-height: 78px; box-shadow: none;
+}
+.relation-summary-card + .relation-summary-card { border-left: 1px solid var(--border); }
+.relation-summary-card-title { font-size: 18px; color: var(--text); }
+.relation-summary-badge { background: var(--surface-hover); border: 0; border-radius: 4px; color: var(--text-soft); }
+.relation-summary-badge-low { color: var(--gold); background: var(--gold-soft); }
+.relation-chart-surface { background: #171a1d; border: 0; border-radius: 6px; }
+.relation-ladder-chart .relation-ladder-subject,
+.relation-ladder-chart .relation-ladder-node {
+  background: #24292e; color: var(--text); border-color: var(--border-strong); border-radius: 5px; box-shadow: none;
+}
+.relation-ladder-chart .relation-ladder-subject { border-color: var(--teal); }
+.relation-ladder-chart-opponent .relation-ladder-subject { border-color: var(--gold); }
+.relation-ladder-chart .relation-ladder-node:is(:hover, :active, :focus-visible) {
+  background: #30363b; box-shadow: none; transform: translate(-50%, -50%);
+}
+.relation-ladder-chart .relation-ladder-node:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
+.relation-ladder-link { stroke: var(--teal); }
+.relation-ladder-chart-opponent .relation-ladder-link { stroke: var(--gold); }
+.relation-ladder-bar::after { background: var(--teal); }
+.relation-ladder-chart-opponent .relation-ladder-bar::after { background: var(--gold); }
+.relation-stats-table thead th { background: #1b1f23; }
+.relation-sort-btn { background: none; border: 0; border-radius: 4px; }
+.leaderboard-champion-mark { background: var(--gold); box-shadow: none; }
+.leaderboard-champion-ti { color: var(--gold); }
+.leaderboard-lifetime-reward-mark { background: var(--gold-soft); color: var(--gold); box-shadow: none; border-color: var(--border); }
+
 /* Shared controls: static geometry keeps hover targets and popovers stable. */
 button, input, select, textarea { font-family: var(--font-ui); }
 button { transition: background-color 140ms ease, border-color 140ms ease, color 140ms ease; }

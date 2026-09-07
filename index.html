@@ -8,7 +8,7 @@
   <link rel="preconnect" href="https://klxkkwwszqtgeuozwtkw.supabase.co" crossorigin />
   <link rel="preload" as="image" href="./assets/Dota2_logo.png" fetchpriority="high" />
   <link rel="stylesheet" href="style.css?v=20260905-item-sponsorship-v1" />
-  <link rel="stylesheet" href="modern-ui.css?v=20260906-modern-league-v2" />
+  <link rel="stylesheet" href="modern-ui.css?v=20260907-modern-league-v3" />
 </head>
   <body>
   <div id="loadingScreen" class="loading-screen" aria-live="polite">
@@ -75,10 +75,12 @@
       </div>
     </div>
     <nav class="league-section-nav" aria-label="联赛资料">
+      <button id="leagueRelationBtn" type="button" aria-haspopup="dialog" aria-controls="playerRelationModal">胜率网络</button>
       <button id="leaderboardPowerViewBtn" type="button" aria-haspopup="dialog" aria-controls="leaderboardPowerViewModal">战力分配</button>
       <button id="leaderboardParticipationViewBtn" type="button" aria-haspopup="dialog" aria-controls="leaderboardParticipationViewModal">场次积分</button>
       <button id="leaderboardChampionsBtn" type="button" aria-haspopup="dialog" aria-controls="leaderboardChampionsModal">历届冠军</button>
       <button id="leaderboardLifetimeRewardsBtn" type="button" aria-haspopup="dialog" aria-controls="leaderboardLifetimeRewardsModal">历届赞助</button>
+      <button id="leagueBackgroundBtn" type="button" aria-pressed="false">欣赏背景</button>
     </nav>
     <p class="sub" hidden><span data-copy="meta.betaNoticePrefix"></span><span id="lastUpdatedText">读取中...</span></p>
     <section id="scorerPanel" class="season-panel admin-panel" hidden>
@@ -1289,6 +1291,6 @@
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="src/site-copy.js?v=20260803-minimal-hero-reward-ui-v1"></script>
-  <script src="app.js?v=20260905-item-sponsorship-v1"></script>
+  <script src="app.js?v=20260907-modern-league-v3"></script>
 </body>
 </html>

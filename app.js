@@ -985,6 +985,8 @@ const brandMonthBadge = document.getElementById("brandMonthBadge");
 const leaderboardSeasonSelect = document.getElementById("leaderboardSeasonSelect");
 const loadingBrandMonth = document.getElementById("loadingBrandMonth");
 const homeStealthToggle = document.getElementById("homeStealthToggle");
+const leagueBackgroundBtn = document.getElementById("leagueBackgroundBtn");
+const leagueRelationBtn = document.getElementById("leagueRelationBtn");
 const signupPlayerGrid = document.getElementById("signupPlayerGrid");
 const signupEmpty = document.getElementById("signupEmpty");
 const messageEl = document.getElementById("message");
@@ -4962,6 +4964,10 @@ async function openLeaderboardLifetimeRewards() {
 function setHomeStealthMode(isEnabled) {
   isHomeStealthMode = Boolean(isEnabled);
   document.body.classList.toggle("home-stealth-mode", isHomeStealthMode);
+  if (leagueBackgroundBtn) {
+    leagueBackgroundBtn.textContent = isHomeStealthMode ? "返回页面" : "欣赏背景";
+    leagueBackgroundBtn.setAttribute("aria-pressed", String(isHomeStealthMode));
+  }
   if (homeStealthToggle) {
     homeStealthToggle.dataset.active = isHomeStealthMode ? "true" : "false";
   }
@@ -21389,6 +21395,17 @@ function subscribeRealtime() {
 if (seasonToggleBtn) {
   seasonToggleBtn.addEventListener("click", () => {
     setSeasonPanelOpen(!isSeasonPanelOpen);
+  });
+}
+if (leagueBackgroundBtn) {
+  leagueBackgroundBtn.addEventListener("click", () => setHomeStealthMode(!isHomeStealthMode));
+}
+if (leagueRelationBtn) {
+  leagueRelationBtn.addEventListener("click", () => {
+    openPlayerRelationModal().catch((error) => {
+      console.error("打开胜率网络失败：", error);
+      setMessage(`打开胜率网络失败：${error.message || "未知错误"}`, true);
+    });
   });
 }
 if (homeStealthToggle) {
