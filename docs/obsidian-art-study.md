@@ -21,3 +21,20 @@ four available historical seasons, automatic-refresh protection and restoration;
 real season navigation; desktop/mobile overflow, player picker, power dialog,
 champion dialog and background-view layout stability. Browser screenshots are
 kept in the task's output directory rather than shipped with the website.
+
+## Edition II
+
+Engraved Chinese display typography, editorial rank numerals, copper hairlines,
+matte match headers and warmer neutral auxiliary surfaces deepen the art direction.
+Sponsorship categories now use flat ledger rows instead of blue nested pills;
+gold totals and muted green paid markers preserve the financial distinctions.
+
+The initial-load power issue came from deferred `loadSeasonPlayers` populating
+the power cache without repainting match totals, plus `Number(null)` being
+accepted as zero before reaching snapshot fallback. Missing totals now show an
+em dash, valid zero stays zero, and membership completion updates only the two
+power badges without replacing cards. No scoring or database writes change.
+
+Run `node scripts/test-match-power.cjs` for ten isolated regressions. Browser
+verification also delays memberships on a fresh context to check that the
+visible totals recover without reload, and checks warm-cache reload separately.

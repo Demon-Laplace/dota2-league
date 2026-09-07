@@ -16979,7 +16979,8 @@ function getMatchPlayerRank(player, fallbackRankMap = null, seasonId = activeSea
   if (seasonId && activeSeason?.id === seasonId) {
     if (cachedRank) return cachedRank;
     if (playerId && fallbackRankMap instanceof Map) {
-      return normalizeSeasonRankNo(fallbackRankMap.get(playerId));
+      const currentRank = normalizeSeasonRankNo(fallbackRankMap.get(playerId));
+      if (currentRank) return currentRank;
     }
   }
   const directRank = normalizeSeasonRankNo(
@@ -17001,7 +17002,7 @@ function getMatchPlayerPowerValue(player, seasonId = activeSeason?.id, fallbackR
     }
     const currentRankNo = getMatchPlayerRank(player, fallbackRankMap, seasonId);
     const currentPowerValue = getSeasonRankPowerValue(currentRankNo, seasonId);
-    if (Number.isFinite(Number(currentPowerValue))) {
+    if (currentPowerValue !== null && Number.isFinite(Number(currentPowerValue))) {
       return Math.max(Number(currentPowerValue) || 0, 0);
     }
   }
@@ -17009,8 +17010,7 @@ function getMatchPlayerPowerValue(player, seasonId = activeSeason?.id, fallbackR
   const rawSnapshotValue = player?.power_value_snapshot;
   if (rawSnapshotValue !== null && rawSnapshotValue !== undefined && rawSnapshotValue !== "") {
     const snapshotValue = Number(rawSnapshotValue);
-    if (!Number.isFinite(snapshotValue)) return 0;
-    return Math.max(snapshotValue, 0);
+    if (Number.isFinite(snapshotValue)) return Math.max(snapshotValue, 0);
   }
   const cachedPower = getCachedSeasonPlayerPower(seasonId, playerId)?.power_value;
   if (cachedPower !== null && cachedPower !== undefined && cachedPower !== "") {
@@ -17019,13 +17019,34 @@ function getMatchPlayerPowerValue(player, seasonId = activeSeason?.id, fallbackR
   }
   const rankNo = getMatchPlayerRank(player, fallbackRankMap, seasonId);
   const powerValue = getSeasonRankPowerValue(rankNo, seasonId);
-  return Math.max(Number(powerValue) || 0, 0);
+  return powerValue === null ? null : Math.max(Number(powerValue) || 0, 0);
 }
 
 function getMatchTeamPowerTotal(players, seasonId = activeSeason?.id, fallbackRankMap = null) {
-  return (players || []).reduce((sum, player) => {
-    return sum + getMatchPlayerPowerValue(player, seasonId, fallbackRankMap);
-  }, 0);
+  const values = (players || []).map((player) => getMatchPlayerPowerValue(player, seasonId, fallbackRankMap));
+  return values.some((value) => value === null) ? null : values.reduce((sum, value) => sum + value, 0);
+}
+
+// Player memberships arrive after the first match render. Update only the totals
+// so expanded days, focus and inline hero selection are not disturbed.
+function refreshRecentMatchPowerBadges() {
+  const rankMap = new Map(seasonPlayers.map((player) => [player.id, player.player_rank]));
+  const matches = new Map(recentMatchesData.map((match) => [match.match_id, match]));
+  recentMatchesList?.querySelectorAll('.recent-match-card[data-match-id]').forEach((card) => {
+    const match = matches.get(card.dataset.matchId);
+    if (!match) return;
+    const players = parseRecentMatchPlayers(match.players);
+    const totals = ["A", "B"].map((team) => getMatchTeamPowerTotal(
+      getOrderedSavedMatchTeamPlayers(players, team), match.season_id || activeSeason?.id, rankMap
+    ));
+    card.querySelectorAll('.recent-match-team-power-badge').forEach((badge, index) => {
+      const value = totals[index];
+      badge.textContent = value === null ? "—" : formatScore(value);
+      badge.title = value === null ? "战力数据待加载" : "战力合计";
+      badge.classList.toggle('recent-match-team-power-badge-leading',
+        value !== null && totals[1 - index] !== null && value > totals[1 - index]);
+    });
+  });
 }
 
 function getSeasonRankLabel(rankNo, seasonId = activeSeason?.id) {
@@ -18297,8 +18318,9 @@ function renderRecentMatches(groups) {
       const teamBPlayers = getOrderedSavedMatchTeamPlayers(players, "B");
       const teamAPowerTotal = getMatchTeamPowerTotal(teamAPlayers, match.season_id || activeSeason?.id, activeSeasonRankMap);
       const teamBPowerTotal = getMatchTeamPowerTotal(teamBPlayers, match.season_id || activeSeason?.id, activeSeasonRankMap);
-      const teamAPowerBadgeClass = teamAPowerTotal > teamBPowerTotal ? " recent-match-team-power-badge-leading" : "";
-      const teamBPowerBadgeClass = teamBPowerTotal > teamAPowerTotal ? " recent-match-team-power-badge-leading" : "";
+      const powerTotalsReady = teamAPowerTotal !== null && teamBPowerTotal !== null;
+      const teamAPowerBadgeClass = powerTotalsReady && teamAPowerTotal > teamBPowerTotal ? " recent-match-team-power-badge-leading" : "";
+      const teamBPowerBadgeClass = powerTotalsReady && teamBPowerTotal > teamAPowerTotal ? " recent-match-team-power-badge-leading" : "";
       const winnerLabel = getWinnerLabel(match.winner_team);
       const roundBadgeLabel = `第 ${matchIndex + 1} 场 · ${winnerLabel}`;
       const resultToneClass = match.winner_team === "A"
@@ -18382,7 +18404,7 @@ function renderRecentMatches(groups) {
           <div class="recent-match-team${match.winner_team === "A" ? " recent-match-team-winner" : ""}">
             <div class="recent-match-team-head">
               <h3>天辉方</h3>
-              <span class="recent-match-team-power-badge${teamAPowerBadgeClass}">${formatScore(teamAPowerTotal)}</span>
+              <span class="recent-match-team-power-badge${teamAPowerBadgeClass}" title="${teamAPowerTotal === null ? "战力数据待加载" : "战力合计"}">${teamAPowerTotal === null ? "—" : formatScore(teamAPowerTotal)}</span>
             </div>
             <ul>${renderPlayerList(teamAPlayers)}</ul>
             ${buildEffectLogHtml("A")}
@@ -18390,7 +18412,7 @@ function renderRecentMatches(groups) {
           <div class="recent-match-team${match.winner_team === "B" ? " recent-match-team-winner" : ""}">
             <div class="recent-match-team-head">
               <h3>夜魇方</h3>
-              <span class="recent-match-team-power-badge${teamBPowerBadgeClass}">${formatScore(teamBPowerTotal)}</span>
+              <span class="recent-match-team-power-badge${teamBPowerBadgeClass}" title="${teamBPowerTotal === null ? "战力数据待加载" : "战力合计"}">${teamBPowerTotal === null ? "—" : formatScore(teamBPowerTotal)}</span>
             </div>
             <ul>${renderPlayerList(teamBPlayers)}</ul>
             ${buildEffectLogHtml("B")}
@@ -18624,6 +18646,7 @@ async function loadSeasonPlayers() {
     activeSeason?.id,
     seasonPlayers.filter((player) => player.is_in_season)
   );
+  refreshRecentMatchPowerBadges();
   writeCachedHomePlayerDirectorySnapshot({
     activeSeasonId: activeSeason?.id,
     seasonRows: seasonPlayers,

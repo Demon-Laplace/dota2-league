@@ -4,8 +4,8 @@
   --bg-mid: #1b1c1b;
   --surface: rgba(23, 24, 23, .96);
   --surface-muted: rgba(33, 34, 32, .88);
-  --surface-elevated: #252623;
-  --surface-hover: #30312d;
+  --surface-elevated: #282726;
+  --surface-hover: #33312f;
   --panel: var(--surface);
   --panel-strong: #1d1e1c;
   --panel-soft: var(--surface-muted);
@@ -163,3 +163,133 @@ body :is(.access-scorer-chip, .manual-score-player-chip, .reward-player-chip,
 .loading-screen { background: #111212; }
 
 @media (prefers-reduced-motion: reduce) { body::after { transition: none; } }
+
+/* Edition II: engraved sporting almanac, not another set of nested cards. */
+:root {
+  --text: #eee9df;
+  --text-soft: #c2bbb0;
+  --text-dim: #a49d92;
+  --surface: rgba(22, 22, 23, .94);
+  --surface-muted: rgba(36, 34, 33, .84);
+  --panel-strong: #201f1f;
+  --copper: #bd7961;
+  --gold: #d0b982;
+  --font-inscription: "STZhongsong", "Songti SC", "SimSun", serif;
+}
+.league-brand-title-main {
+  font-family: var(--font-inscription); font-weight: 900; letter-spacing: .09em;
+  text-shadow: 0 2px 8px #0009;
+}
+.league-brand-mark {
+  background: linear-gradient(145deg, #c9937255, #151515 65%);
+  box-shadow: inset 0 0 0 1px #c9937280, inset 3px 3px 0 #0005;
+}
+.league-brand-title-sub { font-variant-numeric: tabular-nums; color: var(--text-soft); letter-spacing: .1em; }
+.league-brand-kicker { color: #d5a287; letter-spacing: .26em; }
+.league-section-nav {
+  border-top-color: #bf8c6255;
+  background: linear-gradient(90deg, #b1795010, transparent 75%);
+}
+.league-section-nav button { letter-spacing: .04em; }
+.card, .season-panel {
+  background-image: linear-gradient(135deg, #caa57c06, transparent 35%), var(--stone-grain);
+  box-shadow: inset 0 1px #d0b98233, 0 12px 36px #0002;
+}
+.section-head h2 { font-family: var(--font-inscription); font-weight: 800; letter-spacing: .1em; }
+.leaderboard-card > .section-head, #recentMatchesSection > .section-head {
+  border-image: linear-gradient(90deg, #bd796180, #bd796115) 1;
+}
+.leaderboard-table thead th { color: #93897c; }
+.leaderboard-table tbody td { border-bottom-color: #d9c7a811; }
+.leaderboard-table tbody tr:hover { background: #c7a68112; }
+.leaderboard-table tbody td:first-child { font-family: Georgia, "Times New Roman", serif; font-style: italic; }
+.leaderboard-row-top1 { background: linear-gradient(90deg, #b9954d25, #b9954d04); }
+.leaderboard-score { font-variant-numeric: tabular-nums; letter-spacing: .025em; }
+.leaderboard-player-name, .recent-match-player-name { text-shadow: none; }
+.recent-match-season-title-block strong { color: var(--gold); letter-spacing: .04em; }
+.match-day-group > summary { transition: background-color 140ms ease; }
+.match-day-group > summary:hover { background: #c3a27e09; }
+.match-day-summary strong { font-family: Georgia, var(--font-ui); font-size: 17px; color: var(--gold); }
+.match-day-player-list { color: var(--text-soft); }
+.recent-match-card {
+  background: linear-gradient(145deg, #ffffff03, transparent 60%), #202020;
+  border-color: #b7a28638; border-radius: 2px;
+  box-shadow: inset 0 1px #e0c9a615, 0 3px 10px #0003;
+  transition: border-color 150ms ease, box-shadow 150ms ease;
+}
+.recent-match-card:hover { border-color: #c8ab776e; box-shadow: inset 0 1px #e0c9a622, 0 5px 16px #0004; }
+.recent-match-card .recent-match-round-badge {
+  background: #171717; border-bottom-color: #b7a28624;
+  box-shadow: inset 2px 0 currentColor;
+}
+.recent-match-card .recent-match-round-badge::before { content: "◆"; font-size: 8px; opacity: .7; }
+.recent-match-teams > .recent-match-team + .recent-match-team { border-left-color: #baa88c28; }
+.recent-match-card .recent-match-teams > .recent-match-team .recent-match-team-head h3 {
+  color: var(--text-soft); background: transparent; border-color: transparent;
+  box-shadow: none; border-radius: 0; letter-spacing: .08em;
+}
+.recent-match-card .recent-match-teams > .recent-match-team-winner .recent-match-team-head h3 { color: var(--gold); }
+.recent-match-team-power-badge { font-family: Georgia, serif; color: var(--text-soft); }
+.recent-match-team-power-badge-leading { color: var(--gold); background: none; }
+.recent-match-meta-time { color: #999084; font-variant-numeric: tabular-nums; font-size: 11px; }
+.daily-bonus-heroes { color: var(--gold); }
+
+/* Sponsorship is a ledger: neutral rows, aligned values and quiet gold totals. */
+.reward-summary-card {
+  border: 0; border-top: 1px solid #bc9c674d; border-radius: 0;
+  background: #ffffff03; box-shadow: none; align-content: start;
+}
+.reward-summary-card:hover { border-color: #c8aa7877; box-shadow: none; }
+.reward-summary-head { border-bottom: 1px solid var(--border); padding-bottom: 8px; }
+.reward-summary-head strong { color: var(--text); }
+.reward-category-line, .reward-category-line-extra {
+  background: none; border: 0; border-bottom: 1px solid #c9b99e10;
+  border-radius: 0; padding-inline: 0; box-shadow: none;
+}
+.reward-category-line:last-child { border-bottom: 0; }
+.reward-category-name, .reward-category-name-base, .reward-category-name-misc { color: var(--text-soft); }
+.reward-category-name-card, .reward-category-name-extra { color: #ccb78f; }
+.reward-category-value, .reward-category-value-extra { color: var(--text); text-shadow: none; font-variant-numeric: tabular-nums; }
+.reward-log-amount, .reward-log-amount-total {
+  border: 0; border-radius: 2px; background: #c8ae7410; color: var(--gold);
+  box-shadow: none; text-shadow: none; font-variant-numeric: tabular-nums;
+}
+.reward-log-amount-total { background: none; padding-inline: 0; font-weight: 700; }
+.reward-glow-tier-base, .reward-glow-tier-warm, .reward-glow-tier-bright, .reward-glow-tier-blazing { box-shadow: none; }
+.reward-log-amount-total.reward-glow-tier-base { color: var(--text-soft); }
+.reward-log-amount-total.reward-glow-tier-blazing { color: #e7c58c; }
+.reward-log-item, .reward-log-item-extra, .reward-log-outside {
+  background: #ffffff03; border-color: var(--border); border-radius: 3px; box-shadow: none;
+}
+.reward-log-cancelled { color: var(--danger); background: var(--danger-soft); }
+.reward-signup-fee-paid-badge,
+.reward-signup-fee-toggle-btn.reward-signup-fee-toggle-btn-active,
+.reward-signup-fee-toggle-btn.reward-signup-fee-toggle-btn-active:hover:not(:disabled) {
+  background: #83a48d; border-color: #adc3ab80; box-shadow: none;
+}
+
+/* The same warm-neutral materials extend into auxiliary surfaces. */
+.hero-picker-dialog,
+.hero-picker-dialog:is(.system-prompt-dialog, .access-dialog, .relation-stats-dialog, .leaderboard-champions-sheet) {
+  background: linear-gradient(120deg, #b68f6010, transparent 40%), #1e1e1f;
+  border-color: #ba9b6c55; box-shadow: 0 28px 80px #000a, inset 0 1px #d0b98230;
+}
+.hero-picker-dialog h2 { font-family: var(--font-inscription); letter-spacing: .05em; }
+.league-nav-player-list, .team-double-options, .hero-search-suggestions,
+.leaderboard-player-hovercard, .leaderboard-stat-hovercard, .leaderboard-player-tag-popover { background: #272525; }
+.league-brand-season-select, .league-brand-season-select:hover, .league-brand-season-select:focus-visible,
+.league-brand-season-select option, .league-nav-season select { background: #252424; }
+.league-section-nav .league-nav-player-list button:is(:hover, :focus-visible) { background: #bc8a6115; }
+.relation-chart-surface { background: #181819; }
+.relation-ladder-chart .relation-ladder-subject, .relation-ladder-chart .relation-ladder-node { background: #2c2927; }
+.relation-ladder-chart .relation-ladder-node:is(:hover, :focus-visible, :active) { background: #3b332b; }
+.relation-stats-table thead th { background: #201f1f; }
+.relation-summary-badge { background: #302c28; }
+#leaderboardPowerViewList .season-rank-column { background: #242322; border-left: 2px solid #bd796188; }
+#leaderboardPowerViewList .season-rank-column:nth-child(even) { background: #302c28; border-left-color: #c8ae7499; }
+.match-form-panel { background: #252322; }
+input, select, textarea { background: #171717; }
+input:hover, select:hover, textarea:hover { background: #222020; }
+@media (prefers-reduced-motion: reduce) {
+  .recent-match-card, .match-day-group > summary { transition: none; }
+}
