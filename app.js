@@ -1424,7 +1424,7 @@ let leaderboardDisplaySeasonName = "";
 let leaderboardDisplaySeasonId = null;
 let leaderboardManualSeasonId = "";
 let leaderboardSortMode = "total";
-let leaderboardChampions = [];
+let leaderboardChampions = Array.isArray(window.__DOTA2_CHAMPIONS__) ? window.__DOTA2_CHAMPIONS__ : [];
 let leaderboardChampionsStatusText = "";
 let isLeaderboardChampionsLoading = false;
 let lifetimeRewardTotalsByKey = new Map();
@@ -2812,6 +2812,20 @@ async function handleSeasonRolloverFinalization(result, refreshOptions = {}) {
       ? `完成了 ${closedSeasonName} 的赛季完结，并切换至 ${nextSeasonName}；数据库保留了 ${matchCount} 场比赛的赛季记录。`
       : `完成了 ${closedSeasonName} 的赛季完结，并切换至 ${nextSeasonName}；因该赛季没有比赛记录，未保留历史数据。`
   );
+  if (retainedInDatabase && closedSeasonId) {
+    try {
+      const publication = await invokeFunction("publish-season-champion", { seasonId: closedSeasonId });
+      if (publication?.champion) {
+        window.__DOTA2_CHAMPIONS__ = [
+          ...(window.__DOTA2_CHAMPIONS__ || []).filter((entry) => entry.seasonCode !== publication.champion.seasonCode),
+          publication.champion,
+        ].sort(compareChampionEntriesByRecentSeasonStart);
+      }
+    } catch (error) {
+      console.error("冠军静态发布失败：", error);
+      showBlockingAlert(`赛季已完结，但冠军静态发布失败：${error.message || "未知错误"}。请管理员重试冠军发布，勿重复结算。`);
+    }
+  }
   await updateLifetimeRewardTotalsForSeason(closedSeasonId);
   await adoptRolloverNextSeason(result);
   await requestImmediateRefresh({
@@ -4656,59 +4670,11 @@ async function fetchSeasonChampionEntry(season) {
 }
 
 async function loadLeaderboardChampions() {
-  if (isLeaderboardChampionsLoading) return leaderboardChampions;
-  isLeaderboardChampionsLoading = true;
-  leaderboardChampionsStatusText = copyText("leaderboard.championsStatusLoading", "冠军读取中...");
-  renderLeaderboardChampions();
-
-  if (!allSeasons.length) {
-    await loadSeasons();
-  }
-
-  const cache = readSeasonChampionCache();
-  let didChangeCache = false;
-  let errorCount = 0;
-  const dynamicEntries = [];
-
-  for (const season of getAutoChampionSeasons()) {
-    const cachedEntry = normalizeCachedChampionEntry(season, cache[season.code]);
-    if (cachedEntry) {
-      dynamicEntries.push(cachedEntry);
-      continue;
-    }
-
-    try {
-      const fetchedEntry = await fetchSeasonChampionEntry(season);
-      if (!fetchedEntry?.championName) continue;
-      dynamicEntries.push(fetchedEntry);
-      cache[season.code] = {
-        seasonId: season.id,
-        seasonName: season.name || season.code,
-        championName: fetchedEntry.championName,
-        playerId: fetchedEntry.playerId || "",
-        score: fetchedEntry.score,
-        cachedAt: Date.now(),
-      };
-      didChangeCache = true;
-    } catch (error) {
-      errorCount += 1;
-      console.error(`读取 ${season.code} 冠军失败：`, error);
-    }
-  }
-
-  if (didChangeCache) {
-    writeSeasonChampionCache(cache);
-  }
-
-  leaderboardChampions = [
-    ...buildFixedChampionEntries(),
-    ...dynamicEntries,
-  ].sort(compareChampionEntriesByRecentSeasonStart);
-
+  // Settlement snapshots are shipped with the site, independent of local caches
+  // and the currently selected leaderboard sort mode. Never recompute on click.
+  leaderboardChampions = Array.isArray(window.__DOTA2_CHAMPIONS__) ? window.__DOTA2_CHAMPIONS__ : [];
   isLeaderboardChampionsLoading = false;
-  leaderboardChampionsStatusText = errorCount
-    ? copyText("leaderboard.championsStatusPartial", "部分已完结赛季冠军读取失败。")
-    : copyText("leaderboard.championsStatusReady", "");
+  leaderboardChampionsStatusText = leaderboardChampions.length ? "" : "冠军静态文件未加载，请刷新页面重试。";
   renderLeaderboardChampions();
   return leaderboardChampions;
 }
