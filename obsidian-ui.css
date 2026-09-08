@@ -322,3 +322,35 @@ body.history-season-no-data #recentMatchesSection {
   visibility: hidden;
   pointer-events: none;
 }
+
+/* The pointer shares the opaque surface so its inner half disappears into it. */
+.leaderboard-player-tag-popover::before,
+.leaderboard-player-hovercard::before,
+.leaderboard-stat-hovercard::before {
+  background: #272525;
+  border-color: #bda67f55;
+  box-shadow: none;
+}
+
+/* ID-based legacy rules otherwise override the shared action palette. */
+#openMatchFormBtn, #openBackfillFormBtn, #startMatchDayBtn, #addRewardBtn,
+.admin-panel-finish-match-day-btn, .season-rollover-btn, .season-panel-action-btn {
+  background: #252322; color: var(--text-soft); border: 1px solid var(--border);
+  border-radius: 4px; box-shadow: none; text-shadow: none; filter: none;
+}
+#openMatchFormBtn, #addRewardBtn {
+  background: #8a4633; color: #fff0e8; border-color: #c0785e88;
+}
+#openMatchFormBtn:hover:not(:disabled), #addRewardBtn:hover:not(:disabled) {
+  background: #a05740; color: #fff5ee; border-color: var(--copper);
+  box-shadow: none; filter: none; transform: none;
+}
+#openBackfillFormBtn:hover:not(:disabled), #startMatchDayBtn:hover:not(:disabled),
+.admin-panel-finish-match-day-btn:hover:not(:disabled), .season-rollover-btn:hover:not(:disabled),
+.season-panel-action-btn:hover:not(:disabled) {
+  background: #322b27; color: var(--text); border-color: var(--copper);
+  box-shadow: none; filter: none; transform: none;
+}
+#startMatchDayBtn.button-cancel-state {
+  background: var(--danger-soft); color: var(--danger); border-color: #b663554a;
+}
