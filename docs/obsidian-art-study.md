@@ -51,3 +51,9 @@ season exists in the database, choosing one follows the existing season and
 champion-background path but does not issue an empty leaderboard query. The
 standings and match-record surfaces become invisible, like background view,
 until the visitor selects a database-backed season again.
+
+The teammate and opponent relationship networks use five labels per vertical
+lane. Each upper and lower zone can show up to 20 players on landscape layouts,
+and up to five in portrait. The chart grows from 520 to 620 pixels on landscape
+and from 440 to 540 pixels on portrait so the additional row keeps comparable
+spacing instead of compressing the labels.

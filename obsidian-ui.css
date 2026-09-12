@@ -354,3 +354,22 @@ body.history-season-no-data #recentMatchesSection {
 #startMatchDayBtn.button-cancel-state {
   background: var(--danger-soft); color: var(--danger); border-color: #b663554a;
 }
+
+/* Five relation nodes per vertical lane, with near-original breathing room. */
+.hero-picker-dialog.relation-stats-dialog {
+  max-height: min(94vh, 1100px);
+}
+.relation-chart-surface,
+.relation-chart-placeholder,
+.relation-stats-panel-teammate .relation-chart-surface,
+.relation-stats-panel-teammate .relation-chart-placeholder {
+  min-height: 620px;
+}
+@media (orientation: portrait) {
+  .relation-chart-surface,
+  .relation-chart-placeholder,
+  .relation-stats-panel-teammate .relation-chart-surface,
+  .relation-stats-panel-teammate .relation-chart-placeholder {
+    min-height: 540px;
+  }
+}
