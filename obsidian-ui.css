@@ -363,13 +363,19 @@ body.history-season-no-data #recentMatchesSection {
 .relation-chart-placeholder,
 .relation-stats-panel-teammate .relation-chart-surface,
 .relation-stats-panel-teammate .relation-chart-placeholder {
-  min-height: 620px;
+  min-height: 535px;
+}
+@media (min-width: 1420px) {
+  .relation-stats-summary,
+  .relation-stats-chart-grid {
+    grid-template-columns: repeat(2, var(--relation-panel-min-width));
+  }
 }
 @media (orientation: portrait) {
   .relation-chart-surface,
   .relation-chart-placeholder,
   .relation-stats-panel-teammate .relation-chart-surface,
   .relation-stats-panel-teammate .relation-chart-placeholder {
-    min-height: 540px;
+    min-height: 500px;
   }
 }

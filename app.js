@@ -11562,7 +11562,7 @@ function renderPlayerRelationHeatmap(container, chartKey, rows = [], emptyText =
     return (centerX / chartWidth) * 100;
   };
   const getZoneY = (zone, rowPosition) => {
-    const [startY, endY] = zone === "upper" ? [8, 42] : [58, 92];
+    const [startY, endY] = zone === "upper" ? [5.5, 42.5] : [57.5, 94.5];
     return startY + rowPosition * ((endY - startY) / (PLAYER_RELATION_LADDER_ZONE_ROWS - 1));
   };
   const getNodePosition = ({ zone, rowPosition, columnPosition }) => ({

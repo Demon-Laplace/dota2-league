@@ -54,6 +54,8 @@ until the visitor selects a database-backed season again.
 
 The teammate and opponent relationship networks use five labels per vertical
 lane. Each upper and lower zone can show up to 20 players on landscape layouts,
-and up to five in portrait. The chart grows from 520 to 620 pixels on landscape
-and from 440 to 540 pixels on portrait so the additional row keeps comparable
-spacing instead of compressing the labels.
+and up to five in portrait. The chart is 535 pixels high on landscape and 500
+pixels in portrait. Its outer nodes move closer to the panel edges and the five
+row centers are slightly tighter, while remaining clear of the center subject.
+At 1420 pixels and wider the two networks stay side by side, avoiding unnecessary
+dialog scrolling on common 1440-pixel desktop screens.
