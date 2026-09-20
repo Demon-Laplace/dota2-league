@@ -16389,10 +16389,10 @@ function renderLeaderboard(data) {
   const highestRewardIds = getHighestRewardPlayerIds(sortedData);
   const hardcoreLoseIds = getHardcoreLoseTaggedPlayerIds(sortedData);
   const leaderboardSeasonId = String(leaderboardDisplaySeasonId || activeSeason?.id || "");
-  const leaderboardRecentMatches = isActiveSeasonLeaderboard
+  const leaderboardRecentMatches = leaderboardSeasonId
     ? recentMatchesData.filter((match) => String(match?.season_id || "") === leaderboardSeasonId)
     : [];
-  const leaderboardRecentMatchGroups = isActiveSeasonLeaderboard
+  const leaderboardRecentMatchGroups = leaderboardSeasonId
     ? recentMatchDayGroupsData.filter((group) => String(group?.season_id || "") === leaderboardSeasonId)
     : [];
   const winStreakMap = getActiveWinStreakMap(leaderboardRecentMatches, 3);
