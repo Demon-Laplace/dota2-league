@@ -10771,7 +10771,7 @@ function getActiveWinStreakMap(matches, minStreak = 3) {
 
   return new Map(
     [...streakMap.entries()]
-      .filter(([playerId, streak]) => !finishedPlayers.has(playerId) && streak >= minStreak)
+      .filter(([, streak]) => streak >= minStreak)
       .map(([playerId, streak]) => [playerId, streak])
   );
 }
@@ -10802,7 +10802,7 @@ function getActiveLoseStreakMap(matches, minStreak = 3) {
 
   return new Map(
     [...streakMap.entries()]
-      .filter(([playerId, streak]) => !finishedPlayers.has(playerId) && streak >= minStreak)
+      .filter(([, streak]) => streak >= minStreak)
       .map(([playerId, streak]) => [playerId, streak])
   );
 }
