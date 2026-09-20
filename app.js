@@ -15204,7 +15204,7 @@ function buildRewardCategoryLineHtml(item, playerId = "") {
   const expectedAmount = Number(item.expected_amount ?? item.amount ?? 0);
   const signupFeeStateHtml = isSignupFee
     ? (
-      isCurrentRoleAdmin()
+      isCurrentRoleScorer()
         ? `
           <button
             type="button"
@@ -15591,7 +15591,7 @@ function applyRewardLogsToLocalViews() {
 }
 
 async function toggleSignupFeePaid(playerId, buttonEl) {
-  if (!ensureAdminAccess("仅管理员可确认基础赞助。")) return;
+  if (!ensureScorerAccess("仅管理员或记分员可调整基础赞助。")) return;
 
   const normalizedPlayerId = String(playerId || "").trim();
   if (!normalizedPlayerId || !activeSeason?.id) return;
