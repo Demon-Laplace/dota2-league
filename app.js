@@ -10779,6 +10779,46 @@ function getActiveLoseStreakMap(matches, minStreak = 3) {
   );
 }
 
+function formatChineseCardinalNumber(value) {
+  const normalized = Math.trunc(Number(value));
+  if (!Number.isFinite(normalized) || normalized < 0) return String(value ?? "");
+  if (normalized === 0) return "零";
+
+  const digits = ["零", "一", "二", "三", "四", "五", "六", "七", "八", "九"];
+  if (normalized < 10) return digits[normalized];
+  if (normalized < 20) return `十${normalized % 10 ? digits[normalized % 10] : ""}`;
+  if (normalized < 100) {
+    const tens = Math.floor(normalized / 10);
+    const ones = normalized % 10;
+    return `${digits[tens]}十${ones ? digits[ones] : ""}`;
+  }
+
+  if (normalized < 10000) {
+    const units = ["", "十", "百", "千"];
+    let remaining = normalized;
+    let result = "";
+    let zeroPending = false;
+    for (let unitIndex = units.length - 1; unitIndex >= 0; unitIndex -= 1) {
+      const unitValue = 10 ** unitIndex;
+      const digit = Math.floor(remaining / unitValue);
+      remaining %= unitValue;
+      if (!digit) {
+        zeroPending = Boolean(result && remaining);
+        continue;
+      }
+      if (zeroPending) result += "零";
+      result += `${digits[digit]}${units[unitIndex]}`;
+      zeroPending = false;
+    }
+    return result;
+  }
+
+  return String(normalized)
+    .split("")
+    .map((digit) => digits[Number(digit)] || digit)
+    .join("");
+}
+
 function getPlayerWinRateMap(data) {
   const map = new Map();
   (data || []).forEach((player) => {
@@ -16320,8 +16360,13 @@ function renderLeaderboard(data) {
 
   const highestRewardIds = getHighestRewardPlayerIds(sortedData);
   const hardcoreLoseIds = getHardcoreLoseTaggedPlayerIds(sortedData);
-  const leaderboardRecentMatches = isActiveSeasonLeaderboard ? recentMatchesData : [];
-  const leaderboardRecentMatchGroups = isActiveSeasonLeaderboard ? recentMatchDayGroupsData : [];
+  const leaderboardSeasonId = String(leaderboardDisplaySeasonId || activeSeason?.id || "");
+  const leaderboardRecentMatches = isActiveSeasonLeaderboard
+    ? recentMatchesData.filter((match) => String(match?.season_id || "") === leaderboardSeasonId)
+    : [];
+  const leaderboardRecentMatchGroups = isActiveSeasonLeaderboard
+    ? recentMatchDayGroupsData.filter((group) => String(group?.season_id || "") === leaderboardSeasonId)
+    : [];
   const winStreakMap = getActiveWinStreakMap(leaderboardRecentMatches, 3);
   const loseStreakMap = getActiveLoseStreakMap(leaderboardRecentMatches, 3);
   const bronzeFeederIds = getBronzeFeederPlayerIds(sortedData, leaderboardRecentMatches);
@@ -16361,23 +16406,25 @@ function renderLeaderboard(data) {
 
     if (winStreakMap.has(playerId)) {
       const streak = winStreakMap.get(playerId);
+      const streakLabel = `${formatChineseCardinalNumber(streak)}连胜`;
       tags.push({
         icon: "▲",
-        label: "连胜中",
+        label: streakLabel,
         tone: "ember",
         className: getStreakTagIntensityClass(streak),
-        description: `${streak} 连胜`,
+        description: streakLabel,
       });
     }
 
     if (loseStreakMap.has(playerId)) {
       const streak = loseStreakMap.get(playerId);
+      const streakLabel = `${formatChineseCardinalNumber(streak)}连败`;
       tags.push({
         icon: "▼",
-        label: "连败中",
+        label: streakLabel,
         tone: "crimson",
         className: getStreakTagIntensityClass(streak),
-        description: `${streak} 连败`,
+        description: streakLabel,
       });
     }
 
@@ -17364,7 +17411,7 @@ function normalizeMatchRecordFromView(row) {
   const players = parseRecentMatchPlayers(row.players).map((player) => ({
     ...player,
     player_id: player.player_id || player.user_id || player.id || "",
-    team: player.team || mapSideToTeam(player.side),
+    team: mapSideToTeam(player.team || player.side),
     rank_no_snapshot: normalizeSeasonRankNo(player.rank_no_snapshot ?? player.player_rank_snapshot),
     power_value_snapshot: player.power_value_snapshot == null ? null : Number(player.power_value_snapshot),
     score_change: Number.isFinite(Number(player.score_change)) ? Number(player.score_change) : 0,
