@@ -10719,18 +10719,45 @@ function getMvpPlayerIds() {
   return new Set();
 }
 
+function sortMatchesNewestFirstForStreaks(matches = []) {
+  return [...(Array.isArray(matches) ? matches : [])].sort((a, b) => {
+    const aDate = String(a?.match_date || "");
+    const bDate = String(b?.match_date || "");
+    if (aDate !== bDate) return bDate.localeCompare(aDate, "zh-CN");
+
+    const aMatchNo = Number(a?.match_no ?? NaN);
+    const bMatchNo = Number(b?.match_no ?? NaN);
+    if (Number.isFinite(aMatchNo) || Number.isFinite(bMatchNo)) {
+      if (!Number.isFinite(aMatchNo)) return 1;
+      if (!Number.isFinite(bMatchNo)) return -1;
+      if (aMatchNo !== bMatchNo) return bMatchNo - aMatchNo;
+    }
+
+    return new Date(b?.created_at || 0).getTime() - new Date(a?.created_at || 0).getTime();
+  });
+}
+
+function normalizeStreakTeam(value) {
+  return mapSideToTeam(value);
+}
+
+function getStreakWinnerTeam(match) {
+  return normalizeStreakTeam(match?.winner_team || match?.winner_side);
+}
+
 function getActiveWinStreakMap(matches, minStreak = 3) {
   const streakMap = new Map();
   const finishedPlayers = new Set();
 
-  (matches || []).forEach((match) => {
-    if (!hasRecordedWinner(match.winner_team)) return;
+  sortMatchesNewestFirstForStreaks(matches).forEach((match) => {
+    const winnerTeam = getStreakWinnerTeam(match);
+    if (!hasRecordedWinner(winnerTeam)) return;
 
     parseRecentMatchPlayers(match.players).forEach((player) => {
-      const playerId = player.player_id || player.id;
+      const playerId = String(player.player_id || player.id || "").trim();
       if (!playerId || finishedPlayers.has(playerId)) return;
 
-      const isWinner = player.team === match.winner_team;
+      const isWinner = normalizeStreakTeam(player.team || player.side) === winnerTeam;
       const currentStreak = streakMap.get(playerId) || 0;
 
       if (isWinner) {
@@ -10753,14 +10780,15 @@ function getActiveLoseStreakMap(matches, minStreak = 3) {
   const streakMap = new Map();
   const finishedPlayers = new Set();
 
-  (matches || []).forEach((match) => {
-    if (!hasRecordedWinner(match.winner_team)) return;
+  sortMatchesNewestFirstForStreaks(matches).forEach((match) => {
+    const winnerTeam = getStreakWinnerTeam(match);
+    if (!hasRecordedWinner(winnerTeam)) return;
 
     parseRecentMatchPlayers(match.players).forEach((player) => {
-      const playerId = player.player_id || player.id;
+      const playerId = String(player.player_id || player.id || "").trim();
       if (!playerId || finishedPlayers.has(playerId)) return;
 
-      const isLoser = player.team !== match.winner_team;
+      const isLoser = normalizeStreakTeam(player.team || player.side) !== winnerTeam;
       const currentStreak = streakMap.get(playerId) || 0;
 
       if (isLoser) {
@@ -16381,7 +16409,7 @@ function renderLeaderboard(data) {
 
   sortedData.forEach((player, idx) => {
     const tr = document.createElement("tr");
-    const playerId = player.player_id || player.id || "";
+    const playerId = String(player.player_id || player.id || "").trim();
     const rank = totalRankMap.get(playerId) || getLeaderboardDisplayRankAtIndex(sortedData, idx);
     const isBottomTwo = sortedData.length >= 2 && rank >= sortedData.length - 1;
     const hoverDirectionClass = idx < 5 ? "leaderboard-hovercard-below" : "leaderboard-hovercard-above";
