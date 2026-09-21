@@ -1,3 +1,7 @@
+const { parseRecentMatchPlayers, mapWinnerSideToTeam, mapWinnerTeamToSide, mapSideToTeam, normalizeSeasonRankNo, normalizeMatchExhibitionFlag, normalizeMatchRecordFromView, hasRecordedWinner } = globalThis.LeagueMatchRecords;
+const { formatChineseCardinalNumber, formatChineseRankOrdinal } = globalThis.LeagueNumberFormat;
+const { getActiveStreakMaps } = globalThis.LeagueStreaks;
+const { getWinRateNumber, getPlayerWinRateMap, getTeammateAffinityLeaders, getNemesisMap, getSideSpecialistMap, getGoldenTouchPlayerIds, getSuperDoublePlayerIds, getAdjustedWinRateNumber } = globalThis.LeagueAnalytics;
 const RUNTIME_CONFIG = window.__DOTA2SYS_CONFIG__ || {};
 const DEFAULT_PROJECT_ID = "klxkkwwszqtgeuozwtkw";
 const APP_CONFIG = {
@@ -4480,18 +4484,6 @@ function formatItemUsageCount(value) {
   return formatScore(value);
 }
 
-function getWinRateNumber(value, wins = 0, gamesPlayed = 0) {
-  const hasExplicitValue = !(
-    value === null
-    || value === undefined
-    || (typeof value === "string" && value.trim() === "")
-  );
-  const numericValue = hasExplicitValue ? Number(value) : Number.NaN;
-  const resolvedValue = Number.isFinite(numericValue)
-    ? numericValue
-    : (Number(gamesPlayed ?? 0) > 0 ? (Number(wins ?? 0) / Number(gamesPlayed ?? 0)) * 100 : 0);
-  return Math.max(0, Math.min(100, resolvedValue));
-}
 
 function formatWinRateValue(value, wins = 0, gamesPlayed = 0) {
   const resolvedValue = getWinRateNumber(value, wins, gamesPlayed);
@@ -10714,148 +10706,8 @@ function getPlayerNameStyleClass(playerId, options = {}) {
   return "player-name-display";
 }
 
-function getMvpPlayerIds() {
-  // Reserved for future MVP logic.
-  return new Set();
-}
 
-function sortMatchesNewestFirstForStreaks(matches = []) {
-  return [...(Array.isArray(matches) ? matches : [])].sort((a, b) => {
-    const aDate = String(a?.match_date || "");
-    const bDate = String(b?.match_date || "");
-    if (aDate !== bDate) return bDate.localeCompare(aDate, "zh-CN");
 
-    const aMatchNo = Number(a?.match_no ?? NaN);
-    const bMatchNo = Number(b?.match_no ?? NaN);
-    if (Number.isFinite(aMatchNo) || Number.isFinite(bMatchNo)) {
-      if (!Number.isFinite(aMatchNo)) return 1;
-      if (!Number.isFinite(bMatchNo)) return -1;
-      if (aMatchNo !== bMatchNo) return bMatchNo - aMatchNo;
-    }
-
-    return new Date(b?.created_at || 0).getTime() - new Date(a?.created_at || 0).getTime();
-  });
-}
-
-function normalizeStreakTeam(value) {
-  return mapSideToTeam(value);
-}
-
-function getStreakWinnerTeam(match) {
-  return normalizeStreakTeam(match?.winner_team || match?.winner_side);
-}
-
-function getActiveWinStreakMap(matches, minStreak = 3) {
-  const streakMap = new Map();
-  const finishedPlayers = new Set();
-
-  sortMatchesNewestFirstForStreaks(matches).forEach((match) => {
-    const winnerTeam = getStreakWinnerTeam(match);
-    if (!hasRecordedWinner(winnerTeam)) return;
-
-    parseRecentMatchPlayers(match.players).forEach((player) => {
-      const playerId = String(player.player_id || player.id || "").trim();
-      if (!playerId || finishedPlayers.has(playerId)) return;
-
-      const isWinner = normalizeStreakTeam(player.team || player.side) === winnerTeam;
-      const currentStreak = streakMap.get(playerId) || 0;
-
-      if (isWinner) {
-        streakMap.set(playerId, currentStreak + 1);
-        return;
-      }
-
-      finishedPlayers.add(playerId);
-    });
-  });
-
-  return new Map(
-    [...streakMap.entries()]
-      .filter(([, streak]) => streak >= minStreak)
-      .map(([playerId, streak]) => [playerId, streak])
-  );
-}
-
-function getActiveLoseStreakMap(matches, minStreak = 3) {
-  const streakMap = new Map();
-  const finishedPlayers = new Set();
-
-  sortMatchesNewestFirstForStreaks(matches).forEach((match) => {
-    const winnerTeam = getStreakWinnerTeam(match);
-    if (!hasRecordedWinner(winnerTeam)) return;
-
-    parseRecentMatchPlayers(match.players).forEach((player) => {
-      const playerId = String(player.player_id || player.id || "").trim();
-      if (!playerId || finishedPlayers.has(playerId)) return;
-
-      const isLoser = normalizeStreakTeam(player.team || player.side) !== winnerTeam;
-      const currentStreak = streakMap.get(playerId) || 0;
-
-      if (isLoser) {
-        streakMap.set(playerId, currentStreak + 1);
-        return;
-      }
-
-      finishedPlayers.add(playerId);
-    });
-  });
-
-  return new Map(
-    [...streakMap.entries()]
-      .filter(([, streak]) => streak >= minStreak)
-      .map(([playerId, streak]) => [playerId, streak])
-  );
-}
-
-function formatChineseCardinalNumber(value) {
-  const normalized = Math.trunc(Number(value));
-  if (!Number.isFinite(normalized) || normalized < 0) return String(value ?? "");
-  if (normalized === 0) return "零";
-
-  const digits = ["零", "一", "二", "三", "四", "五", "六", "七", "八", "九"];
-  if (normalized < 10) return digits[normalized];
-  if (normalized < 20) return `十${normalized % 10 ? digits[normalized % 10] : ""}`;
-  if (normalized < 100) {
-    const tens = Math.floor(normalized / 10);
-    const ones = normalized % 10;
-    return `${digits[tens]}十${ones ? digits[ones] : ""}`;
-  }
-
-  if (normalized < 10000) {
-    const units = ["", "十", "百", "千"];
-    let remaining = normalized;
-    let result = "";
-    let zeroPending = false;
-    for (let unitIndex = units.length - 1; unitIndex >= 0; unitIndex -= 1) {
-      const unitValue = 10 ** unitIndex;
-      const digit = Math.floor(remaining / unitValue);
-      remaining %= unitValue;
-      if (!digit) {
-        zeroPending = Boolean(result && remaining);
-        continue;
-      }
-      if (zeroPending) result += "零";
-      result += `${digits[digit]}${units[unitIndex]}`;
-      zeroPending = false;
-    }
-    return result;
-  }
-
-  return String(normalized)
-    .split("")
-    .map((digit) => digits[Number(digit)] || digit)
-    .join("");
-}
-
-function getPlayerWinRateMap(data) {
-  const map = new Map();
-  (data || []).forEach((player) => {
-    const playerId = player.player_id || player.id;
-    if (!playerId) return;
-    map.set(playerId, getWinRateNumber(player.win_rate, player.wins, player.games_played));
-  });
-  return map;
-}
 
 function isPlayerAffectedByDoubleDown(player, doubleDowns) {
   const playerId = player?.player_id || player?.id;
@@ -10914,224 +10766,11 @@ function getBronzeFeederPlayerIds(data, matches) {
   return new Set([top.playerId]);
 }
 
-function getGoldenTouchPlayerIds(matches) {
-  const bonusMap = new Map();
 
-  (matches || []).forEach((match) => {
-    parseRecentMatchPlayers(match.players).forEach((player) => {
-      const playerId = player.player_id || player.id;
-      if (!playerId) return;
-      const itemEffectDelta = Number(player.item_effect_delta ?? 0);
-      if (!Number.isFinite(itemEffectDelta) || itemEffectDelta === 0) return;
-      bonusMap.set(playerId, Number((bonusMap.get(playerId) || 0) + itemEffectDelta));
-    });
-  });
 
-  let highest = 0;
-  bonusMap.forEach((value) => {
-    if (value > highest) highest = value;
-  });
-  if (highest <= 0) return new Set();
-  return new Set(
-    [...bonusMap.entries()]
-      .filter(([, value]) => value === highest)
-      .map(([playerId]) => playerId)
-  );
-}
 
-function getSuperDoublePlayerIds(matches) {
-  const penaltyMap = new Map();
 
-  (matches || []).forEach((match) => {
-    parseRecentMatchPlayers(match.players).forEach((player) => {
-      const playerId = player.player_id || player.id;
-      if (!playerId) return;
-      const itemEffectDelta = Number(player.item_effect_delta ?? 0);
-      if (!Number.isFinite(itemEffectDelta) || itemEffectDelta === 0) return;
-      penaltyMap.set(playerId, Number((penaltyMap.get(playerId) || 0) - itemEffectDelta));
-    });
-  });
 
-  let highest = 0;
-  penaltyMap.forEach((value) => {
-    if (value > highest) highest = value;
-  });
-  if (highest <= 0) return new Set();
-  return new Set(
-    [...penaltyMap.entries()]
-      .filter(([, value]) => value === highest)
-      .map(([playerId]) => playerId)
-  );
-}
-
-function getTeammateAffinityLeaders(data, matches, minSharedGames = 8, threshold = 12) {
-  const overallWinRateMap = getPlayerWinRateMap(data);
-  const pairMap = new Map();
-
-  (matches || []).forEach((match) => {
-    if (!hasRecordedWinner(match.winner_team)) return;
-    const players = parseRecentMatchPlayers(match.players);
-
-    ["A", "B"].forEach((teamKey) => {
-      const teamPlayers = players.filter((player) => player.team === teamKey);
-      teamPlayers.forEach((subject) => {
-        const subjectId = subject.player_id || subject.id;
-        if (!subjectId) return;
-        teamPlayers.forEach((mate) => {
-          const mateId = mate.player_id || mate.id;
-          if (!mateId || mateId === subjectId) return;
-          const key = `${subjectId}__${mateId}`;
-          const current = pairMap.get(key) || { games: 0, wins: 0 };
-          current.games += 1;
-          if (teamKey === match.winner_team) current.wins += 1;
-          pairMap.set(key, current);
-        });
-      });
-    });
-  });
-
-  const influence = new Map();
-  pairMap.forEach((stat, key) => {
-    if (stat.games < minSharedGames) return;
-    const [subjectId, mateId] = key.split("__");
-    const mateOverallRate = overallWinRateMap.get(mateId);
-    if (!Number.isFinite(mateOverallRate)) return;
-    const pairRate = (stat.wins / stat.games) * 100;
-    const delta = pairRate - mateOverallRate;
-    const current = influence.get(subjectId) || { weightedDelta: 0, totalGames: 0 };
-    current.weightedDelta += delta * stat.games;
-    current.totalGames += stat.games;
-    influence.set(subjectId, current);
-  });
-
-  let luckiest = null;
-  let unluckiest = null;
-  influence.forEach((value, playerId) => {
-    if (!value.totalGames) return;
-    const averageDelta = value.weightedDelta / value.totalGames;
-    if (!luckiest || averageDelta > luckiest.averageDelta) {
-      luckiest = { playerId, averageDelta };
-    }
-    if (!unluckiest || averageDelta < unluckiest.averageDelta) {
-      unluckiest = { playerId, averageDelta };
-    }
-  });
-
-  return {
-    luckyId: luckiest && luckiest.averageDelta >= threshold ? luckiest.playerId : "",
-    unluckyId: unluckiest && unluckiest.averageDelta <= -threshold ? unluckiest.playerId : "",
-  };
-}
-
-function getNemesisMap(_data, matches, minHeadToHeadGames = 8, minDelta = 25) {
-  const duelMap = new Map();
-
-  (matches || []).forEach((match) => {
-    if (!hasRecordedWinner(match.winner_team)) return;
-    const players = parseRecentMatchPlayers(match.players);
-    const teamA = players.filter((player) => player.team === "A");
-    const teamB = players.filter((player) => player.team === "B");
-
-    teamA.forEach((playerA) => {
-      const playerAId = playerA.player_id || playerA.id;
-      if (!playerAId) return;
-      teamB.forEach((playerB) => {
-        const playerBId = playerB.player_id || playerB.id;
-        if (!playerBId) return;
-
-        const aKey = `${playerAId}__${playerBId}`;
-        const aStat = duelMap.get(aKey) || { games: 0, wins: 0 };
-        aStat.games += 1;
-        if (match.winner_team === "A") aStat.wins += 1;
-        duelMap.set(aKey, aStat);
-
-        const bKey = `${playerBId}__${playerAId}`;
-        const bStat = duelMap.get(bKey) || { games: 0, wins: 0 };
-        bStat.games += 1;
-        if (match.winner_team === "B") bStat.wins += 1;
-        duelMap.set(bKey, bStat);
-      });
-    });
-  });
-
-  const nemesisMap = new Map();
-  duelMap.forEach((stat, key) => {
-    if (stat.games < minHeadToHeadGames) return;
-    const [playerId, opponentId] = key.split("__");
-    const duelRate = (stat.wins / stat.games) * 100;
-    const delta = duelRate - 50;
-    if (delta < minDelta) return;
-
-    const currentList = nemesisMap.get(playerId) || [];
-    currentList.push({ opponentId, delta, games: stat.games, winRate: duelRate });
-    nemesisMap.set(playerId, currentList);
-  });
-
-  nemesisMap.forEach((entries, playerId) => {
-    nemesisMap.set(
-      playerId,
-      [...entries].sort((a, b) => {
-        if (b.delta !== a.delta) return b.delta - a.delta;
-        if (b.games !== a.games) return b.games - a.games;
-        return String(a.opponentId).localeCompare(String(b.opponentId));
-      })
-    );
-  });
-
-  return nemesisMap;
-}
-
-function getSideSpecialistMap(matches, minTotalGames = 11, minPerSideGames = 4, minDelta = 22, minSideWinRate = 58) {
-  const sideMap = new Map();
-
-  (matches || []).forEach((match) => {
-    if (!hasRecordedWinner(match.winner_team)) return;
-    const players = parseRecentMatchPlayers(match.players);
-
-    players.forEach((player) => {
-      const playerId = player.player_id || player.id;
-      const team = player.team === "A" ? "A" : (player.team === "B" ? "B" : "");
-      if (!playerId || !team) return;
-
-      const current = sideMap.get(playerId) || {
-        A: { games: 0, wins: 0 },
-        B: { games: 0, wins: 0 },
-      };
-      current[team].games += 1;
-      if (team === match.winner_team) current[team].wins += 1;
-      sideMap.set(playerId, current);
-    });
-  });
-
-  const result = new Map();
-  sideMap.forEach((entry, playerId) => {
-    const radiantGames = Number(entry.A?.games || 0);
-    const direGames = Number(entry.B?.games || 0);
-    const totalGames = radiantGames + direGames;
-    if (totalGames < minTotalGames || radiantGames < minPerSideGames || direGames < minPerSideGames) return;
-
-    const radiantRate = radiantGames > 0 ? (Number(entry.A?.wins || 0) / radiantGames) * 100 : 0;
-    const direRate = direGames > 0 ? (Number(entry.B?.wins || 0) / direGames) * 100 : 0;
-    const delta = radiantRate - direRate;
-
-    if (delta >= minDelta && radiantRate >= minSideWinRate) {
-      result.set(playerId, { side: "A", delta, radiantRate, direRate });
-      return;
-    }
-
-    if (delta <= -minDelta && direRate >= minSideWinRate) {
-      result.set(playerId, { side: "B", delta, radiantRate, direRate });
-    }
-  });
-
-  return result;
-}
-
-function getAdjustedWinRateNumber(wins = 0, games = 0) {
-  const resolvedGames = Math.max(Math.trunc(Number(games) || 0), 0);
-  const resolvedWins = Math.max(Math.trunc(Number(wins) || 0), 0);
-  return getWinRateNumber(((resolvedWins + 1) / (resolvedGames + 2)) * 100, resolvedWins + 1, resolvedGames + 2);
-}
 
 function getPlayerRelationWinRateNumber(row = null) {
   return getWinRateNumber(null, row?.wins, row?.games);
@@ -11931,9 +11570,6 @@ function buildDecoratedPlayerNameHtml(playerId, displayName, options = {}) {
   return `<span class="${className}">${safeName}</span>`;
 }
 
-function hasRecordedWinner(value) {
-  return value === "A" || value === "B";
-}
 
 function getWinnerLabel(winnerTeam) {
   if (winnerTeam === "A") return "天辉方获胜";
@@ -16395,8 +16031,7 @@ function renderLeaderboard(data) {
   const leaderboardRecentMatchGroups = leaderboardSeasonId
     ? recentMatchDayGroupsData.filter((group) => String(group?.season_id || "") === leaderboardSeasonId)
     : [];
-  const winStreakMap = getActiveWinStreakMap(leaderboardRecentMatches, 3);
-  const loseStreakMap = getActiveLoseStreakMap(leaderboardRecentMatches, 3);
+  const { wins: winStreakMap, losses: loseStreakMap } = getActiveStreakMaps(leaderboardRecentMatches, 3);
   const bronzeFeederIds = getBronzeFeederPlayerIds(sortedData, leaderboardRecentMatches);
   const goldenTouchIds = getGoldenTouchPlayerIds(leaderboardRecentMatches);
   const superDoubleIds = getSuperDoublePlayerIds(leaderboardRecentMatches);
@@ -16404,7 +16039,6 @@ function renderLeaderboard(data) {
   const nemesisMap = getNemesisMap(sortedData, leaderboardRecentMatches, 8, 25);
   const sideSpecialistMap = getSideSpecialistMap(leaderboardRecentMatches, 11, 4, 22);
   const lateArrivalIds = getLateArrivalTaggedPlayerIds(leaderboardRecentMatchGroups, 3);
-  const mvpIds = getMvpPlayerIds();
   const playerNameMap = new Map(sortedData.map((player) => [player.player_id || player.id, stripPlayerNameMeta(player.display_name || "未知选手") || "未知选手"]));
 
   sortedData.forEach((player, idx) => {
@@ -16513,9 +16147,6 @@ function renderLeaderboard(data) {
       });
     }
 
-    if (mvpIds.has(playerId)) {
-      tags.push({ icon: "★", label: "MVP", tone: "royal" });
-    }
 
     // Future follow-up: if tags exceed 12, add an admin action log entry so we can revisit tag prioritization.
     const tagsMarkup = tags.slice(0, 12).map((tag) => {
@@ -16836,49 +16467,11 @@ async function cancelRewardDonation(donationId, playerName, buttonEl) {
   });
 }
 
-function parseRecentMatchPlayers(players) {
-  if (!players) return [];
-  if (Array.isArray(players)) return players;
-  if (typeof players === "string") {
-    try {
-      return JSON.parse(players);
-    } catch {
-      return [];
-    }
-  }
-  return [];
-}
 
-function mapWinnerSideToTeam(value) {
-  if (value === "radiant" || value === "A") return "A";
-  if (value === "dire" || value === "B") return "B";
-  return "";
-}
 
-function mapWinnerTeamToSide(value) {
-  if (value === "A" || value === "radiant") return "radiant";
-  if (value === "B" || value === "dire") return "dire";
-  return null;
-}
 
-function mapSideToTeam(value) {
-  return value === "radiant" ? "A" : value === "dire" ? "B" : value || "";
-}
 
-function normalizeSeasonRankNo(rankNo) {
-  const value = Number(rankNo);
-  if (!Number.isInteger(value) || value < 1) return null;
-  return value;
-}
 
-function formatChineseRankOrdinal(value) {
-  const normalized = Number(value);
-  const numerals = ["零", "一", "二", "三", "四", "五", "六", "七", "八", "九", "十", "十一", "十二"];
-  if (Number.isInteger(normalized) && normalized >= 0 && normalized < numerals.length) {
-    return numerals[normalized];
-  }
-  return String(value || "");
-}
 
 function getDefaultSeasonRankLabel(rankNo) {
   const normalizedRank = normalizeSeasonRankNo(rankNo);
@@ -17427,44 +17020,7 @@ function buildPlayerRankGroups(players, seasonId = activeSeason?.id, { includeEm
   return groups;
 }
 
-function normalizeMatchExhibitionFlag(value) {
-  if (typeof value === "boolean") return value;
-  const normalized = String(value ?? "").trim().toLowerCase();
-  return normalized === "true" || normalized === "1";
-}
 
-function normalizeMatchRecordFromView(row) {
-  if (!row) return null;
-  const metadata = row.metadata && typeof row.metadata === "object" ? row.metadata : {};
-  const players = parseRecentMatchPlayers(row.players).map((player) => ({
-    ...player,
-    player_id: player.player_id || player.user_id || player.id || "",
-    team: mapSideToTeam(player.team || player.side),
-    rank_no_snapshot: normalizeSeasonRankNo(player.rank_no_snapshot ?? player.player_rank_snapshot),
-    power_value_snapshot: player.power_value_snapshot == null ? null : Number(player.power_value_snapshot),
-    score_change: Number.isFinite(Number(player.score_change)) ? Number(player.score_change) : 0,
-    hero_name: player.hero_name || null,
-    kills: player.kills ?? null,
-    deaths: player.deaths ?? null,
-    assists: player.assists ?? null,
-  }));
-
-  return {
-    match_id: row.match_id || row.id || "",
-    match_day_id: row.match_day_id || null,
-    season_id: row.season_id || null,
-    match_no: Number.isFinite(Number(row.match_no)) ? Number(row.match_no) : null,
-    match_date: row.match_date || "",
-    day_is_active: Boolean(row.day_is_active),
-    winner_team: row.winner_team || mapWinnerSideToTeam(row.winner_side),
-    note: row.note ?? row.notes ?? "",
-    created_at: row.created_at || row.submitted_at || row.approved_at || "",
-    players,
-    double_downs: row.double_downs || metadata.double_downs || [],
-    is_exhibition: normalizeMatchExhibitionFlag(metadata.is_exhibition),
-    status: row.status || "",
-  };
-}
 
 function normalizeMatchDayAttendanceNoteRow(row) {
   if (!row) return null;
