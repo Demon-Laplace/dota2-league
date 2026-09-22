@@ -48,7 +48,8 @@ atomic RPC; it is not solved by hiding it behind a client abstraction.
 ## Next database milestone
 
 1. Add an atomic, permission-checked save RPC covering definition, seasonal
-   settings and pair rules, with revision conflict detection and audit logging.
+   settings and pair rules, with conflict detection. Do not build an item-edit
+   history log; a current revision token may be used to reject stale writes.
 2. Introduce typed, validated effect primitives: multiply match delta, add an
    independent delta, set a chosen score component, or record usage only.
    Keep target selection, trigger conditions and sponsorship separate.
@@ -64,6 +65,44 @@ Do not advertise arbitrary reset values or new triggers until backend validation
 settlement, history snapshots and reversal are all implemented together.
 
 ## Verification
+
+## Agreed rollout policy (2026-09-22)
+
+- Earliest candidate is the 2026-10 season. A date change or switching the
+  frontend branch alone must not enable v2: the active season must explicitly
+  select the new settlement contract, enforced by the server.
+- Do not migrate current scores, replay closed seasons, or clean up legacy
+  SQL in the initial rollout. Keep legacy routes until the new season has been
+  verified in use.
+- Item edits are season-scoped. No item-edit history UI or persistent sequence
+  of catalog revisions is required.
+- Preserve actual per-match score changes for in-season correction and undo.
+  Closed seasons keep confirmed final results, match history and sponsorship.
+  Normal item edits must never change closed-season results.
+- Existing exceptional historical-repair functionality must not accidentally
+  bypass this protection; retain it separately until its new behavior is tested.
+
+### Implemented, but not activated
+
+`src/domain/item-settlement-v2.js` is a standalone, strict calculation contract.
+Conditions select actor/target, win/loss/any, and an optional pre-match score
+threshold; effects independently select match multiplier, flat points, total
+assignment or record-only. Numeric precision and half-away-from-zero rounding
+are explicit. It is intentionally NOT included by `index.html`.
+
+`scripts/item-settlement-v2.test.cjs` covers conditions, loss behavior,
+reset thresholds, rounding, invalid payloads and explicit future-season gating.
+This is not a deployed backend or a complete multi-item settlement pipeline.
+
+### Required before activation
+
+An isolated PostgreSQL/Supabase test environment is still needed. Implement and
+test server-derived context, generic verification, transactional persistence,
+inventory/sponsorship integration, combinations, undo and closed-season protection.
+The browser must never be the authority for score context or season eligibility.
+Neither an online migration nor production activation has been performed.
+
+## Test commands
 
 - `node --test scripts/item-rules.test.cjs scripts/domain.test.cjs scripts/champions.test.mjs`
 - `node scripts/test-match-power.cjs`
