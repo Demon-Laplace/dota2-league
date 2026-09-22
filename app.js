@@ -1,3 +1,4 @@
+const { RESET_ITEM_SCORE_SPECIAL_TOKEN, getItemCatalogResolutionMode, isItemCatalogRecordOnly, normalizeItemScoreMultiplierValue, normalizeItemScoreSpecialToken, parseItemScoreMultiplierInput, formatItemScoreMultiplierInputValue, getItemCatalogScoreDeltaMultiplier, getItemCatalogScoreDeltaSpecialToken, isResetToInitialWinScoreMultiplier, normalizeItemScoreStackRules, getItemCatalogScoreStackRules, getItemScoreMultiplierPriority, getItemCatalogScoreStackMultiplier } = globalThis.LeagueItemRules;
 const { parseRecentMatchPlayers, mapWinnerSideToTeam, mapWinnerTeamToSide, mapSideToTeam, normalizeSeasonRankNo, normalizeMatchExhibitionFlag, normalizeMatchRecordFromView, hasRecordedWinner } = globalThis.LeagueMatchRecords;
 const { formatChineseCardinalNumber, formatChineseRankOrdinal } = globalThis.LeagueNumberFormat;
 const { getActiveStreakMaps } = globalThis.LeagueStreaks;
@@ -1608,25 +1609,11 @@ let matchHeroAssignments = {};
 let backfillHeroAssignments = {};
 let matchKdaAssignments = {};
 let backfillKdaAssignments = {};
-const ITEM_MATCH_TARGET_DEFINITIONS = [
-  { value: "self", label: "自己", group: "single" },
-  { value: "ally", label: "队友(单人)", group: "single" },
-  { value: "opponent", label: "对手(单人)", group: "single" },
-  { value: "own_team", label: "己方团队", group: "team" },
-  { value: "enemy_team", label: "对方团队", group: "team" },
-];
+const { ITEM_MATCH_TARGET_DEFINITIONS } = globalThis.LeagueItemOptions;
 const ITEM_MATCH_TARGET_OPTIONS = new Set(ITEM_MATCH_TARGET_DEFINITIONS.map((option) => option.value));
 const ITEM_MATCH_TARGET_LABELS = new Map(ITEM_MATCH_TARGET_DEFINITIONS.map((option) => [option.value, option.label]));
 const ITEM_MATCH_TARGET_GROUPS = new Map(ITEM_MATCH_TARGET_DEFINITIONS.map((option) => [option.value, option.group]));
-const ITEM_MATCH_ICON_OPTIONS = [
-  { value: "◉", label: "圆形金币" },
-  { value: "⇄", label: "左右互换" },
-  { value: "↻", label: "刷新" },
-  { value: "●", label: "黑色圆形" },
-  { value: "◆", label: "菱形" },
-  { value: "✦", label: "星芒" },
-  { value: "⚔", label: "交叉双剑" },
-];
+const { ITEM_MATCH_ICON_OPTIONS } = globalThis.LeagueItemOptions;
 const DEFAULT_ITEM_MATCH_ICON = ITEM_MATCH_ICON_OPTIONS[0].value;
 const LEGACY_MATCH_ITEM_IDS = {
   personal: "__legacy_personal_double__",
@@ -8250,16 +8237,7 @@ function getItemCatalogConfigNumber(entry, key, fallback = 0) {
   return Number.isFinite(value) ? value : fallback;
 }
 
-function getItemCatalogResolutionMode(entry) {
-  const rawValue = entry?.config && typeof entry.config === "object"
-    ? entry.config.match_resolution_mode
-    : undefined;
-  return rawValue === "record_only" ? "record_only" : "effect";
-}
 
-function isItemCatalogRecordOnly(entry) {
-  return getItemCatalogResolutionMode(entry) === "record_only";
-}
 
 function normalizeItemMatchTargets(rawTargets = []) {
   if (!Array.isArray(rawTargets)) return [];
@@ -8373,93 +8351,15 @@ function getItemCatalogInitialQuantity(entry) {
   return Number.isFinite(value) ? Math.max(0, value) : 0;
 }
 
-function normalizeItemScoreMultiplierValue(value, fallback = 0) {
-  const normalized = Number(value);
-  return Number.isFinite(normalized) ? normalized : fallback;
-}
 
-const RESET_ITEM_SCORE_SPECIAL_TOKEN = "@";
 
-function normalizeItemScoreSpecialToken(value = "") {
-  const normalized = String(value ?? "").trim();
-  return normalized === RESET_ITEM_SCORE_SPECIAL_TOKEN ? RESET_ITEM_SCORE_SPECIAL_TOKEN : "";
-}
 
-function parseItemScoreMultiplierInput(value, fallback = 0) {
-  const raw = String(value ?? "").trim();
-  if (!raw) {
-    return {
-      valid: true,
-      multiplier: normalizeItemScoreMultiplierValue(fallback, 0),
-      specialToken: "",
-    };
-  }
-  if (raw === RESET_ITEM_SCORE_SPECIAL_TOKEN) {
-    return {
-      valid: true,
-      multiplier: 0,
-      specialToken: RESET_ITEM_SCORE_SPECIAL_TOKEN,
-    };
-  }
-  const multiplier = Number(raw);
-  if (!Number.isFinite(multiplier)) {
-    return {
-      valid: false,
-      multiplier: normalizeItemScoreMultiplierValue(fallback, 0),
-      specialToken: "",
-    };
-  }
-  return {
-    valid: true,
-    multiplier,
-    specialToken: "",
-  };
-}
 
-function formatItemScoreMultiplierInputValue(multiplier = 0, specialToken = "") {
-  const normalizedSpecialToken = normalizeItemScoreSpecialToken(specialToken);
-  if (normalizedSpecialToken) return normalizedSpecialToken;
-  return String(normalizeItemScoreMultiplierValue(multiplier, 0));
-}
 
-function getItemCatalogScoreDeltaMultiplier(entry) {
-  return normalizeItemScoreMultiplierValue(entry?.score_delta_multiplier, 0);
-}
 
-function getItemCatalogScoreDeltaSpecialToken(entry) {
-  return normalizeItemScoreSpecialToken(entry?.score_delta_special ?? entry?.config?.score_delta_special);
-}
 
-function isResetToInitialWinScoreMultiplier(multiplier = 0, specialToken = "") {
-  return normalizeItemScoreSpecialToken(specialToken) === RESET_ITEM_SCORE_SPECIAL_TOKEN;
-}
 
-function normalizeItemScoreStackRules(rawRules = [], selfItemId = "") {
-  if (!Array.isArray(rawRules)) return [];
-  const seenItemIds = new Set();
 
-  return rawRules.reduce((list, rule) => {
-    const itemCatalogId = String(rule?.itemCatalogId || rule?.item_catalog_id || "").trim();
-    if (!itemCatalogId || itemCatalogId === selfItemId || seenItemIds.has(itemCatalogId)) {
-      return list;
-    }
-    seenItemIds.add(itemCatalogId);
-    const specialToken = normalizeItemScoreSpecialToken(rule?.specialToken ?? rule?.score_delta_special);
-    list.push({
-      itemCatalogId,
-      multiplier: normalizeItemScoreMultiplierValue(rule?.multiplier ?? rule?.score_delta_multiplier, 0),
-      specialToken,
-    });
-    return list;
-  }, []);
-}
-
-function getItemCatalogScoreStackRules(entry) {
-  if (isItemCatalogRecordOnly(entry)) {
-    return [];
-  }
-  return normalizeItemScoreStackRules(entry?.score_delta_stack_rules, entry?.id || "");
-}
 
 function formatItemScoreMultiplierLabel(multiplier = 0, specialToken = "") {
   return isResetToInitialWinScoreMultiplier(multiplier, specialToken)
@@ -8491,24 +8391,7 @@ function getItemCatalogScoreStackSummaryLabel(entry) {
   return stackRules.length ? `叠加 ${stackRules.length} 组` : "无叠加";
 }
 
-function getItemScoreMultiplierPriority(multiplier = 0, specialToken = "") {
-  return isResetToInitialWinScoreMultiplier(multiplier, specialToken)
-    ? Number.POSITIVE_INFINITY
-    : Math.abs(normalizeItemScoreMultiplierValue(multiplier, 0));
-}
 
-function getItemCatalogScoreStackMultiplier(itemEntryA, itemEntryB) {
-  const itemIdA = itemEntryA?.id || "";
-  const itemIdB = itemEntryB?.id || "";
-  if (!itemIdA || !itemIdB || itemIdA === itemIdB) return null;
-  const rule = getItemCatalogScoreStackRules(itemEntryA).find((entry) => entry.itemCatalogId === itemIdB) || null;
-  return rule
-    ? {
-      multiplier: normalizeItemScoreMultiplierValue(rule.multiplier, 0),
-      specialToken: normalizeItemScoreSpecialToken(rule.specialToken),
-    }
-    : null;
-}
 
 function collectPendingMatchItemEffects(doubleDownPayload = [], players = []) {
   const normalizedPlayers = (players || []).map((player) => ({
@@ -8549,59 +8432,7 @@ function collectPendingMatchItemEffects(doubleDownPayload = [], players = []) {
     });
   });
 
-  const appliedGroups = [];
-  effectCandidatesByTarget.forEach((effects) => {
-    while (true) {
-      let bestPair = null;
-      for (let index = 0; index < effects.length; index += 1) {
-        const current = effects[index];
-        if (current.isConsumed || !current.itemEntry?.id) continue;
-        for (let peerIndex = index + 1; peerIndex < effects.length; peerIndex += 1) {
-          const peer = effects[peerIndex];
-          if (peer.isConsumed || !peer.itemEntry?.id) continue;
-          const stackRule = getItemCatalogScoreStackMultiplier(current.itemEntry, peer.itemEntry);
-          if (stackRule === null) continue;
-          const candidate = {
-            left: current,
-            right: peer,
-            appliedMultiplier: stackRule.multiplier,
-            appliedSpecialToken: stackRule.specialToken,
-          };
-          if (
-            !bestPair
-            || getItemScoreMultiplierPriority(candidate.appliedMultiplier, candidate.appliedSpecialToken)
-              > getItemScoreMultiplierPriority(bestPair.appliedMultiplier, bestPair.appliedSpecialToken)
-          ) {
-            bestPair = candidate;
-          }
-        }
-      }
-
-      if (!bestPair) break;
-      bestPair.left.isConsumed = true;
-      bestPair.right.isConsumed = true;
-      appliedGroups.push({
-        targetPlayerId: bestPair.left.targetPlayerId,
-        targetTeam: bestPair.left.targetTeam,
-        itemLabel: `${bestPair.left.itemLabel} + ${bestPair.right.itemLabel}`,
-        appliedMultiplier: bestPair.appliedMultiplier,
-        appliedSpecialToken: bestPair.appliedSpecialToken,
-      });
-    }
-
-    effects.forEach((entry) => {
-      if (entry.isConsumed) return;
-      appliedGroups.push({
-        targetPlayerId: entry.targetPlayerId,
-        targetTeam: entry.targetTeam,
-        itemLabel: entry.itemLabel,
-        appliedMultiplier: entry.appliedMultiplier,
-        appliedSpecialToken: entry.appliedSpecialToken,
-      });
-    });
-  });
-
-  return appliedGroups;
+  return globalThis.LeagueItemRules.resolveItemEffectGroups(effectCandidatesByTarget);
 }
 
 function validateResetEffectUsage(winnerTeam, doubleDownPayload = [], players = []) {
@@ -8722,20 +8553,7 @@ function renderItemScoreStackSelector(mode = "scorer", selectedRules = []) {
   refs.stackMultiplierList.innerHTML = selectedEntries.length
     ? selectedEntries.map((entry) => {
       const activeRule = ruleMap.get(entry.id) || { multiplier: 0, specialToken: "" };
-      return `
-      <label class="item-stack-multiplier-row">
-        <span class="item-stack-multiplier-name">${escapeHtml(entry.name || "未命名道具")}</span>
-        <input
-          type="text"
-          inputmode="text"
-          data-role="item-stack-multiplier-input"
-          data-mode="${mode}"
-          data-item-id="${entry.id}"
-          value="${escapeHtml(formatItemScoreMultiplierInputValue(activeRule.multiplier, activeRule.specialToken))}"
-          ${canManage ? "" : "disabled"}
-        />
-      </label>
-    `;
+      return globalThis.LeagueItemEditor.stackControl(activeRule, mode, entry.id, entry.name || "未命名道具", canManage);
     }).join("")
     : '<span class="item-stack-empty muted">未选择叠加对象。</span>';
 }
@@ -8800,11 +8618,14 @@ function syncItemCatalogFormState(mode = "scorer") {
   if (refs.initialQuantityInput) refs.initialQuantityInput.disabled = !canManage;
   if (refs.saveBtn) refs.saveBtn.disabled = !canManage;
   if (refs.resetBtn) refs.resetBtn.disabled = !canManage;
+  globalThis.LeagueItemEditor.update(mode, { canManage });
   syncItemCatalogEditorState(mode);
 }
 
 function resetItemCatalogForm(mode = "scorer", { closeEditor = false } = {}) {
   const refs = getItemManagementRefs(mode);
+  const editorMessage = document.getElementById(`${mode}ItemEditorMessage`);
+  if (editorMessage) { editorMessage.textContent = ""; editorMessage.hidden = true; }
   itemCatalogEditingIds[mode] = "";
   if (closeEditor) {
     itemCatalogEditorOpen[mode] = false;
@@ -8817,6 +8638,7 @@ function resetItemCatalogForm(mode = "scorer", { closeEditor = false } = {}) {
   renderItemMatchTargetSelector(mode, []);
   renderItemScoreStackSelector(mode, []);
   if (refs.initialQuantityInput) refs.initialQuantityInput.value = "";
+  globalThis.LeagueItemEditor.update(mode, { readLegacy: true });
   syncItemCatalogFormState(mode);
 }
 
@@ -8839,6 +8661,7 @@ function populateItemCatalogForm(entry, mode = "scorer") {
   renderItemMatchTargetSelector(mode, getItemCatalogMatchTargets(entry));
   renderItemScoreStackSelector(mode, getItemCatalogScoreStackRules(entry));
   if (refs.initialQuantityInput) refs.initialQuantityInput.value = String(getItemCatalogInitialQuantity(entry) || "");
+  globalThis.LeagueItemEditor.update(mode, { readLegacy: true });
   syncItemCatalogFormState(mode);
   setManagedDialogOpen(mode === "admin" ? "adminItemCatalog" : "scorerItemCatalog", true, {
     initialFocus: refs.nameInput || refs.donationInput || undefined,
@@ -8882,6 +8705,12 @@ function clearItemCatalogPendingPlayerAction() {
 }
 
 function setItemCatalogPanelMessage(mode = "scorer", text = "", isError = false) {
+  const editorMessage = document.getElementById(`${mode}ItemEditorMessage`);
+  if (editorMessage) {
+    editorMessage.textContent = text;
+    editorMessage.hidden = !text;
+    editorMessage.classList.toggle("item-rule-error", isError);
+  }
   if (mode === "admin") {
     setAdminPanelMessage(text, isError);
     return;
@@ -9385,7 +9214,7 @@ async function saveItemCatalogEntry(mode = "scorer") {
     ? parseItemScoreMultiplierInput(scoreMultiplierRaw, 1)
     : parseItemScoreMultiplierInput(scoreMultiplierRaw, 0);
   const initialQuantity = initialQuantityRaw === "" ? 0 : Number(initialQuantityRaw);
-  const setPanelMessage = mode === "admin" ? setAdminPanelMessage : setScorerPanelMessage;
+  const setPanelMessage = (text, isError = false) => setItemCatalogPanelMessage(mode, text, isError);
   const editingId = itemCatalogEditingIds[mode] || "";
   const existing = itemCatalogEntries.find((entry) => entry.id === editingId) || null;
   const name = String(refs.nameInput?.value || existing?.name || "").trim();

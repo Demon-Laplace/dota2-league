@@ -10,6 +10,7 @@
   <link rel="stylesheet" href="style.css?v=20260907-modern-league-v4" />
   <link rel="stylesheet" href="modern-ui.css?v=20260907-modern-league-v5" />
   <link rel="stylesheet" href="obsidian-ui.css?v=20260912-obsidian-v7" />
+  <link rel="stylesheet" href="src/ui/item-editor.css?v=20260922" />
 </head>
   <body>
   <div id="loadingScreen" class="loading-screen" aria-live="polite">
@@ -1028,50 +1029,7 @@
         </div>
         <button id="closeScorerItemCatalogBtn" class="button-secondary" type="button">关闭</button>
       </div>
-      <div id="scorerItemCatalogEditorPanel" class="item-management-editor" hidden>
-        <div class="row admin-panel-actions">
-          <input id="scorerItemNameInput" type="text" maxlength="32" placeholder="道具名称" />
-          <input id="scorerItemDonationInput" type="number" min="0" step="1" inputmode="decimal" placeholder="关联赞助额" />
-          <div class="item-target-field">
-            <span class="item-target-label">生效对象</span>
-            <div id="scorerItemMatchTargets" class="item-target-selector" aria-label="生效对象">
-              <button type="button" class="item-target-chip" data-role="item-target-toggle" data-mode="scorer" data-target="self">自己</button>
-              <button type="button" class="item-target-chip" data-role="item-target-toggle" data-mode="scorer" data-target="ally">队友(单人)</button>
-              <button type="button" class="item-target-chip" data-role="item-target-toggle" data-mode="scorer" data-target="opponent">对手(单人)</button>
-              <button type="button" class="item-target-chip" data-role="item-target-toggle" data-mode="scorer" data-target="own_team">己方团队</button>
-              <button type="button" class="item-target-chip" data-role="item-target-toggle" data-mode="scorer" data-target="enemy_team">对方团队</button>
-            </div>
-          </div>
-        </div>
-        <div class="row admin-panel-actions item-management-secondary-row">
-          <div class="item-target-field item-score-mode-field">
-            <select id="scorerItemResolutionModeSelect" aria-label="道具记录模式">
-              <option value="effect">积分生效</option>
-              <option value="record_only">仅记录</option>
-            </select>
-          </div>
-          <div class="item-target-field item-score-multiplier-field">
-            <input id="scorerItemScoreMultiplierInput" type="text" inputmode="text" placeholder="积分变动倍率或@" />
-          </div>
-          <input id="scorerItemInitialQuantityInput" type="number" min="0" step="1" inputmode="numeric" placeholder="赛季初始数量" />
-          <select id="scorerItemMatchIconSelect" aria-label="道具图标">
-            <option value="◉">◉</option>
-            <option value="⇄">⇄</option>
-            <option value="↻">↻</option>
-            <option value="●">●</option>
-            <option value="◆">◆</option>
-            <option value="✦">✦</option>
-            <option value="⚔">⚔</option>
-          </select>
-          <button id="scorerSaveItemBtn" type="button">保存道具</button>
-          <button id="scorerResetItemBtn" class="button-secondary" type="button">清空</button>
-        </div>
-        <div class="item-target-field item-stack-field">
-          <span class="item-target-label">可叠加倍率效果</span>
-          <div id="scorerItemStackTargets" class="item-target-selector" aria-label="可叠加倍率效果"></div>
-          <div id="scorerItemStackMultiplierList" class="item-stack-multiplier-list"></div>
-        </div>
-      </div>
+      <div id="scorerItemCatalogEditorPanel" class="item-management-editor item-rule-editor" hidden></div>
     </div>
   </div>
 
@@ -1084,50 +1042,7 @@
         </div>
         <button id="closeAdminItemCatalogBtn" class="button-secondary" type="button">关闭</button>
       </div>
-      <div id="adminItemCatalogEditorPanel" class="item-management-editor" hidden>
-        <div class="row admin-panel-actions">
-          <input id="adminItemNameInput" type="text" maxlength="32" placeholder="道具名称" />
-          <input id="adminItemDonationInput" type="number" min="0" step="1" inputmode="decimal" placeholder="关联赞助额" />
-          <div class="item-target-field">
-            <span class="item-target-label">生效对象</span>
-            <div id="adminItemMatchTargets" class="item-target-selector" aria-label="生效对象">
-              <button type="button" class="item-target-chip" data-role="item-target-toggle" data-mode="admin" data-target="self">自己</button>
-              <button type="button" class="item-target-chip" data-role="item-target-toggle" data-mode="admin" data-target="ally">队友(单人)</button>
-              <button type="button" class="item-target-chip" data-role="item-target-toggle" data-mode="admin" data-target="opponent">对手(单人)</button>
-              <button type="button" class="item-target-chip" data-role="item-target-toggle" data-mode="admin" data-target="own_team">己方团队</button>
-              <button type="button" class="item-target-chip" data-role="item-target-toggle" data-mode="admin" data-target="enemy_team">对方团队</button>
-            </div>
-          </div>
-        </div>
-        <div class="row admin-panel-actions item-management-secondary-row">
-          <div class="item-target-field item-score-mode-field">
-            <select id="adminItemResolutionModeSelect" aria-label="道具记录模式">
-              <option value="effect">积分生效</option>
-              <option value="record_only">仅记录</option>
-            </select>
-          </div>
-          <div class="item-target-field item-score-multiplier-field">
-            <input id="adminItemScoreMultiplierInput" type="text" inputmode="text" placeholder="积分变动倍率或@" />
-          </div>
-          <input id="adminItemInitialQuantityInput" type="number" min="0" step="1" inputmode="numeric" placeholder="赛季初始数量" />
-          <select id="adminItemMatchIconSelect" aria-label="道具图标">
-            <option value="◉">◉</option>
-            <option value="⇄">⇄</option>
-            <option value="↻">↻</option>
-            <option value="●">●</option>
-            <option value="◆">◆</option>
-            <option value="✦">✦</option>
-            <option value="⚔">⚔</option>
-          </select>
-          <button id="adminSaveItemBtn" type="button">保存道具</button>
-          <button id="adminResetItemBtn" class="button-secondary" type="button">清空</button>
-        </div>
-        <div class="item-target-field item-stack-field">
-          <span class="item-target-label">可叠加倍率效果</span>
-          <div id="adminItemStackTargets" class="item-target-selector" aria-label="可叠加倍率效果"></div>
-          <div id="adminItemStackMultiplierList" class="item-stack-multiplier-list"></div>
-        </div>
-      </div>
+      <div id="adminItemCatalogEditorPanel" class="item-management-editor item-rule-editor" hidden></div>
     </div>
   </div>
 
@@ -1315,6 +1230,9 @@
   <script src="src/domain/number-format.js?v=20260922"></script>
   <script src="src/domain/streaks.js?v=20260922"></script>
   <script src="src/domain/leaderboard-analytics.js?v=20260922"></script>
-  <script src="app.js?v=20260922-component-boundaries"></script>
+  <script src="src/domain/item-rules.js?v=20260922"></script>
+  <script src="src/config/item-options.js?v=20260922"></script>
+  <script src="src/ui/item-editor.js?v=20260922"></script>
+  <script src="app.js?v=20260922-item-rules"></script>
 </body>
 </html>
