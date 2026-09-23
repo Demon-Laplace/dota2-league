@@ -8,6 +8,9 @@
 .item-rule-section summary { cursor: pointer; }
 .item-rule-section p, .item-rule-note, .item-rule-preview { font-size: 12px; line-height: 1.6; margin: 8px 0; }
 .item-rule-preview { color: var(--text-primary, #ddd); }
+.item-rule-stage-badge { display: inline-flex; margin-left: 6px; padding: 2px 6px; border: 1px solid rgba(160,170,185,.24); border-radius: 999px; color: var(--text-muted, #aaa); font-size: 10px; font-weight: 500; vertical-align: 1px; }
+.item-condition-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.item-condition-hint { margin-bottom: 0 !important; }
 .item-rule-error { color: #f4a0a0; }
 .item-rule-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 14px; }
 .item-rule-editor .item-stack-multiplier-row { display: grid; grid-template-columns: minmax(80px, 1fr) minmax(0, 2fr) 85px; gap: 8px; align-items: center; }
@@ -16,4 +19,6 @@
   .item-rule-grid { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 10px; }
   .item-rule-editor .item-stack-multiplier-row { grid-template-columns: minmax(0, 1fr) minmax(0, 1.5fr); }
   .item-rule-editor .item-stack-multiplier-row [data-stack-value] { grid-column: 2; }
+  .item-condition-grid { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+  .item-condition-grid .item-rule-field:last-child { grid-column: 1 / -1; }
 }

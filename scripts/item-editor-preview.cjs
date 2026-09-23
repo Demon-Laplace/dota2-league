@@ -4,7 +4,7 @@ const fs = require("node:fs");
 const path = require("node:path");
 const root = path.resolve(__dirname, "..");
 const assets = new Set(["/style.css", "/modern-ui.css", "/obsidian-ui.css", "/src/ui/item-editor.css",
-  "/src/domain/item-rules.js", "/src/config/item-options.js", "/src/ui/item-editor.js"]);
+  "/src/domain/item-rules.js", "/src/domain/item-settlement-v2.js", "/src/config/item-options.js", "/src/ui/item-editor.js"]);
 http.createServer((req, res) => {
   const url = new URL(req.url, "http://localhost");
   if (assets.has(url.pathname)) {
@@ -19,10 +19,11 @@ http.createServer((req, res) => {
     <main style="max-width:${url.searchParams.has("mobile") ? "360" : "720"}px;margin:24px auto;padding:16px">
     <h2>道具编辑器 · 本地测试（不会保存数据）</h2><div id="adminItemCatalogEditorPanel" class="item-management-editor item-rule-editor"></div>
     <output id="testResult"></output></main>
-    <script src="/src/domain/item-rules.js"></script><script src="/src/config/item-options.js"></script><script src="/src/ui/item-editor.js"></script>
+    <script src="/src/domain/item-rules.js"></script><script src="/src/domain/item-settlement-v2.js"></script><script src="/src/config/item-options.js"></script><script src="/src/ui/item-editor.js"></script>
     <script>
       LeagueItemEditor.update("admin");
+      LeagueItemEditor.setCondition("admin", null, {requireExplicit:!new URL(location.href).searchParams.has("existing")});
       adminItemStackMultiplierList.innerHTML = LeagueItemEditor.stackControl({multiplier:4,specialToken:""}, "admin", "test", "测试组合道具", true);
-      adminSaveItemBtn.onclick=()=>{testResult.textContent=JSON.stringify({mode:adminItemResolutionModeSelect.value,multiplier:adminItemScoreMultiplierInput.value})};
+      adminSaveItemBtn.onclick=()=>{try{testResult.textContent=JSON.stringify({mode:adminItemResolutionModeSelect.value,multiplier:adminItemScoreMultiplierInput.value,rule:LeagueItemEditor.getRule("admin")})}catch(error){testResult.textContent=error.message}};
     </script></html>`);
 }).listen(4173, "127.0.0.1", () => console.log("Isolated editor preview: http://127.0.0.1:4173"));

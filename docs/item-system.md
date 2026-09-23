@@ -12,12 +12,16 @@
 - `app.js`: still owns authorization, catalog loading and persistence,
   selected players, ledger rendering and match submission.
 
-The editor compiles human-readable choices into the existing
+The editor compiles the currently active behavior into the existing
 `score_delta_multiplier`, `score_delta_special` and
-`config.match_resolution_mode` fields. No second rules JSON is stored.
+`config.match_resolution_mode` fields. It also stores a strictly validated
+`config.item_settlement_v2` draft containing independent subject, outcome,
+threshold and effect fields. That draft is visible as "下赛季暂存" and is not
+used by current-season settlement.
 Renaming a catalog item does not change its effect; combinations reference IDs.
 Existing catalog definitions and historical ledger entries are not rewritten.
-No database migration is required for this compatible iteration.
+The forward migration `20260923120000_atomic_item_catalog_save.sql` adds the
+atomic save RPC. It updates no existing catalog, match or score rows.
 
 ## What is customizable now
 
@@ -30,9 +34,9 @@ being an additional multiplication. Unpaired effects retain existing semantics.
 
 ## Important boundaries: not yet a fully declarative settlement engine
 
-The authoritative SQL still owns the special reset rule: winning target only,
-pre-match total below 100, settle total to 100 after other effects. The editor
-displays these restrictions; it does not pretend they are customizable.
+The authoritative legacy SQL still owns current-season effects, including the
+special reset rule. The editor can prepare a different condition for v2, but
+changing the staged condition cannot affect the active season.
 
 Legacy personal/team IDs remain compatibility identifiers for historical matches.
 Do not delete them simply because the new editor does not create them.
@@ -41,23 +45,21 @@ Historical score-ledger rendering still includes effect interpretation and is
 not yet fully unified with the preview engine. Server settlement is not replaced
 by client calculations.
 
-Catalog saving still updates the catalog, seasonal settings and pair rules in
-separate requests. This existing partial-save/concurrent-edit risk requires an
-atomic RPC; it is not solved by hiding it behind a client abstraction.
+Catalog saving now updates the definition, one season's initial inventory and
+pair rules in one transaction. `updated_at` rejects stale concurrent edits.
+The RPC validates the staged v2 rule on the server and rolls back the entire
+save if any pair or rule is invalid. It deliberately creates no item-edit log.
 
 ## Next database milestone
 
-1. Add an atomic, permission-checked save RPC covering definition, seasonal
-   settings and pair rules, with conflict detection. Do not build an item-edit
-   history log; a current revision token may be used to reject stale writes.
-2. Introduce typed, validated effect primitives: multiply match delta, add an
+1. Introduce typed, validated effect primitives: multiply match delta, add an
    independent delta, set a chosen score component, or record usage only.
    Keep target selection, trigger conditions and sponsorship separate.
-3. Represent conditions explicitly (outcome, pre-match score threshold), with
+2. Represent conditions explicitly (outcome, pre-match score threshold), with
    validated parameters. Do not allow arbitrary JavaScript/SQL expressions.
-4. Snapshot versioned rules on each usage. Existing usages retain their original
+3. Snapshot versioned rules on each usage. Existing usages retain their original
    meaning; changing a catalog definition must not silently recalculate history.
-5. Have preview and SQL settlement share a conformance test matrix, including
+4. Have preview and SQL settlement share a conformance test matrix, including
    combinations, cancellations, sponsorship exemptions, losses and undo.
 
 This requires new forward SQL migrations and local database-chain validation.
@@ -88,7 +90,8 @@ settlement, history snapshots and reversal are all implemented together.
 Conditions select actor/target, win/loss/any, and an optional pre-match score
 threshold; effects independently select match multiplier, flat points, total
 assignment or record-only. Numeric precision and half-away-from-zero rounding
-are explicit. It is intentionally NOT included by `index.html`.
+are explicit. It is loaded for editor validation, but no match path calls it to
+settle a score.
 
 `scripts/item-settlement-v2.test.cjs` covers conditions, loss behavior,
 reset thresholds, rounding, invalid payloads and explicit future-season gating.
@@ -96,9 +99,13 @@ This is not a deployed backend or a complete multi-item settlement pipeline.
 
 ### Required before activation
 
-An isolated PostgreSQL/Supabase test environment is still needed. Implement and
-test server-derived context, generic verification, transactional persistence,
-inventory/sponsorship integration, combinations, undo and closed-season protection.
+The full migration chain and atomic RPC were tested in a temporary local
+PostgreSQL-compatible environment, including stale-write rejection, invalid-v2
+rejection and transaction rollback. No production Supabase migration was run.
+
+Before activation, implement and test server-derived context, authoritative
+settlement persistence, inventory/sponsorship integration, combinations, undo
+and closed-season protection.
 The browser must never be the authority for score context or season eligibility.
 Neither an online migration nor production activation has been performed.
 
@@ -107,7 +114,7 @@ Neither an online migration nor production activation has been performed.
 - `node --test scripts/item-rules.test.cjs scripts/domain.test.cjs scripts/champions.test.mjs`
 - `node scripts/test-match-power.cjs`
 - `node scripts/item-editor-preview.cjs`: isolated browser fixture, no database
-  calls. Save only prints the legacy payload. It is not an authenticated
+  calls. Save prints both the legacy payload and staged v2 rule. It is not an authenticated
   end-to-end persistence test.
 - Browser fixture checked explicit reset and record-only payloads.
   Screenshot capture timed out, so full desktop/mobile visual QA is pending.

@@ -1,5 +1,5 @@
-// Staged v2 contract. Deliberately not loaded by index.html until the server
-// validator and season activation gate pass integration tests.
+// Staged v2 contract. The editor may validate and store this shape, but score
+// settlement remains on legacy SQL until the server-side season gate is enabled.
 (() => {
   const TYPES = new Set(["multiply_match", "add_points", "set_total", "record_only"]);
   const OUTCOMES = new Set(["win", "loss", "any"]);

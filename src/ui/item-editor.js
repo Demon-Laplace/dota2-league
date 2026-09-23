@@ -1,6 +1,7 @@
 // One editor for administrators and scorers; no network or scoring writes here.
 (() => {
   const rules = globalThis.LeagueItemRules;
+  const settlementV2 = globalThis.LeagueItemSettlementV2;
   const { ITEM_MATCH_TARGET_DEFINITIONS: targets, ITEM_MATCH_ICON_OPTIONS: icons } = globalThis.LeagueItemOptions;
   const escape = value => String(value).replace(/[&<>"']/g, char => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[char]));
   const options = includeRecord => rules.EFFECTS.filter(effect => includeRecord || effect.id !== "record")
@@ -25,11 +26,20 @@
         <h3>积分效果</h3>
         <div class="item-rule-grid">
           ${field("EffectSelect", "效果类型", `<select id="${mode}ItemEffectSelect">${options(true)}</select>`)}
-          ${field("EffectValue", "倍率（可为小数或负数）", `<input id="${mode}ItemEffectValue" type="number" step="any" value="1" />`)}
+          ${field("EffectValue", "倍率（最多两位小数，可为负数）", `<input id="${mode}ItemEffectValue" type="number" step="0.01" value="1" />`)}
         </div>
         <p id="${mode}ItemEffectPreview" class="item-rule-preview" aria-live="polite"></p>
         <select id="${mode}ItemResolutionModeSelect" hidden aria-hidden="true"><option value="effect">积分生效</option><option value="record_only">仅记录</option></select>
         <input id="${mode}ItemScoreMultiplierInput" type="hidden" value="1" />
+      </section>
+      <section class="item-rule-section">
+        <h3>生效条件 <span class="item-rule-stage-badge">下赛季暂存</span></h3>
+        <div class="item-rule-grid item-condition-grid">
+          ${field("ConditionSubject", "以谁的赛果判断", `<select id="${mode}ItemConditionSubject"><option value="">请选择</option><option value="target">被使用者</option><option value="actor">使用者</option></select>`)}
+          ${field("ConditionOutcome", "何时生效", `<select id="${mode}ItemConditionOutcome"><option value="">请选择</option><option value="any">无论胜负</option><option value="win">获胜时</option><option value="loss">失败时</option></select>`)}
+          ${field("ConditionScoreBelow", "赛前总分低于（可选）", `<input id="${mode}ItemConditionScoreBelow" type="number" step="0.01" placeholder="不限制" />`)}
+        </div>
+        <p id="${mode}ItemConditionHint" class="muted item-condition-hint">该条件只写入下赛季规则，本赛季仍按现有规则结算。</p>
       </section>
       <details class="item-rule-section" id="${mode}ItemStackSection">
         <summary>组合效果（可选）</summary>
@@ -73,6 +83,63 @@
     panel.querySelectorAll("[data-stack-effect], [data-stack-value]").forEach(control => {
       control.disabled = !canManage || type.value === "record";
     });
+    ["ConditionSubject", "ConditionOutcome", "ConditionScoreBelow"].forEach(suffix => {
+      const control = get(suffix);
+      if (control) control.disabled = !canManage;
+    });
+  }
+  function inferredLegacyRule(mode) {
+    const get = suffix => document.getElementById(`${mode}Item${suffix}`);
+    const type = get("EffectSelect")?.value || "multiply";
+    const effect = type === "record"
+      ? { type: "record_only", value: null }
+      : type === "reset"
+        ? { type: "set_total", value: 100 }
+        : { type: "multiply_match", value: type === "cancel" ? 0 : Number(get("EffectValue")?.value || 1) };
+    return {
+      version: 2,
+      condition: {
+        subject: "target",
+        outcome: type === "reset" ? "win" : "any",
+        scoreBelow: type === "reset" ? 100 : null,
+      },
+      effect,
+    };
+  }
+  function setCondition(mode, storedRule = null, { requireExplicit = false } = {}) {
+    const fallback = inferredLegacyRule(mode);
+    const rule = storedRule && typeof storedRule === "object" ? storedRule : fallback;
+    const subject = document.getElementById(`${mode}ItemConditionSubject`);
+    const outcome = document.getElementById(`${mode}ItemConditionOutcome`);
+    const scoreBelow = document.getElementById(`${mode}ItemConditionScoreBelow`);
+    if (!subject || !outcome || !scoreBelow) return;
+    subject.value = requireExplicit && !storedRule ? "" : (rule.condition?.subject || "target");
+    outcome.value = requireExplicit && !storedRule ? "" : (rule.condition?.outcome || "any");
+    scoreBelow.value = rule.condition?.scoreBelow === null || rule.condition?.scoreBelow === undefined
+      ? "" : String(rule.condition.scoreBelow);
+  }
+  function getRule(mode) {
+    const get = suffix => document.getElementById(`${mode}Item${suffix}`);
+    const subject = get("ConditionSubject")?.value || "";
+    const outcome = get("ConditionOutcome")?.value || "";
+    const rawThreshold = String(get("ConditionScoreBelow")?.value || "").trim();
+    const type = get("EffectSelect")?.value || "multiply";
+    const effect = type === "record"
+      ? { type: "record_only", value: null }
+      : type === "reset"
+        ? { type: "set_total", value: 100 }
+        : { type: "multiply_match", value: type === "cancel" ? 0 : Number(get("EffectValue")?.value) };
+    const rule = {
+      version: 2,
+      condition: {
+        subject,
+        outcome,
+        scoreBelow: rawThreshold === "" ? null : Number(rawThreshold),
+      },
+      effect,
+    };
+    settlementV2.validateRule(rule);
+    return rule;
   }
   function stackControl(rule, mode, itemId, name, canManage) {
     const decoded = rules.decodeEffect({ score_delta_multiplier: rule.multiplier, score_delta_special: rule.specialToken });
@@ -106,5 +173,5 @@
     panel.addEventListener("input", onChange);
     panel.addEventListener("change", onChange);
   }
-  globalThis.LeagueItemEditor = Object.freeze({ update, stackControl });
+  globalThis.LeagueItemEditor = Object.freeze({ update, setCondition, getRule, stackControl });
 })();

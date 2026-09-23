@@ -10,7 +10,7 @@
   <link rel="stylesheet" href="style.css?v=20260907-modern-league-v4" />
   <link rel="stylesheet" href="modern-ui.css?v=20260907-modern-league-v5" />
   <link rel="stylesheet" href="obsidian-ui.css?v=20260912-obsidian-v7" />
-  <link rel="stylesheet" href="src/ui/item-editor.css?v=20260922" />
+  <link rel="stylesheet" href="src/ui/item-editor.css?v=20260923-v2" />
 </head>
   <body>
   <div id="loadingScreen" class="loading-screen" aria-live="polite">
@@ -253,6 +253,7 @@
           <div id="scorerMembersList" class="admin-members-list admin-identity-list admin-identity-list-compact"></div>
         </section>
       </div>
+      <p id="adminBuildInfo" class="admin-build-info muted" hidden></p>
       <p id="adminPanelMessage" class="message"></p>
     </section>
     <section id="rewardPanel" class="season-panel" hidden>
@@ -437,6 +438,7 @@
               <input id="matchNote" class="match-note-input" type="text" data-copy-placeholder="recentMatches.matchNotePlaceholder" />
             </div>
             <div id="matchDoublePanel" class="double-panel"></div>
+            <div id="matchSettlementPreview" class="match-settlement-preview" hidden></div>
             <p id="matchMessage" class="message"></p>
           </div>
           <div id="backfillFormPanel" class="match-form-panel recent-match-form-panel" hidden>
@@ -488,6 +490,7 @@
               <input id="backfillMatchNote" class="match-note-input" type="text" data-copy-placeholder="recentMatches.backfillNotePlaceholder" />
             </div>
             <div id="backfillDoublePanel" class="double-panel"></div>
+            <div id="backfillSettlementPreview" class="match-settlement-preview" hidden></div>
             <p id="backfillMessage" class="message"></p>
           </div>
           <div id="recentMatchesList" class="recent-matches"></div>
@@ -1231,8 +1234,11 @@
   <script src="src/domain/streaks.js?v=20260922"></script>
   <script src="src/domain/leaderboard-analytics.js?v=20260922"></script>
   <script src="src/domain/item-rules.js?v=20260922"></script>
+  <script src="src/domain/item-settlement-v2.js?v=20260923"></script>
+  <script src="src/domain/match-settlement-preview.js?v=20260923"></script>
   <script src="src/config/item-options.js?v=20260922"></script>
-  <script src="src/ui/item-editor.js?v=20260922"></script>
-  <script src="app.js?v=20260922-item-rules"></script>
+  <script src="src/config/build-info.js?v=20260923"></script>
+  <script src="src/ui/item-editor.js?v=20260923-v2"></script>
+  <script src="app.js?v=20260923-item-reliability"></script>
 </body>
 </html>

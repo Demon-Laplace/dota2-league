@@ -4676,6 +4676,66 @@ button:disabled {
   gap: 4px;
 }
 
+button[aria-busy="true"] {
+  cursor: wait;
+  opacity: 0.72;
+}
+
+.admin-build-info {
+  margin: 10px 0 0;
+  font-size: 11px;
+  line-height: 1.4;
+  opacity: 0.68;
+  text-align: right;
+}
+
+.match-settlement-preview {
+  margin-top: 12px;
+  padding-top: 10px;
+  border-top: 1px solid rgba(160, 170, 185, 0.16);
+}
+
+.match-settlement-preview-title {
+  margin: 0 0 7px;
+  font-size: 12px;
+  font-weight: 650;
+}
+
+.match-settlement-preview-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 4px 14px;
+}
+
+.match-settlement-preview-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  gap: 8px;
+  align-items: baseline;
+  min-width: 0;
+  font-size: 12px;
+}
+
+.match-settlement-preview-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.match-settlement-preview-detail {
+  color: var(--text-dim);
+  font-size: 11px;
+}
+
+.match-settlement-preview-final {
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+}
+
+@media (max-width: 620px) {
+  .match-settlement-preview-grid { grid-template-columns: 1fr; }
+}
+
 .item-sponsorship-toggle {
   flex: 0 0 auto;
   padding: 4px 8px;

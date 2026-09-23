@@ -823,6 +823,9 @@ function isMissingPublicTableError(error, tableName = "") {
 
 function getLatestSchemaMigrationHint(error) {
   const message = getErrorMessage(error);
+  if (message.includes("save_item_catalog_atomic")) {
+    return "请先应用 20260923120000_atomic_item_catalog_save.sql。";
+  }
   if (
     message.includes("p_is_exhibition")
     || message.includes("record_match_result(p_dire_player_ids")
@@ -1049,6 +1052,7 @@ const scorerExitModeBtn = document.getElementById("scorerExitModeBtn");
 const adminExitModeBtn = document.getElementById("adminExitModeBtn");
 const scorerPanelSummary = document.getElementById("scorerPanelSummary");
 const adminPanelSummary = document.getElementById("adminPanelSummary");
+const adminBuildInfo = document.getElementById("adminBuildInfo");
 const adminHistoryRepairToggleBtn = document.getElementById("adminHistoryRepairToggleBtn");
 const adminHistoryRepairControls = document.getElementById("adminHistoryRepairControls");
 const adminHistoryRepairSeasonSelect = document.getElementById("adminHistoryRepairSeasonSelect");
@@ -1362,11 +1366,13 @@ const matchExhibitionToggleBtn = document.getElementById("matchExhibitionToggleB
 const backfillExhibitionToggleBtn = document.getElementById("backfillExhibitionToggleBtn");
 const matchNoteInput = document.getElementById("matchNote");
 const matchDoublePanel = document.getElementById("matchDoublePanel");
+const matchSettlementPreview = document.getElementById("matchSettlementPreview");
 const backfillSeasonSelect = document.getElementById("backfillSeasonSelect");
 const backfillDateShell = document.getElementById("backfillDateShell");
 const backfillDateInput = document.getElementById("backfillDateInput");
 const backfillMatchNoteInput = document.getElementById("backfillMatchNote");
 const backfillDoublePanel = document.getElementById("backfillDoublePanel");
+const backfillSettlementPreview = document.getElementById("backfillSettlementPreview");
 const recordMatchBtn = document.getElementById("recordMatchBtn");
 const recordBackfillBtn = document.getElementById("recordBackfillBtn");
 const recentMatchesList = document.getElementById("recentMatchesList");
@@ -4449,6 +4455,27 @@ function setBackfillMessage(text, isError = false) {
   setMessageNode(backfillMessageEl, text, isError);
 }
 
+function setControlBusy(button, isBusy, busyLabel = "处理中...") {
+  if (!button) return;
+  if (isBusy) {
+    if (!button.dataset.idleLabel) button.dataset.idleLabel = button.textContent || "";
+    if (!Object.hasOwn(button.dataset, "idleDisabled")) {
+      button.dataset.idleDisabled = button.disabled ? "true" : "false";
+    }
+    button.textContent = busyLabel;
+    button.disabled = true;
+    button.setAttribute("aria-busy", "true");
+    return;
+  }
+  if (button.dataset.idleLabel) {
+    button.textContent = button.dataset.idleLabel;
+    delete button.dataset.idleLabel;
+  }
+  button.disabled = button.dataset.idleDisabled === "true";
+  delete button.dataset.idleDisabled;
+  button.removeAttribute("aria-busy");
+}
+
 function setHeroPickerMessage(text, isError = false) {
   setMessageNode(heroPickerMessage, text, isError);
 }
@@ -6402,12 +6429,23 @@ function setAdminPanelOpen(isOpen) {
     adminModeBtn.textContent = isAdminPanelOpen ? "收起管理" : "管理员模式";
   }
   if (isAdminPanelOpen) {
+    renderAdminBuildInfo();
     setScorerPanelOpen(false);
     renderAdminHistoryRepairControls();
     void loadItemCatalogUsageSummary();
   } else if (adminHistoryRepairState.seasonId) {
     stopAdminHistoryRepairMode("");
   }
+}
+
+function renderAdminBuildInfo() {
+  if (!adminBuildInfo) return;
+  const info = globalThis.LeagueBuildInfo;
+  const visible = isCurrentRoleAdmin() && Boolean(info);
+  adminBuildInfo.hidden = !visible;
+  adminBuildInfo.textContent = visible
+    ? `版本 ${info.release} · 分支 ${info.branch} · 道具结算 ${info.itemSettlement}`
+    : "";
 }
 
 const DIALOG_FOCUS_SELECTOR = [
@@ -8639,6 +8677,7 @@ function resetItemCatalogForm(mode = "scorer", { closeEditor = false } = {}) {
   renderItemScoreStackSelector(mode, []);
   if (refs.initialQuantityInput) refs.initialQuantityInput.value = "";
   globalThis.LeagueItemEditor.update(mode, { readLegacy: true });
+  globalThis.LeagueItemEditor.setCondition(mode, null, { requireExplicit: true });
   syncItemCatalogFormState(mode);
 }
 
@@ -8662,6 +8701,7 @@ function populateItemCatalogForm(entry, mode = "scorer") {
   renderItemScoreStackSelector(mode, getItemCatalogScoreStackRules(entry));
   if (refs.initialQuantityInput) refs.initialQuantityInput.value = String(getItemCatalogInitialQuantity(entry) || "");
   globalThis.LeagueItemEditor.update(mode, { readLegacy: true });
+  globalThis.LeagueItemEditor.setCondition(mode, entry?.config?.item_settlement_v2 || null);
   syncItemCatalogFormState(mode);
   setManagedDialogOpen(mode === "admin" ? "adminItemCatalog" : "scorerItemCatalog", true, {
     initialFocus: refs.nameInput || refs.donationInput || undefined,
@@ -9218,6 +9258,14 @@ async function saveItemCatalogEntry(mode = "scorer") {
   const editingId = itemCatalogEditingIds[mode] || "";
   const existing = itemCatalogEntries.find((entry) => entry.id === editingId) || null;
   const name = String(refs.nameInput?.value || existing?.name || "").trim();
+  let itemSettlementV2Rule = null;
+
+  try {
+    itemSettlementV2Rule = globalThis.LeagueItemEditor.getRule(mode);
+  } catch {
+    setPanelMessage("请选择完整的生效对象与胜负条件，并检查分数门槛。", true);
+    return false;
+  }
 
   if (!activeSeason?.id) {
     setPanelMessage("当前没有可设置道具赛季配置的赛季。", true);
@@ -9302,87 +9350,49 @@ async function saveItemCatalogEntry(mode = "scorer") {
     match_icon: matchIcon,
     match_targets: matchTargets,
     match_resolution_mode: resolutionMode,
+    item_settlement_v2: itemSettlementV2Rule,
     operator_roles: ["season_admin", "score_keeper", "item_operator"],
   };
-  const payload = editingId
-    ? {
-        name,
-        config,
-        effect_type: "informational",
-        score_delta_multiplier: scoreMultiplierSpec.multiplier,
-        score_delta_special: scoreMultiplierSpec.specialToken || null,
-      }
-    : {
-        name,
-        visibility_default: "public",
-        effect_type: "informational",
-        score_delta_multiplier: scoreMultiplierSpec.multiplier,
-        score_delta_special: scoreMultiplierSpec.specialToken || null,
-        config,
-        is_active: true,
-      };
-
-  if (refs.saveBtn) refs.saveBtn.disabled = true;
+  setControlBusy(refs.saveBtn, true, editingId ? "正在更新..." : "正在保存...");
+  if (refs.resetBtn) refs.resetBtn.disabled = true;
   setPanelMessage(editingId ? "正在更新道具..." : "正在添加道具...");
 
-  let error = null;
-  let savedItemId = editingId || "";
-  if (editingId) {
-    ({ error } = await db.from("item_catalog").update(payload).eq("id", editingId));
-  } else {
-    const insertResult = await db
-      .from("item_catalog")
-      .insert(payload)
-      .select("id")
-      .single();
-    error = insertResult.error;
-    savedItemId = insertResult.data?.id || "";
-  }
+  const stackPayload = resolutionMode === "record_only"
+    ? []
+    : scoreStackRules.map((rule) => ({
+      item_catalog_id: rule.itemCatalogId,
+      score_delta_multiplier: normalizeItemScoreMultiplierValue(rule.multiplier, 0),
+      score_delta_special: normalizeItemScoreSpecialToken(rule.specialToken) || null,
+    }));
+  const { error } = await db.rpc("save_item_catalog_atomic", {
+    p_season_id: activeSeason.id,
+    p_item_catalog_id: editingId || null,
+    p_expected_updated_at: existing?.updated_at || null,
+    p_name: name,
+    p_config: config,
+    p_score_delta_multiplier: scoreMultiplierSpec.multiplier,
+    p_score_delta_special: scoreMultiplierSpec.specialToken || null,
+    p_initial_quantity: initialQuantity,
+    p_stack_rules: stackPayload,
+  });
 
-  if (!error && savedItemId) {
-    const settingsResult = await db
-      .from("season_item_catalog_settings")
-      .upsert([{
-        season_id: activeSeason.id,
-        item_catalog_id: savedItemId,
-        initial_quantity: initialQuantity,
-      }], {
-        onConflict: "season_id,item_catalog_id",
-      });
-    error = settingsResult.error;
-  }
-
-  if (!error && savedItemId) {
-    const deleteResult = await db
-      .from("item_catalog_score_stacks")
-      .delete()
-      .or(`item_catalog_id_low.eq.${savedItemId},item_catalog_id_high.eq.${savedItemId}`);
-    error = deleteResult.error;
-  }
-
-  if (!error && savedItemId && resolutionMode !== "record_only" && scoreStackRules.length) {
-    const stackRows = scoreStackRules.map((rule) => {
-      const lowItemId = savedItemId < rule.itemCatalogId ? savedItemId : rule.itemCatalogId;
-      const highItemId = savedItemId < rule.itemCatalogId ? rule.itemCatalogId : savedItemId;
-      return {
-        item_catalog_id_low: lowItemId,
-        item_catalog_id_high: highItemId,
-        score_delta_multiplier: normalizeItemScoreMultiplierValue(rule.multiplier, 0),
-        score_delta_special: normalizeItemScoreSpecialToken(rule.specialToken) || null,
-      };
-    });
-    const stackResult = await db
-      .from("item_catalog_score_stacks")
-      .insert(stackRows);
-    error = stackResult.error;
-  }
-
-  if (refs.saveBtn) refs.saveBtn.disabled = false;
+  setControlBusy(refs.saveBtn, false);
+  if (refs.resetBtn) refs.resetBtn.disabled = false;
 
   if (error) {
     const migrationHint = getLatestSchemaMigrationHint(error);
     const errorMessage = getErrorMessage(error);
-    setPanelMessage(`保存道具失败：${errorMessage}${migrationHint ? `。${migrationHint}` : ""}`, true);
+    const conflictHint = error?.code === "40001"
+      ? "道具已被其他人更新，已重新载入最新内容，请再次编辑。"
+      : "";
+    setPanelMessage(
+      conflictHint || `保存道具失败：${errorMessage}${migrationHint ? `。${migrationHint}` : ""}`,
+      true
+    );
+    if (conflictHint) {
+      await loadItemCatalog();
+      resetItemCatalogForm(mode, { closeEditor: true });
+    }
     return false;
   }
 
@@ -15577,6 +15587,79 @@ async function signupAllPlayers() {
   requestImmediateRefresh({ queue: true });
 }
 
+function renderMatchSettlementPreview(formType = "match") {
+  const isBackfill = formType === "backfill";
+  const container = isBackfill ? backfillSettlementPreview : matchSettlementPreview;
+  if (!container) return;
+  const teamSelections = isBackfill ? backfillTeamSelections : matchTeamSelections;
+  const players = isBackfill ? backfillPlayers : seasonPlayers;
+  const seasonId = isBackfill ? backfillSeasonSelect?.value : activeSeason?.id;
+  const winnerTeam = isBackfill ? backfillWinnerSelect?.value : winnerSelect?.value;
+  const isExhibition = isBackfill ? isBackfillExhibition : isMatchExhibition;
+  const complete = Boolean(
+    seasonId
+    && teamSelections.teamA.length === TEAM_SIZE
+    && teamSelections.teamB.length === TEAM_SIZE
+  );
+  if (!complete) {
+    container.hidden = true;
+    container.innerHTML = "";
+    return;
+  }
+
+  const selectedPlayers = [
+    ...getPlayersInSelectionOrder(teamSelections.teamA, players, "A"),
+    ...getPlayersInSelectionOrder(teamSelections.teamB, players, "B"),
+  ].map(player => ({ ...player, player_id: player.player_id || player.id }));
+  const rankMap = new Map(players.map(player => [player.id, player.player_rank ?? player.rank_no]));
+  const teamPowerTotals = {
+    A: getMatchTeamPowerTotal(selectedPlayers.filter(player => player.team === "A"), seasonId, rankMap),
+    B: getMatchTeamPowerTotal(selectedPlayers.filter(player => player.team === "B"), seasonId, rankMap),
+  };
+  const ruleMode = isExhibition ? "exhibition" : "standard";
+  const baseRows = globalThis.LeagueMatchSettlementPreview.calculateBaseRows({
+    players: selectedPlayers,
+    winnerTeam,
+    winPoints: getSeasonWinPoints(seasonId, ruleMode),
+    lossPoints: getSeasonLossPoints(seasonId, ruleMode),
+    participationPoints: getSeasonParticipationPoints(seasonId),
+    powerGapStep: getSeasonPowerGapStep(seasonId, ruleMode),
+    powerGapDelta: getSeasonPowerGapDelta(seasonId, ruleMode),
+    teamPowerTotals,
+  });
+  const builtItems = buildDoubleDownPayload(formType);
+  const effects = builtItems.error ? [] : collectPendingMatchItemEffects(builtItems.payload, selectedPlayers);
+  const currentTotals = seasonId === activeSeason?.id
+    ? new Map(leaderboardPlayers.map(player => [
+      player.player_id || player.id,
+      Number(player.score ?? player.score_total),
+    ]))
+    : new Map();
+  const rows = globalThis.LeagueMatchSettlementPreview.applyLegacyEffects(baseRows, effects, currentTotals);
+  const titleSuffix = builtItems.error
+    ? " · 道具选择尚未完成"
+    : (!winnerTeam ? " · 胜负未定时不会计分" : "");
+  container.innerHTML = `
+    <h4 class="match-settlement-preview-title">保存前积分预览${escapeHtml(titleSuffix)}</h4>
+    <div class="match-settlement-preview-grid">
+      ${rows.map(row => {
+        const effectText = row.effects.length
+          ? row.effects.map(effect => `${effect.label} ${effect.kind === "reset_pending" ? "待判定" : formatSignedScore(effect.delta)}`).join("、")
+          : "无道具变动";
+        const baseText = winnerTeam ? `基础 ${formatSignedScore(row.baseDelta)}` : "基础 0";
+        return `
+          <div class="match-settlement-preview-row">
+            <span class="match-settlement-preview-name" title="${escapeHtml(row.playerName)}">${escapeHtml(row.playerName)}</span>
+            <span class="match-settlement-preview-detail" title="${escapeHtml(effectText)}">${baseText}${row.itemDelta ? ` · 道具 ${formatSignedScore(row.itemDelta)}` : ""}</span>
+            <span class="match-settlement-preview-final">${formatSignedScore(row.finalDelta)}</span>
+          </div>
+        `;
+      }).join("")}
+    </div>
+  `;
+  container.hidden = false;
+}
+
 function renderMatchForm() {
   refreshMatchSelectOptions();
   renderDoublePanel("match");
@@ -15600,6 +15683,7 @@ function renderMatchForm() {
     button.disabled = !canUseForm;
   });
   setWinnerSelection("match", winnerSelect.value);
+  renderMatchSettlementPreview("match");
 }
 
 function renderBackfillForm() {
@@ -15633,6 +15717,7 @@ function renderBackfillForm() {
     button.disabled = !hasSeason || !hasEnoughPlayers;
   });
   setWinnerSelection("backfill", backfillWinnerSelect.value);
+  renderMatchSettlementPreview("backfill");
 }
 
 function clearMatchForm() {
@@ -15650,6 +15735,7 @@ function clearMatchForm() {
   matchNoteInput.value = "";
   refreshMatchSelectOptions();
   renderDoublePanel("match");
+  renderMatchSettlementPreview("match");
   setMatchMessage("");
 }
 
@@ -15669,6 +15755,7 @@ function clearBackfillForm() {
   backfillMatchNoteInput.value = "";
   refreshBackfillSelectOptions();
   renderDoublePanel("backfill");
+  renderMatchSettlementPreview("backfill");
   setBackfillMessage("");
 }
 
@@ -20308,7 +20395,7 @@ async function recordMatch() {
     return;
   }
 
-  recordMatchBtn.disabled = true;
+  setControlBusy(recordMatchBtn, true, "正在保存...");
   setMatchMessage(activeMatchDay ? "正在记录比赛..." : "正在保存今日比赛...");
 
   let matchId = null;
@@ -20331,7 +20418,7 @@ async function recordMatch() {
     ({ data: matchId, error } = await db.rpc("record_match_result", legacyMatchPayload));
   }
 
-  recordMatchBtn.disabled = false;
+  setControlBusy(recordMatchBtn, false);
 
   if (error) {
     reportMatchOperationFailure("match", buildMatchOperationFailureMessage("记录比赛失败", error));
@@ -20421,7 +20508,7 @@ async function recordBackfillMatch() {
     }
   }
 
-  recordBackfillBtn.disabled = true;
+  setControlBusy(recordBackfillBtn, true, isEditing ? "正在修改..." : "正在补录...");
   setBackfillMessage(isEditing ? "正在保存比赛修改..." : "正在补录比赛...");
 
   let matchId = targetMatchId;
@@ -20493,7 +20580,7 @@ async function recordBackfillMatch() {
     }
   }
 
-  recordBackfillBtn.disabled = false;
+  setControlBusy(recordBackfillBtn, false);
 
   if (error) {
     if (isEditing) {
@@ -23213,6 +23300,7 @@ function applyRolePermissions() {
   const isAdmin = isCurrentRoleAdmin();
   const isScorerOnly = isCurrentRoleScorerOnly();
   const hasVisibleSession = hasVisibleAuthSession();
+  renderAdminBuildInfo();
 
   if (openAuthModalBtn) {
     openAuthModalBtn.hidden = hasVisibleSession;
