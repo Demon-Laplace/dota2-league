@@ -15494,12 +15494,12 @@ function updateRewardMinimumHint() {
   const selectedPlayer = seasonPlayers.find((player) => player.id === rewardSelectedPlayerId);
   if (!selectedPlayer) {
     rewardMinimumHint.textContent = "点选一位选手";
-    return;
+  } else {
+    rewardMinimumHint.textContent = selectedPlayer.is_in_season
+      ? ""
+      : `已选：${selectedPlayer.display_name} · 记为场外赞助`;
   }
-
-  rewardMinimumHint.textContent = selectedPlayer.is_in_season
-    ? `已选：${selectedPlayer.display_name} · 当前道具额度 ${formatScore(seasonItemCredits.get(selectedPlayer.id) || 0)}；修改时填写本赛季新总额`
-    : `已选：${selectedPlayer.display_name} · 记为场外赞助`;
+  rewardMinimumHint.hidden = !isCurrentRoleScorer() || !rewardMinimumHint.textContent.trim();
 }
 
 async function setSelectedPlayerItemCredit() {
@@ -23983,7 +23983,7 @@ function applyRolePermissions() {
   rewardExtraInput.hidden = !canScore;
   rewardExtraInput.disabled = !canScore;
   if (rewardMinimumHint) {
-    rewardMinimumHint.hidden = !canScore;
+    updateRewardMinimumHint();
   }
   if (rewardMessageEl) {
     rewardMessageEl.hidden = !canScore;

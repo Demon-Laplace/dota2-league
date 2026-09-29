@@ -150,7 +150,7 @@
       collapse: "收起",
       amountPlaceholder: "赞助额",
       addAction: "添加赞助",
-      itemCreditPlaceholder: "本赛季额度总额",
+      itemCreditPlaceholder: "本赛季道具额度",
       itemCreditAction: "添加道具额度",
       signupFeePaidToggle: "确认",
       signupFeePaidBadge: "已确认",
