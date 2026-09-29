@@ -1257,6 +1257,8 @@ const rewardEntryShell = rewardPanel?.querySelector(".reward-entry-shell") || nu
 const rewardPlayerPicker = document.getElementById("rewardPlayerPicker");
 const rewardExtraInput = document.getElementById("rewardExtraInput");
 const addRewardBtn = document.getElementById("addRewardBtn");
+const itemCreditInput = document.getElementById("itemCreditInput");
+const setItemCreditBtn = document.getElementById("setItemCreditBtn");
 const rewardMinimumHint = document.getElementById("rewardMinimumHint");
 const rewardMessageEl = document.getElementById("rewardMessage");
 const rewardLogsList = document.getElementById("rewardLogsList");
@@ -1491,6 +1493,7 @@ let adminBackgroundUploadInProgress = false;
 let participationPointsTable = [];
 let participationPointsTableBySeasonId = new Map();
 let rewardLogs = [];
+let seasonItemCredits = new Map();
 let seasonActionLogs = [];
 let itemInventoryLogRows = [];
 let itemInventoryLogStatus = "idle";
@@ -4115,15 +4118,16 @@ async function getPrizeDistributionContext() {
     };
   }
 
-  const [membershipsResult, rewardLogsResult] = await Promise.all([
+  const [membershipsResult, rewardLogsResult, creditsResult] = await Promise.all([
     db
       .from("season_memberships")
       .select("player_id, join_status, players ( display_name )")
       .eq("season_id", targetSeasonId),
     db
       .from("reward_donations")
-      .select("player_id, amount, category, donor_name, is_outside, players ( display_name )")
+      .select("player_id, amount, category, source_key, donor_name, is_outside, players ( display_name )")
       .eq("season_id", targetSeasonId),
+    db.from("season_player_item_credits").select("player_id, amount").eq("season_id", targetSeasonId),
   ]);
 
   if (membershipsResult.error) {
@@ -4131,6 +4135,9 @@ async function getPrizeDistributionContext() {
   }
   if (rewardLogsResult.error) {
     throw rewardLogsResult.error;
+  }
+  if (creditsResult.error) {
+    throw creditsResult.error;
   }
 
   const players = (membershipsResult.data || [])
@@ -4151,7 +4158,10 @@ async function getPrizeDistributionContext() {
         .filter((log) => isSignupFeeRewardLog(log) && log.player_id)
         .map((log) => String(log.player_id))
     ),
-    totalCents: Math.round(logs.reduce((sum, log) => sum + Math.max(Number(log?.amount ?? 0), 0), 0) * 100),
+    totalCents: globalThis.LeagueItemCredit.totals(
+      logs,
+      new Map((creditsResult.data || []).map((row) => [String(row.player_id), Number(row.amount)]))
+    ).netCents,
     leaderboardRows,
   };
 }
@@ -4866,14 +4876,17 @@ async function fetchSeasonLifetimeRewardTotals(seasonId = "") {
   const normalizedSeasonId = String(seasonId || "").trim();
   if (!normalizedSeasonId) return new Map();
 
-  const { data, error } = await db
-    .from("reward_donations")
-    .select("player_id, donor_name, amount, players ( display_name )")
-    .eq("season_id", normalizedSeasonId);
+  const [{ data, error }, creditsResult] = await Promise.all([
+    db.from("reward_donations")
+      .select("player_id, donor_name, amount, category, source_key, players ( display_name )")
+      .eq("season_id", normalizedSeasonId),
+    db.from("season_player_item_credits").select("player_id, amount").eq("season_id", normalizedSeasonId),
+  ]);
 
   if (error) {
     throw error;
   }
+  if (creditsResult.error) throw creditsResult.error;
 
   const playerByName = new Map(
     allPlayersDirectory.map((player) => [
@@ -4903,6 +4916,14 @@ async function fetchSeasonLifetimeRewardTotals(seasonId = "") {
     };
     current.totalAmount = Number((Number(current.totalAmount || 0) + Number(row.amount || 0)).toFixed(2));
     totals.set(key, current);
+  });
+
+  const credited = globalThis.LeagueItemCredit.totals(
+    data || [], new Map((creditsResult.data || []).map((row) => [String(row.player_id), Number(row.amount)]))
+  ).byPlayer;
+  totals.forEach((entry) => {
+    entry.totalAmount = Math.max(0, Number((entry.totalAmount
+      - (credited.get(entry.playerId)?.appliedCents || 0) / 100).toFixed(2)));
   });
 
   return totals;
@@ -14840,12 +14861,13 @@ async function migrateStoredSignupFeePaidStateToDatabase() {
 
 function syncSeasonRewardTotalFromLogs() {
   const logs = Array.isArray(rewardLogs) ? rewardLogs : [];
-  seasonPlayerRewardTotal = logs.reduce(
-    (sum, log) => sum + Math.max(Number(log?.amount ?? 0), 0),
-    0
-  );
+  seasonPlayerRewardTotal = globalThis.LeagueItemCredit.totals(logs, seasonItemCredits).netCents / 100;
   externalRewardTotal = 0;
   return logs.length > 0;
+}
+
+function getCurrentItemCreditTotals() {
+  return globalThis.LeagueItemCredit.totals(rewardLogs, seasonItemCredits);
 }
 
 function syncSeasonRewardTotalFromStats(rows = [], options = {}) {
@@ -15207,9 +15229,12 @@ function buildSeasonRewardSummary() {
         });
       }
 
-      const total = categories.reduce((sum, item) => sum + Number(item.amount ?? 0), 0);
+      const credit = getCurrentItemCreditTotals().byPlayer.get(player.id);
+      const grossTotal = categories.reduce((sum, item) => sum + Number(item.amount ?? 0), 0);
+      const total = Math.round(grossTotal * 100 - (credit?.appliedCents || 0)) / 100;
       return {
         ...player,
+        item_credit_remaining: (credit?.remainingCents || 0) / 100,
         categories: categories.sort(
           (a, b) => getRewardCategoryConfig(a.kind).order - getRewardCategoryConfig(b.kind).order
         ),
@@ -15224,7 +15249,7 @@ function buildRewardCategoryLineHtml(item, playerId = "") {
   const config = getRewardCategoryConfig(item.kind);
   const label = item.label || config.label;
   const numericCount = Number(item.count ?? 0);
-  const metaText = Number.isFinite(numericCount) && Math.abs(numericCount - 1) > 0.0001
+  const metaText = item.kind !== "extra_donation" && Number.isFinite(numericCount) && Math.abs(numericCount - 1) > 0.0001
     ? ` · ${formatScore(numericCount)} 次`
     : "";
   const isSignupFee = item.kind === "signup_fee" && playerId;
@@ -15377,6 +15402,9 @@ function buildLeaderboardGamesTooltip(player) {
   const wins = Math.max(Number(player?.wins ?? 0), 0);
   const losses = Math.max(Number(player?.losses ?? 0), 0);
   const playerId = player?.player_id || player?.id || "";
+  const showingActiveSeason = !leaderboardDisplaySeasonId || leaderboardDisplaySeasonId === activeSeason?.id;
+  const credit = getCurrentItemCreditTotals().byPlayer.get(playerId);
+  const remainingCredit = (credit?.remainingCents || 0) / 100;
   const itemDetail = getLeaderboardItemUsageDetail(playerId);
   const lines = [
     `胜场：${wins}`,
@@ -15387,6 +15415,11 @@ function buildLeaderboardGamesTooltip(player) {
     `<span class="leaderboard-hovercard-row"><span class="leaderboard-hovercard-row-label">胜场</span><strong class="leaderboard-hovercard-row-value">${escapeHtml(String(wins))}</strong></span>`,
     `<span class="leaderboard-hovercard-row"><span class="leaderboard-hovercard-row-label">负场</span><strong class="leaderboard-hovercard-row-value">${escapeHtml(String(losses))}</strong></span>`,
   ];
+
+  if (showingActiveSeason) {
+    lines.push(`剩余道具额度：${formatScore(remainingCredit)}`);
+    htmlLines.push(`<span class="leaderboard-hovercard-row"><span class="leaderboard-hovercard-row-label">剩余道具额度</span><strong class="leaderboard-hovercard-row-value">${escapeHtml(formatScore(remainingCredit))}</strong></span>`);
+  }
 
   if (itemDetail.status === "ready") {
     const remainingItems = itemDetail.remainingItems.map(
@@ -15461,8 +15494,38 @@ function updateRewardMinimumHint() {
   }
 
   rewardMinimumHint.textContent = selectedPlayer.is_in_season
-    ? `已选：${selectedPlayer.display_name}`
+    ? `已选：${selectedPlayer.display_name} · 当前道具额度 ${formatScore(seasonItemCredits.get(selectedPlayer.id) || 0)}；修改时填写本赛季新总额`
     : `已选：${selectedPlayer.display_name} · 记为场外赞助`;
+}
+
+async function setSelectedPlayerItemCredit() {
+  if (!ensureScorerAccess("仅记分员或管理员可修改道具额度。")) return;
+  const player = seasonPlayers.find((entry) => entry.id === rewardSelectedPlayerId && entry.is_in_season);
+  if (!activeSeason?.id || !player) {
+    setRewardMessage("请先选择本赛季选手。", true);
+    return;
+  }
+  const raw = itemCreditInput.value.trim();
+  const amount = Number(raw);
+  if (!raw || !Number.isInteger(amount) || amount < 0) {
+    setRewardMessage("请输入大于等于 0 的整数；填写的是本赛季道具额度总额。", true);
+    return;
+  }
+  setItemCreditBtn.disabled = true;
+  const { error } = await db.from("season_player_item_credits").upsert([{
+    season_id: activeSeason.id, player_id: player.id, amount,
+  }], { onConflict: "season_id,player_id" });
+  setItemCreditBtn.disabled = false;
+  if (error) {
+    setRewardMessage(`保存道具额度失败：${getErrorMessage(error)}`, true);
+    return;
+  }
+  seasonItemCredits.set(player.id, amount);
+  itemCreditInput.value = "";
+  updateRewardMinimumHint();
+  applyRewardLogsToLocalViews();
+  setRewardMessage(`${player.display_name} 本赛季道具额度总额已设为 ${formatScore(amount)}。`);
+  requestImmediateRefresh({ playerDriven: true, leaderboard: true, rewardLogs: true });
 }
 
 function renderRewardLogs() {
@@ -15509,7 +15572,7 @@ function renderRewardLogs() {
       item.innerHTML = `
         <div class="reward-summary-head">
           <strong>${escapeHtml(player.display_name)}</strong>
-          <span class="reward-log-amount reward-log-amount-total ${rewardTierClass}">总额 ${formatScore(player.total)}</span>
+          <span class="reward-log-amount reward-log-amount-total ${rewardTierClass}">总额 ${formatScore(player.total)} · 剩余道具额度 ${formatScore(player.item_credit_remaining)}</span>
         </div>
         <div class="reward-category-list">
           ${player.categories.map((category) => buildRewardCategoryLineHtml(category, player.id)).join("")}
@@ -15602,7 +15665,8 @@ function applyRewardLogsToLocalViews() {
   if (leaderboardPlayers.length) {
     renderLeaderboard(leaderboardPlayers.map((player) => {
       const playerId = player.player_id || player.id;
-      const rewardPoints = Number(donationTotals.get(playerId) ?? 0);
+      const rewardPoints = Number(donationTotals.get(playerId) ?? 0)
+        - (getCurrentItemCreditTotals().byPlayer.get(playerId)?.appliedCents || 0) / 100;
       const rewardExtraPoints = Number(extraDonationTotals.get(playerId) ?? 0);
       const rewardDoubleBonus = Number(cardDonationTotals.get(playerId) ?? 0);
       const rewardFloorBonus = Number(miscDonationTotals.get(playerId) ?? 0);
@@ -16702,6 +16766,7 @@ async function loadRewardLogs() {
   if (!activeSeason?.id) {
     rewardCardUsageSummary = new Map();
     rewardLogs = [];
+    seasonItemCredits = new Map();
     resetRewardSummarySortSnapshot();
     syncSeasonSignupFeePaidStateFromLogs([]);
     externalRewardTotal = 0;
@@ -16721,16 +16786,20 @@ async function loadRewardLogs() {
     .select("id, season_id, source_key, donor_name, player_id, amount, category, note, is_outside, is_public, donated_at, created_at, players ( display_name )")
     .eq("season_id", activeSeason.id)
     .order("created_at", { ascending: false });
-  const { data, error } = await query;
+  const [{ data, error }, creditResult] = await Promise.all([
+    query,
+    db.from("season_player_item_credits").select("player_id, amount").eq("season_id", activeSeason.id),
+  ]);
   rewardCardUsageSummary = new Map();
 
-  if (error) {
-    console.error("加载赞助记录失败：", error);
+  if (error || creditResult.error) {
+    console.error("加载赞助记录或道具额度失败：", error || creditResult.error);
     rewardLogs = [];
+    seasonItemCredits = new Map();
     rewardLogsLoadedSeasonId = "";
     syncSeasonSignupFeePaidStateFromLogs([]);
     externalRewardTotal = 0;
-    const migrationHint = getLatestSchemaMigrationHint(error);
+    const migrationHint = getLatestSchemaMigrationHint(error || creditResult.error);
     if (migrationHint) {
       setRewardMessage(`赞助面板尚未完成数据库升级。${migrationHint}`, true);
     }
@@ -16740,6 +16809,8 @@ async function loadRewardLogs() {
     return;
   }
 
+  seasonItemCredits = new Map((creditResult.data || []).map((row) => [String(row.player_id), Number(row.amount)]));
+  updateRewardMinimumHint();
   rewardLogs = (data || []).map((row) => {
     const matchedPlayer = row.player_id
       ? seasonPlayers.find((player) => player.id === row.player_id) || null
@@ -16782,8 +16853,11 @@ async function loadRewardLogs() {
   syncSeasonRewardTotalFromLogs();
   refreshSeasonRewardTotal();
   renderRewardLogs();
+  const netDonationTotals = new Map([...donationTotals].map(([id, gross]) => [
+    id, gross - (getCurrentItemCreditTotals().byPlayer.get(id)?.appliedCents || 0) / 100,
+  ]));
   updateLeaderboardRewardTotals({
-    totalMap: donationTotals,
+    totalMap: netDonationTotals,
     extraMap: extraDonationTotals,
     cardMap: cardDonationTotals,
     miscMap: miscDonationTotals,
@@ -23016,6 +23090,12 @@ rewardPlayerPicker.addEventListener("click", (event) => {
 });
 
 addRewardBtn.addEventListener("click", addRewardExtra);
+setItemCreditBtn.addEventListener("click", setSelectedPlayerItemCredit);
+itemCreditInput.addEventListener("keydown", async (event) => {
+  if (event.key !== "Enter") return;
+  event.preventDefault();
+  await setSelectedPlayerItemCredit();
+});
 
 
 rewardExtraInput.addEventListener("keydown", async (event) => {
@@ -23887,6 +23967,10 @@ function applyRolePermissions() {
   }
   addRewardBtn.hidden = !canScore;
   addRewardBtn.disabled = !canScore;
+  setItemCreditBtn.hidden = !canScore;
+  setItemCreditBtn.disabled = !canScore;
+  itemCreditInput.hidden = !canScore;
+  itemCreditInput.disabled = !canScore;
   rewardExtraInput.hidden = !canScore;
   rewardExtraInput.disabled = !canScore;
   if (rewardMinimumHint) {
