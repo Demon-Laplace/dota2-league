@@ -14893,6 +14893,7 @@ const REWARD_CATEGORY_CONFIG = {
   team_card: { label: "团队道具", tone: "card", order: 20 },
   single_card: { label: "个人道具", tone: "card", order: 30 },
   extra_donation: { label: "额外赞助", tone: "extra", order: 40 },
+  item_credit_remaining: { label: "剩余道具额度", tone: "credit", order: 45 },
   misc_item: { label: "其它道具", tone: "misc", order: 50 },
 };
 
@@ -15234,6 +15235,7 @@ function buildSeasonRewardSummary() {
       const total = Math.round(grossTotal * 100 - (credit?.appliedCents || 0)) / 100;
       return {
         ...player,
+        item_credit_total: (credit?.creditCents || 0) / 100,
         item_credit_remaining: (credit?.remainingCents || 0) / 100,
         categories: categories.sort(
           (a, b) => getRewardCategoryConfig(a.kind).order - getRewardCategoryConfig(b.kind).order
@@ -15274,7 +15276,9 @@ function buildRewardCategoryLineHtml(item, playerId = "") {
           : "")
     )
     : "";
-  const valueText = isSignupFee && !isPaid
+  const valueText = item.kind === "item_credit_remaining"
+    ? formatScore(item.amount)
+    : isSignupFee && !isPaid
     ? `待确认 ${expectedAmount > 0 ? formatScore(expectedAmount) : ""}`.trim()
     : `+${formatScore(item.amount)}${metaText}`;
   return `
@@ -15569,13 +15573,18 @@ function renderRewardLogs() {
       const item = document.createElement("article");
       item.className = "reward-summary-card";
       const rewardTierClass = `reward-glow-tier-${getRewardGlowTier(player.total)}`;
+      const displayCategories = [...player.categories];
+      if (player.item_credit_remaining !== 0) {
+        displayCategories.push({ kind: "item_credit_remaining", amount: player.item_credit_remaining });
+        displayCategories.sort((a, b) => getRewardCategoryConfig(a.kind).order - getRewardCategoryConfig(b.kind).order);
+      }
       item.innerHTML = `
         <div class="reward-summary-head">
           <strong>${escapeHtml(player.display_name)}</strong>
-          <span class="reward-log-amount reward-log-amount-total ${rewardTierClass}">总额 ${formatScore(player.total)} · 剩余道具额度 ${formatScore(player.item_credit_remaining)}</span>
+          <span class="reward-log-amount reward-log-amount-total ${rewardTierClass}">道具额度 ${formatScore(player.item_credit_total)} · 总额 ${formatScore(player.total)}</span>
         </div>
         <div class="reward-category-list">
-          ${player.categories.map((category) => buildRewardCategoryLineHtml(category, player.id)).join("")}
+          ${displayCategories.map((category) => buildRewardCategoryLineHtml(category, player.id)).join("")}
         </div>
       `;
       summaryGrid.appendChild(item);

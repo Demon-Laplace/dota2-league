@@ -571,12 +571,6 @@ button.season-total {
 
 .reward-entry-row {
   align-items: stretch;
-  flex-wrap: wrap;
-}
-
-.reward-entry-row input {
-  flex: 1 1 140px;
-  min-width: 0;
 }
 
 .reward-summary-section {
