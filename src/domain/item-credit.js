@@ -24,7 +24,7 @@
       const row = byPlayer.get(id) || { grossCents: 0, itemCents: 0 };
       const creditCents = Math.max(cents(credits.get(id)), 0);
       row.creditCents = creditCents;
-      row.remainingCents = creditCents > 0 ? creditCents - row.itemCents : 0;
+      row.remainingCents = creditCents - row.itemCents;
       row.appliedCents = Math.min(creditCents, row.itemCents);
       row.netCents = row.grossCents - row.appliedCents;
       appliedCents += row.appliedCents;

@@ -9,7 +9,7 @@ test('item credit only offsets item charges and may be set after use', () => {
   const logs = [item(50), extra(10)];
   let result = totals(logs, new Map());
   assert.equal(result.byPlayer.get('A').netCents, 6000);
-  assert.equal(result.byPlayer.get('A').remainingCents, 0);
+  assert.equal(result.byPlayer.get('A').remainingCents, -5000);
   result = totals(logs, new Map([['A', 50]]));
   assert.equal(result.byPlayer.get('A').netCents, 1000);
   assert.equal(result.byPlayer.get('A').remainingCents, 0);
