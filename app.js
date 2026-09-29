@@ -16485,7 +16485,7 @@ function renderLeaderboard(data) {
     const playerId = String(player.player_id || player.id || "").trim();
     const rank = totalRankMap.get(playerId) || getLeaderboardDisplayRankAtIndex(sortedData, idx);
     const isBottomTwo = sortedData.length >= 2 && rank >= sortedData.length - 1;
-    const hoverDirectionClass = idx < 5 ? "leaderboard-hovercard-below" : "leaderboard-hovercard-above";
+    const hoverDirectionClass = idx < 8 ? "leaderboard-hovercard-below" : "leaderboard-hovercard-above";
     const gamesPlayed = Number(player.games_played ?? 0);
     const rewardExtraPoints = Number(player.reward_extra_points ?? 0);
     const gamesTooltip = buildLeaderboardGamesTooltip(player);
