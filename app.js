@@ -15581,7 +15581,7 @@ function renderRewardLogs() {
       item.innerHTML = `
         <div class="reward-summary-head">
           <strong>${escapeHtml(player.display_name)}</strong>
-          <span class="reward-log-amount reward-log-amount-total ${rewardTierClass}">道具额度 ${formatScore(player.item_credit_total)} · 总额 ${formatScore(player.total)}</span>
+          <span class="reward-log-amount reward-log-amount-total ${rewardTierClass}">道具额度 ${formatScore(player.item_credit_total)} · 赞助额 ${formatScore(player.total)}</span>
         </div>
         <div class="reward-category-list">
           ${displayCategories.map((category) => buildRewardCategoryLineHtml(category, player.id)).join("")}
