@@ -2427,6 +2427,7 @@ function normalizeItemInventoryLogRow(row = {}) {
     item_name: String(row?.item_name || "未命名道具"),
     event_kind: String(row?.event_kind || "record"),
     quantity: Math.max(Number(row?.quantity ?? 0), 0),
+    sponsorship_amount: Math.max(Number(row?.sponsorship_amount ?? 0), 0),
     occurred_at: String(row?.occurred_at || row?.created_at || new Date().toISOString()),
     operator_name: String(row?.operator_name || ""),
     notes: String(row?.notes || ""),
@@ -7699,7 +7700,7 @@ function renderItemInventoryLogEventPill(row) {
   const quantityPrefix = eventKind === "usage" ? "-" : "+";
   return `
     <span class="queue-slot item-history-event item-history-event-${eventTone}">
-      ${escapeHtml(row?.item_name || "未命名道具")} ${escapeHtml(eventLabel)} ${escapeHtml(quantityPrefix)}${escapeHtml(formatItemUsageCount(quantity))}
+      ${escapeHtml(row?.item_name || "未命名道具")} ${escapeHtml(eventLabel)} ${escapeHtml(quantityPrefix)}${escapeHtml(formatItemUsageCount(quantity))}${eventKind === "usage" || eventKind === "purchase" ? ` · 消费赞助额 ${escapeHtml(formatScore(row.sponsorship_amount))}` : ""}
     </span>
   `;
 }
@@ -7875,7 +7876,7 @@ async function loadItemInventoryLogs() {
   renderItemInventoryLogs();
 
   try {
-    const { data, error } = await db.rpc("get_item_inventory_activity_log", {
+    const { data, error } = await db.rpc("get_item_inventory_activity_log_v2", {
       p_season_id: activeSeason.id,
       p_item_catalog_id: null,
     });
@@ -23793,7 +23794,7 @@ function isCurrentRoleScorerOnly() {
 
 function getCurrentAccessActorLabel() {
   if (!hasVisibleAuthSession()) return copyText("runtime.common.viewer", "游客");
-  return authProfile?.display_name || authAccessRole?.username || authSession.user?.email || getAccessRoleLabel();
+  return authAccessRole?.username || authProfile?.display_name || authSession.user?.email || getAccessRoleLabel();
 }
 
 function applyAccessModalMode() {
