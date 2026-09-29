@@ -11620,10 +11620,19 @@ function renderPlayerRelationHeatmap(container, chartKey, rows = [], emptyText =
   const upperRows = sortedRows
     .filter((row) => getPlayerRelationWinRateNumber(row) > 50)
     .slice(0, zoneLimit);
-  const lowerCandidateRows = sortedRows.filter((row) => getPlayerRelationWinRateNumber(row) <= 50);
+  const lowerCandidateRows = sortedRows.filter((row) => getPlayerRelationWinRateNumber(row) < 50);
   const lowerRows = isPortraitLayout
     ? lowerCandidateRows.slice(-zoneLimit)
     : lowerCandidateRows.slice(0, zoneLimit);
+  const neutralRows = sortedRows.filter((row) => getPlayerRelationWinRateNumber(row) === 50);
+  neutralRows.forEach((row) => {
+    if (upperRows.length >= zoneLimit && lowerRows.length >= zoneLimit) return;
+    const targetRows = upperRows.length < lowerRows.length ? upperRows : lowerRows;
+    targetRows.push(row);
+  });
+  // Preserve the existing rate/sample ordering after allocating neutral labels.
+  upperRows.sort((a, b) => sortedRows.indexOf(a) - sortedRows.indexOf(b));
+  lowerRows.sort((a, b) => sortedRows.indexOf(a) - sortedRows.indexOf(b));
   const buildZoneEntries = (zoneRows, zone, rankOffset = 0) => {
     return zoneRows.map((row, index) => ({
       row,
