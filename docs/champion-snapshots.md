@@ -33,6 +33,17 @@ site load after GitHub Pages has published the commit. There is no polling.
 
 ## Retry / explicit correction
 
+The `Publish missing season champions` GitHub Actions workflow also checks every
+hour (at minute 17 UTC; GitHub may delay scheduled runs), on publisher changes
+in `main`, and on manual dispatch. It reads ended seasons through the existing
+public API and fills missing snapshots on both publication branches. Existing
+snapshots are preserved; active seasons are excluded. Failed reads prevent a
+branch write, and SHA conflicts are re-read before retrying. A partial run is
+safe to repeat without settling the season again. No database writes occur.
+The workflow uses the repository-scoped GitHub Actions token with contents and
+Pages write permissions, and explicitly requests a legacy Pages build when its
+source commit has not yet been built. Failures appear in the Actions run log.
+
 An authenticated season manager can retry the existing function invocation with
 `{ "seasonId": "<ended-season-uuid>" }`. Only an administrator may request
 `{ "seasonId": "<ended-season-uuid>", "regenerate": true }` after correcting
