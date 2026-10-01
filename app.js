@@ -17248,6 +17248,7 @@ function getSeasonRankLabel(rankNo, seasonId = activeSeason?.id) {
 }
 
 function getSeasonPlayerPowerInputValue(player, seasonId = activeSeason?.id) {
+  if (!player?.is_in_season) return "-99";
   const rankNo = normalizeSeasonRankNo(player?.player_rank);
   if (!rankNo) return "0";
   const powerValue = getSeasonRankPowerValue(rankNo, seasonId);
@@ -17297,12 +17298,12 @@ function getSeasonPowerEditorValues(players = []) {
     (players || [])
       .map((player) => {
         const rawValue = String(player.rawValue || "").trim();
-        return /^\d+$/.test(rawValue) ? Number(rawValue) : 0;
+        return /^\d+$/.test(rawValue) ? Number(rawValue) : null;
       })
-      .filter((value) => value > 0)
+      .filter((value) => value !== null)
   )].sort((a, b) => b - a);
-  const mergedValues = [];
-  [...existingValues, ...defaultValues].forEach((value) => {
+  const mergedValues = [...existingValues];
+  defaultValues.forEach((value) => {
     if (mergedValues.length >= 10 || mergedValues.includes(value)) return;
     mergedValues.push(value);
   });
@@ -17328,7 +17329,7 @@ function buildRankLabelEditorHtml(mode = "scorer") {
 
   const playersByPower = new Map();
   players.forEach((player) => {
-    const normalizedPower = /^\d+$/.test(String(player.rawValue || "").trim())
+    const normalizedPower = /^(?:-99|\d+)$/.test(String(player.rawValue || "").trim())
       ? Number(player.rawValue)
       : 0;
     if (!playersByPower.has(normalizedPower)) {
@@ -17343,14 +17344,14 @@ function buildRankLabelEditorHtml(mode = "scorer") {
     }
     return groupPlayers.map((player) => {
       const inputValue = String(player.rawValue || "").trim();
-      const participationLabel = Number(inputValue) > 0 ? "参赛" : "未参赛";
+      const participationLabel = inputValue === "-99" ? "未参赛" : "参赛";
       return `
         <label class="season-player-power-row">
           <span class="season-player-power-name">${escapeHtml(player.displayName || "未知选手")}</span>
           <input
             type="number"
             step="1"
-            min="0"
+            min="-99"
             inputmode="numeric"
             class="season-player-power-input"
             value="${escapeHtml(inputValue)}"
@@ -17364,8 +17365,8 @@ function buildRankLabelEditorHtml(mode = "scorer") {
     }).join("");
   };
 
-  const positivePowerValues = getSeasonPowerEditorValues(players);
-  const rankedGroupsHtml = positivePowerValues.map((powerValue, index) => {
+  const participatingPowerValues = getSeasonPowerEditorValues(players);
+  const rankedGroupsHtml = participatingPowerValues.map((powerValue, index) => {
     const rankNo = index + 1;
     const groupPlayers = playersByPower.get(powerValue) || [];
     return `
@@ -17393,7 +17394,7 @@ function buildRankLabelEditorHtml(mode = "scorer") {
       </section>
     `;
   }).join("");
-  const unrankedPlayers = playersByPower.get(0) || [];
+  const unrankedPlayers = playersByPower.get(-99) || [];
 
   return `
     <div class="season-player-power-ranked-grid">
@@ -19911,7 +19912,7 @@ async function saveSeasonRankLabels(messageTarget = "scorer") {
     return {
       playerId: entry.playerId || "",
       rawValue,
-      powerValue: rawValue === "" ? 0 : Number(rawValue),
+      powerValue: Number(rawValue),
     };
   });
 
@@ -19926,18 +19927,18 @@ async function saveSeasonRankLabels(messageTarget = "scorer") {
       return;
     }
     if (
-      entry.rawValue !== ""
-      && (!/^\d+$/.test(entry.rawValue) || !Number.isSafeInteger(entry.powerValue))
+      !/^(?:-99|\d+)$/.test(entry.rawValue)
+      || !Number.isSafeInteger(entry.powerValue)
     ) {
       const playerName = seasonPlayers.find((player) => player.id === entry.playerId)?.display_name || "该选手";
-      panelMessage(`${playerName} 的战力值必须是大于等于 0 的整数；0 表示不参加当前赛季。`, true);
+      panelMessage(`${playerName} 的战力值必须是大于等于 0 的整数或 -99；-99 表示不参加当前赛季。`, true);
       return;
     }
   }
 
   const powerValues = [...new Set(
     entries
-      .filter((entry) => entry.powerValue > 0)
+      .filter((entry) => entry.powerValue !== -99)
       .map((entry) => entry.powerValue)
   )].sort((a, b) => b - a);
 
@@ -19951,7 +19952,7 @@ async function saveSeasonRankLabels(messageTarget = "scorer") {
   const targetRankByPlayerId = new Map(
     entries.map((entry) => [
       entry.playerId,
-      entry.powerValue > 0 ? rankByPowerValue.get(entry.powerValue) : null,
+      entry.powerValue !== -99 ? rankByPowerValue.get(entry.powerValue) : null,
     ])
   );
   const changedPlayers = seasonPlayers.filter((player) => {
