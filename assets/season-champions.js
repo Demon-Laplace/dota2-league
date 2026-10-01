@@ -1,5 +1,15 @@
 window.__DOTA2_CHAMPIONS__ = [
   {
+    "seasonId": "33231b58-dfbe-45e1-96e0-8806decb6fbf",
+    "seasonCode": "2026-09",
+    "seasonName": "2026 年 9 月赛季",
+    "tiLabel": "TI7",
+    "championName": "瓜神",
+    "playerId": "09571391-a177-4259-b5ba-ccb33155b8a7",
+    "score": 410,
+    "source": "settlement-snapshot"
+  },
+  {
     "seasonId": "bf910f11-2fca-43fb-99d8-a6c8aa9866c9",
     "seasonCode": "2026-08",
     "seasonName": "2026 年 8 月赛季",
