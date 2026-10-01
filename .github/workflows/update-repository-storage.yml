@@ -14,7 +14,28 @@ permissions:
   contents: write
 
 jobs:
+  publish-champions:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+      pages: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Check champion publication safeguards
+        run: node --test scripts/champions.test.mjs scripts/publish-missing-champions.test.mjs
+      - name: Publish missing ended-season champions
+        run: node scripts/publish-missing-champions.mjs
+        env:
+          GH_TOKEN: ${{ github.token }}
+
   update-storage-snapshot:
+    needs: publish-champions
+    if: always()
     runs-on: ubuntu-latest
     env:
       GH_TOKEN: ${{ github.token }}

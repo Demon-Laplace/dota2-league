@@ -33,9 +33,9 @@ site load after GitHub Pages has published the commit. There is no polling.
 
 ## Retry / explicit correction
 
-The `Publish missing season champions` GitHub Actions workflow also checks every
-hour (at minute 17 UTC; GitHub may delay scheduled runs), on publisher changes
-in `main`, and on manual dispatch. It reads ended seasons through the existing
+The existing `Update repository storage snapshot` GitHub Actions workflow also
+checks once daily at 02:00 Beijing time (18:00 UTC the previous day; GitHub may
+delay scheduled runs), and on manual dispatch. It reads ended seasons through the existing
 public API and fills missing snapshots on both publication branches. Existing
 snapshots are preserved; active seasons are excluded. Failed reads prevent a
 branch write, and SHA conflicts are re-read before retrying. A partial run is
