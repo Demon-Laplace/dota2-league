@@ -53,7 +53,10 @@ if (code) {
   const { calculateChampion } = await import('../supabase/functions/publish-season-champion/champion.mjs');
   const predicted = await calculateChampion(`https://${project}.supabase.co`, key, { id: season.id, code, status: season.status });
   assert.ok(sameChampion(existing, predicted), 'Existing winner differs; stop without altering champion history');
-  await query(`select private.capture_season_champion_publication('${season.id}'); select private.dispatch_champion_publications('${season.id}');`);
+  await query(`select private.capture_season_champion_publication('${season.id}');
+    update private.season_champion_publications set next_attempt_at=now()
+      where season_id='${season.id}' and status='pending';
+    select private.dispatch_champion_publications('${season.id}');`);
   let published = false;
   for (let attempt = 0; attempt < 48; attempt++) {
     const [job] = await query(`select status,attempts,last_error,champion from private.season_champion_publications where season_id='${season.id}'`);
