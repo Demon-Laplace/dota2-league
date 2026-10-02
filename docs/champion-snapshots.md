@@ -1,76 +1,80 @@
-# Static season champions
+# Durable season champion publication
 
-`assets/season-champions.js` is a small public asset loaded before the app. The
-champions dialog renders it synchronously: opening the dialog does not query
-Supabase, recompute historical scores, or consult the device champion cache.
-The existing two legacy entries are retained. Later entries are generated from
-ended-season records, never manually assigned to a winner.
+`assets/season-champions.js` remains the public champion list. Opening the
+champions dialog reads this asset without querying Supabase or recalculating
+historical scores.
 
-## Settlement and publication
+## Season closure
 
-After successful season rollover, the client invokes `publish-season-champion`.
-The function verifies authentication and `can_adjust_scores(seasonId)`, requires
-an ended season, calculates the winner on the server, and publishes only the
-static champion asset to `main` and `design/modern-league-ui`. It reuses the
-existing `GITHUB_REPOSITORY` and `GITHUB_TOKEN` Edge Function secrets (the token
-must have repository contents write access). No schema migration is required.
-The existing deploy-functions workflow deploys the new function on push.
+Migration `20261002120000_durable_season_champion_publication.sql` adds an
+AFTER status-change trigger to `seasons`. On a transition to `closed`, a season
+with matches receives exactly one private delivery record in the same
+transaction. Empty seasons receive no champion task. If closure rolls back,
+its frozen data, task and outgoing request roll back too.
 
-The calculation includes ledger points, season-specific participation rules,
-unrevoked manual adjustments and hero rewards. Total-score ties use win/loss,
-item, participation and manual components, win rate, then the Chinese name sort,
-matching the existing total leaderboard. The UI's optional win/loss sort never
-affects champion selection. Source reads are paginated and any failure prevents
-publication; a missing score component is never silently treated as zero.
+The record freezes the season metadata and all inputs to the existing champion
+calculation: leaderboard, participation rules, unrevoked manual adjustments,
+hero rewards and item/rollback ledger. The background worker uses the unchanged
+JavaScript ranking rule, including Chinese name tie-breaking. It persists the
+champion result before the first GitHub write. Later changes to historical
+scores cannot alter the frozen automatic publication result.
 
-Existing snapshots are immutable during normal publication. GitHub SHA checks
-and retries prevent overwriting concurrent asset updates. A partial two-branch
-publication can be retried without another season rollover. This is a post-
-settlement operation: publication failure does not undo or repeat settlement.
-The client shows a distinct failure message. Newly published results update the
-settling browser immediately; other visitors receive the asset on their next
-site load after GitHub Pages has published the commit. There is no polling.
+The database queues an immediate `pg_net` request to
+`process-season-champion-publications`. HTTP starts after transaction commit.
+Publication continues independently of the closing browser. The existing
+`publish-season-champion` endpoint remains a user-authenticated compatibility
+endpoint that requests a safe delivery retry and returns status/the saved
+champion; regular calls no longer recalculate or publish independently.
 
-## Retry / explicit correction
+## Delivery and recovery
 
-The existing `Update repository storage snapshot` GitHub Actions workflow also
-checks once daily at 02:00 Beijing time (18:00 UTC the previous day; GitHub may
-delay scheduled runs), and on manual dispatch. It reads ended seasons through the existing
-public API and fills missing snapshots on both publication branches. Existing
-snapshots are preserved; active seasons are excluded. Failed reads prevent a
-branch write, and SHA conflicts are re-read before retrying. A partial run is
-safe to repeat without settling the season again. No database writes occur.
-The workflow uses the repository-scoped GitHub Actions token with contents and
-Pages write permissions, and explicitly requests a legacy Pages build when its
-source commit has not yet been built. Failures appear in the Actions run log.
+Only due delivery records are processed. There is no daily season scan,
+monthly completion marker or champion job in the repository-size workflow.
+The original Beijing 02:00 storage accounting remains unchanged.
 
-Monthly completion is measured in Beijing time: October checks September's
-champion, November checks October's, and January checks the previous December.
-Once the previous season is ended and its champion agrees on both branches and
-the live Pages asset, the publisher persists `.github/state/champion-publication.json`
-on `main`. Remaining daily runs in that accounting month read this marker and
-skip champion tests, database reads and publication checks; storage accounting
-still runs. A new month automatically resumes the daily checks. Missing,
-failed or incomplete publication never creates a completion marker.
+A minute-based recovery task consults the small private delivery queue and
+makes no HTTP request while it is idle. Pending tasks use exponential backoff
+(up to one hour). Processing tasks have a five-minute lease; an interrupted
+worker can be reclaimed. Stale workers cannot save or finish a newer lease.
+The frozen champion is reused on every retry. Published tasks are never claimed.
 
-An authenticated season manager can retry the existing function invocation with
-`{ "seasonId": "<ended-season-uuid>" }`. Only an administrator may request
-`{ "seasonId": "<ended-season-uuid>", "regenerate": true }` after correcting
-historical records. Clients cannot supply a winner, branch or repository path.
+The worker publishes only the champion asset to the existing `main` and
+`design/modern-league-ui` branches. SHA conflicts are re-read before retrying.
+If one branch succeeded, the retry preserves that existing identical champion
+and completes the other branch. A conflicting winner is an error, not an
+implicit overwrite. Delivery is marked published only after the deployed
+GitHub Pages asset contains the same winner and score. Deployment lag is a
+retryable delivery failure and never repeats league settlement.
 
-Repository maintainers can also run `node scripts/export-champions.mjs` to add
-missing ended seasons using public reads only, then commit the asset to both
-branches. It preserves all existing snapshots by default. After an intentional
-historical correction use `node scripts/export-champions.mjs --regenerate=2026-06`
-with the actual season code. Review the diff before committing. Never hand-edit
-the winner to hide a data error. Git history is the publication audit trail.
+## Authorization and operations
 
-## Verification
+Worker endpoints disable gateway JWT checks and enforce their own auth:
+normal callers must have a valid Supabase user session; background requests
+must carry a random token generated and stored in a private database table.
+The worker proves this token through a service-role-only claim RPC. Neither
+anonymous nor authenticated users can read the token, claim jobs, mutate frozen
+results or finish deliveries. The pg_net request queue is also private to
+protect queued headers. No worker secret is placed in the repository/browser.
 
-- `node --test scripts/champions.test.mjs` covers independent reward components,
-  progressive participation points, item reversals, Unicode serialization and
-  rejection of active seasons.
-- Initial May–August 2026 generated winners and scores were compared with the
-  existing browser total leaderboard; all four matched, including TI4 将军.
-- Six champions rendered with Supabase REST blocked in the browser.
-- Live season rollover is not executed for testing: it changes league state.
+The worker reuses the existing Edge Function `GITHUB_REPOSITORY`/`GITHUB_TOKEN`
+secrets. Its repository and deployment URL are fixed to this production league.
+Only administrators may use the existing explicit `regenerate` correction
+option; automatic delivery never requests regeneration. Do not correct a
+champion while its original delivery is pending: first resolve that task.
+
+`Verify durable champion publication` is a manual operational workflow. Without
+an input it checks the deployed trigger, recovery job and authorization. An
+optional **already-published ended season** checks idempotent background
+delivery after confirming the winner still matches the existing asset. It does
+not close a season or modify any scores. A mismatch stops verification rather
+than overwriting history. Inspect `private.season_champion_publications` for
+attempt count, state, saved champion and the latest delivery error.
+
+## Validation
+
+Run `node --test scripts/champions.test.mjs scripts/champion-publication.test.mjs`.
+The database validation applies the migration chain to an isolated PostgreSQL
+compatible fixture with pg_net/pg_cron stubs, then verifies rollback, close
+capture, empty seasons, immutable inputs, authorization, exclusive leases,
+backoff, crash recovery, stale lease rejection and idle dispatch behavior.
+Platform extensions and actual delivery require the deployed operational check.

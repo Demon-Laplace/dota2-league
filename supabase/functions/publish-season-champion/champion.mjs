@@ -65,6 +65,11 @@ export async function calculateChampion(url, key, season) {
     readRows(url,key,'hero_reward_adjustments',{...common,select:'player_id,points_delta',revoked_at:'is.null',order:'id'}),
     readRows(url,key,'score_ledger',{...common,select:'id,player_id,entry_type,points_delta,reversal_of_id',order:'id'}),
   ]);
+  return championFromSnapshot({season,players,rules,manual,heroes,ledger});
+}
+export function championFromSnapshot({season,players,rules,manual,heroes,ledger}) {
+  if (!['closed','archived'].includes(season.status)) throw new Error('Season must be ended');
+  if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(season.code)) throw new Error('Invalid season code');
   const winner = rankRows(players,rules,manual,heroes,ledger)[0];
   if (!winner) throw new Error(`No leaderboard rows for ${season.code}`);
   return {seasonId:season.id,seasonCode:season.code,seasonName:season.name || season.code,

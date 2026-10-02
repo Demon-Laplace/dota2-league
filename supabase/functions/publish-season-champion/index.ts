@@ -16,6 +16,13 @@ Deno.serve(async (req: Request) => {
   if ('error' in body) return body.error;
   const seasonId = String(body.data.seasonId || '');
   if (!/^[0-9a-f-]{36}$/i.test(seasonId)) return jsonResponse({error:'Invalid seasonId'}, {status:400});
+  if (!body.data.regenerate) {
+    // Compatibility endpoint only: closing the season has already captured and
+    // dispatched the durable task. The browser can request a safe retry/status.
+    const result = await client.supabase.rpc('request_champion_publication', { p_season_id: seasonId });
+    if (result.error) return jsonResponse({ error: result.error.message }, { status: result.error.code === '42501' ? 403 : 400 });
+    return jsonResponse(result.data);
+  }
   const permission = await client.supabase.rpc('can_adjust_scores', {p_season_id:seasonId});
   if (permission.error || !permission.data) return jsonResponse({error:'Forbidden'}, {status:403});
   if (body.data.regenerate) {

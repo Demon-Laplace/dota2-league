@@ -59,3 +59,11 @@ verify_jwt = false
 
 [functions.rollback-match]
 verify_jwt = false
+
+# Both endpoints enforce authentication internally. Worker uses a private,
+# database-generated token; compatibility publisher validates the user session.
+[functions.publish-season-champion]
+verify_jwt = false
+
+[functions.process-season-champion-publications]
+verify_jwt = false

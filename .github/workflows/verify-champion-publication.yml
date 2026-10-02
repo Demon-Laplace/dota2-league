@@ -1,0 +1,27 @@
+name: Verify durable champion publication
+on:
+  workflow_dispatch:
+    inputs:
+      existing_season:
+        description: 'Optional already-published ended season to verify delivery without changing scores (YYYY-MM)'
+        required: false
+        default: ''
+permissions:
+  contents: read
+jobs:
+  verify:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: node --test scripts/champions.test.mjs scripts/champion-publication.test.mjs
+      - name: Verify deployed database and publication worker
+        run: node scripts/verify-champion-publication.mjs
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          SUPABASE_PROJECT_ID: ${{ secrets.SUPABASE_PROJECT_ID }}
+          VERIFY_EXISTING_SEASON: ${{ inputs.existing_season }}
