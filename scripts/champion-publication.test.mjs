@@ -2,6 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { processPublication, publishStoredChampion } from '../supabase/functions/process-season-champion-publications/publication.mjs';
 import { championFromSnapshot, encodeSnapshot, decodeSnapshot } from '../supabase/functions/publish-season-champion/champion.mjs';
+import { migrationWithHistory } from './champion-migration-sql.mjs';
 
 const source = {
   season: { id: 'season', code: '2026-09', name: 'September', status: 'closed' },
@@ -10,6 +11,14 @@ const source = {
 };
 const winner = championFromSnapshot(source);
 const job = { season_id: 'season', lease_id: 'lease', source_snapshot: source, champion: null };
+
+test('deployment history preserves PostgreSQL dollar quoting and regex anchors', () => {
+  const sql = "begin; do $$ begin if 'x' ~ '^x$' then null; end if; end; $$; commit;\n";
+  const result = migrationWithHistory(sql, '20261002120000', 'durable_season_champion_publication');
+  assert.ok(result.startsWith(sql.slice(0, sql.lastIndexOf('commit;'))));
+  assert.ok(result.includes("array['" + sql.replaceAll("'", "''") + "']"));
+  assert.ok(result.endsWith('commit;'));
+});
 function mockRepository() {
   const branches = new Map([['main', []], ['design/modern-league-ui', []]]);
   const writes = [];

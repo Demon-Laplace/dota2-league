@@ -2,6 +2,7 @@
 // production migrations belonging to other worktrees.
 import { readFile } from 'node:fs/promises';
 import assert from 'node:assert/strict';
+import { migrationWithHistory } from './champion-migration-sql.mjs';
 const project = process.env.SUPABASE_PROJECT_ID;
 assert.equal(project, 'klxkkwwszqtgeuozwtkw', 'Unexpected production project');
 const version = '20261002120000';
@@ -24,10 +25,7 @@ if (existing.length) {
 } else {
   // DDL and its history record commit together. Every unrelated history entry
   // remains untouched. A failed DDL statement leaves neither change behind.
-  const literal = `'${sql.replaceAll("'", "''")}'`;
-  assert.match(sql, /commit;\s*$/i);
-  const applied = sql.replace(/commit;\s*$/i,
-    `insert into supabase_migrations.schema_migrations(version,name,statements) values ('${version}','${name}',array[${literal}]);\ncommit;`);
+  const applied = migrationWithHistory(sql, version, name);
   await query(applied);
   console.log('Applied only the durable champion migration and recorded its version');
 }
