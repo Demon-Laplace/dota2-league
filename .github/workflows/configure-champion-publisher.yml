@@ -19,3 +19,11 @@ jobs:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
           SUPABASE_PROJECT_ID: ${{ secrets.SUPABASE_PROJECT_ID }}
           CHAMPION_PUBLICATION_BOOTSTRAP_TOKEN: ${{ secrets.CHAMPION_PUBLICATION_BOOTSTRAP_TOKEN }}
+      - name: Always delete the temporary credential copy
+        if: always()
+        run: |
+          if [ -n "$GH_TOKEN" ]; then
+            gh secret delete CHAMPION_PUBLICATION_BOOTSTRAP_TOKEN --repo "$GITHUB_REPOSITORY"
+          fi
+        env:
+          GH_TOKEN: ${{ secrets.CHAMPION_PUBLICATION_BOOTSTRAP_TOKEN }}
