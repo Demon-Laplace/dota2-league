@@ -23,15 +23,33 @@ jobs:
       pages: write
     steps:
       - uses: actions/checkout@v4
+      - name: Determine Beijing accounting month
+        id: month
+        run: |
+          month="$(TZ=Asia/Shanghai date +'%Y-%m')"
+          completed=""
+          if [ -f .github/state/champion-publication.json ]; then
+            completed="$(jq -r '.completedAccountingMonth // empty' .github/state/champion-publication.json)"
+          fi
+          echo "value=$month" >> "$GITHUB_OUTPUT"
+          if [ "$completed" = "$month" ]; then
+            echo "complete=true" >> "$GITHUB_OUTPUT"
+            echo "Champion publication is complete for $month; skipping champion checks."
+          fi
       - uses: actions/setup-node@v4
+        if: steps.month.outputs.complete != 'true'
         with:
           node-version: '22'
       - name: Check champion publication safeguards
+        if: steps.month.outputs.complete != 'true'
         run: node --test scripts/champions.test.mjs scripts/publish-missing-champions.test.mjs
       - name: Publish missing ended-season champions
+        id: publication
+        if: steps.month.outputs.complete != 'true'
         run: node scripts/publish-missing-champions.mjs
         env:
           GH_TOKEN: ${{ github.token }}
+          CHAMPION_ACCOUNTING_MONTH: ${{ steps.month.outputs.value }}
 
   update-storage-snapshot:
     needs: publish-champions

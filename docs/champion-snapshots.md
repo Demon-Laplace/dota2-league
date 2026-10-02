@@ -44,6 +44,15 @@ The workflow uses the repository-scoped GitHub Actions token with contents and
 Pages write permissions, and explicitly requests a legacy Pages build when its
 source commit has not yet been built. Failures appear in the Actions run log.
 
+Monthly completion is measured in Beijing time: October checks September's
+champion, November checks October's, and January checks the previous December.
+Once the previous season is ended and its champion agrees on both branches and
+the live Pages asset, the publisher persists `.github/state/champion-publication.json`
+on `main`. Remaining daily runs in that accounting month read this marker and
+skip champion tests, database reads and publication checks; storage accounting
+still runs. A new month automatically resumes the daily checks. Missing,
+failed or incomplete publication never creates a completion marker.
+
 An authenticated season manager can retry the existing function invocation with
 `{ "seasonId": "<ended-season-uuid>" }`. Only an administrator may request
 `{ "seasonId": "<ended-season-uuid>", "regenerate": true }` after correcting
