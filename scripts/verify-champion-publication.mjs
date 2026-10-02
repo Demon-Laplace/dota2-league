@@ -26,6 +26,9 @@ assert.equal(anonymous.status, 403);
 const wrong = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Champion-Worker-Token': '0'.repeat(64) }, body: '{}' });
 assert.equal(wrong.status, 403);
 console.log('PASS deployed close trigger, retry scheduler and worker authorization');
+const deliveries = await query(`select source_snapshot->'season'->>'code' as season, status, attempts, last_error
+  from private.season_champion_publications order by created_at desc limit 5`);
+console.log('Recent delivery status:', JSON.stringify(deliveries));
 
 const code = process.env.VERIFY_EXISTING_SEASON || '';
 if (code) {
