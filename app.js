@@ -35,6 +35,7 @@ const SUPABASE_DATABASE_USAGE_QUOTA_BYTES = 500 * 1024 * 1024;
 const SUPABASE_SYSTEM_USAGE_DAILY_CACHE_STORAGE_KEY = "nd_dota_supabase_system_usage_daily_v3";
 const REALTIME_HIDDEN_DISCONNECT_DELAY_MS = 60 * 1000;
 const SEASON_BASE_SPONSOR_AMOUNT = 20;
+const HIGHEST_REWARD_HIGHLIGHT_MINIMUM = 100;
 const LIFETIME_REWARD_EXTRA_DISPLAY_THRESHOLD = 100;
 const SEASON_ROLLOVER_REQUIRED_SCORER_CONFIRMATIONS = 1;
 let ADMIN_BACKGROUND_IMAGE_OPTIONS = [];
@@ -10672,7 +10673,7 @@ function getHighestRewardPlayerIds(data) {
   }, 0);
 
   return new Set(
-    highestReward > 0
+    highestReward >= HIGHEST_REWARD_HIGHLIGHT_MINIMUM
       ? (data || [])
         .filter((player) => Number(player.reward_points ?? 0) === highestReward)
         .map((player) => player.player_id || player.id)
