@@ -13831,6 +13831,19 @@ function removeTeamDoubleConfig(formType, team, itemCatalogId) {
   );
 }
 
+function selectTeamDoublePayer(formType, team, itemCatalogId, playerId = "", sponsorshipExempt = false) {
+  const config = getTeamDoubleConfig(formType, team, itemCatalogId);
+  if (!config.targetTeam) return;
+  const isSameSelection = sponsorshipExempt
+    ? config.sponsorshipExempt === true
+    : !config.sponsorshipExempt && config.userPlayerId === playerId;
+  upsertTeamDoubleConfig(formType, team, {
+    ...config,
+    userPlayerId: sponsorshipExempt || isSameSelection ? "" : playerId,
+    sponsorshipExempt: sponsorshipExempt && !isSameSelection,
+  });
+}
+
 function getTeamDoubleBaseCost(sourceTeam, targetTeam) {
   return sourceTeam && targetTeam && sourceTeam !== targetTeam ? 15 : 10;
 }
@@ -13843,7 +13856,7 @@ function getTeamDoublePerPlayerCost(sourceTeam, targetTeam, paymentMode = "solo"
 function getTeamDoubleModeLabel(sourceTeam, targetTeam, paymentMode = "solo", sponsorshipExempt = false) {
   if (!targetTeam) return "";
   const relationLabel = sourceTeam === targetTeam ? "己方效果" : "对方效果";
-  if (sponsorshipExempt) return `${relationLabel} · 免赞助`;
+  if (sponsorshipExempt) return `${relationLabel} · 系统赠送`;
   return `${relationLabel} · ${paymentMode === "split" ? "平分出资" : "单人出资"}`;
 }
 
@@ -13851,7 +13864,7 @@ function getTeamDoubleSummaryLabel(formType, sourceTeam, itemCatalogId = "") {
   const config = getTeamDoubleConfig(formType, sourceTeam, itemCatalogId);
   if (!config?.targetTeam) return "不使用";
   const relationLabel = config.targetTeam === sourceTeam ? "己方效果" : "对方效果";
-  if (config.sponsorshipExempt) return `${relationLabel} · 免赞助`;
+  if (config.sponsorshipExempt) return `${relationLabel} · 系统赠送`;
   const payerLabel = config.paymentMode === "split"
     ? "平分出资"
     : (config.userPlayerId ? "单人出资" : "待选出资人");
@@ -14063,12 +14076,13 @@ function buildTeamDoubleOptionsHtml(formType, team, players, itemEntry) {
     ? payerPlayers.map((player) => `
       <button
         type="button"
-        class="player-double-option team-double-payer-option player-double-option-own${player.id === config.userPlayerId ? " player-double-option-active" : ""}"
+        class="player-double-option team-double-payer-option player-double-option-own${!sponsorshipExempt && player.id === config.userPlayerId ? " player-double-option-active" : ""}"
         data-role="team-double-payer"
         data-form-type="${formType}"
         data-team="${team}"
         data-item-id="${itemEntry.id}"
         data-player-id="${player.id}"
+        aria-pressed="${!sponsorshipExempt && player.id === config.userPlayerId}"
       >${escapeHtml(player.display_name)}</button>
     `).join("")
     : "";
@@ -14081,11 +14095,21 @@ function buildTeamDoubleOptionsHtml(formType, team, players, itemEntry) {
     <div class="team-double-mode-grid">
       ${modeOptions}
     </div>
-    ${isCurrentItem ? buildItemSponsorshipToggle({ formType, itemId: itemEntry.id, team, exempt: sponsorshipExempt }) : ""}
-    ${isCurrentItem && config.paymentMode === "solo" && !sponsorshipExempt ? `
+    ${isCurrentItem && config.paymentMode === "solo" ? `
       <div class="team-double-payer-block">
         <span>出资人</span>
         <div class="team-double-payer-grid">
+          <button
+            type="button"
+            class="player-double-option team-double-payer-option${sponsorshipExempt ? " player-double-option-active" : ""}"
+            data-role="team-double-payer"
+            data-form-type="${formType}"
+            data-team="${team}"
+            data-item-id="${itemEntry.id}"
+            data-sponsorship-exempt="true"
+            aria-pressed="${sponsorshipExempt}"
+            title="仅本次使用免赞助，不扣已有道具"
+          >系统赠送</button>
           ${payerOptions}
         </div>
       </div>
@@ -22565,12 +22589,8 @@ matchFormPanel.addEventListener("click", (event) => {
   if (teamDoublePayer) {
     const team = teamDoublePayer.dataset.team === "A" ? "A" : "B";
     const itemCatalogId = teamDoublePayer.dataset.itemId || LEGACY_MATCH_ITEM_IDS.team;
-    const currentConfig = getTeamDoubleConfig("match", team, itemCatalogId);
-    upsertTeamDoubleConfig("match", team, {
-      ...currentConfig,
-      itemCatalogId,
-      userPlayerId: currentConfig.userPlayerId === (teamDoublePayer.dataset.playerId || "") ? "" : (teamDoublePayer.dataset.playerId || ""),
-    });
+    selectTeamDoublePayer("match", team, itemCatalogId, teamDoublePayer.dataset.playerId || "",
+      teamDoublePayer.dataset.sponsorshipExempt === "true");
     teamDoublePickerOpen.match[team] = "";
     renderInlineTeamDoubleControls("match", !canUseMatchRecordingForm());
     refreshMatchSelectOptions();
@@ -22688,12 +22708,8 @@ backfillFormPanel.addEventListener("click", (event) => {
   if (teamDoublePayer) {
     const team = teamDoublePayer.dataset.team === "A" ? "A" : "B";
     const itemCatalogId = teamDoublePayer.dataset.itemId || LEGACY_MATCH_ITEM_IDS.team;
-    const currentConfig = getTeamDoubleConfig("backfill", team, itemCatalogId);
-    upsertTeamDoubleConfig("backfill", team, {
-      ...currentConfig,
-      itemCatalogId,
-      userPlayerId: currentConfig.userPlayerId === (teamDoublePayer.dataset.playerId || "") ? "" : (teamDoublePayer.dataset.playerId || ""),
-    });
+    selectTeamDoublePayer("backfill", team, itemCatalogId, teamDoublePayer.dataset.playerId || "",
+      teamDoublePayer.dataset.sponsorshipExempt === "true");
     teamDoublePickerOpen.backfill[team] = "";
     renderInlineTeamDoubleControls("backfill", !backfillSeasonSelect.value || backfillPlayers.length < TEAM_SIZE * 2);
     refreshBackfillSelectOptions();
