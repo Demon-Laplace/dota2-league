@@ -4,7 +4,8 @@ name: Deploy Supabase DB
 on:
   push:
     branches:
-      - "**"
+      - main
+      - design/modern-league-ui
     paths:
       - "supabase/migrations/**"
       - "supabase/seed.sql"
@@ -18,6 +19,7 @@ concurrency:
 
 jobs:
   deploy-db:
+    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/design/modern-league-ui'
     runs-on: ubuntu-latest
     permissions:
       contents: read

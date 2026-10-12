@@ -59,3 +59,12 @@ verify_jwt = false
 
 [functions.rollback-match]
 verify_jwt = false
+
+[functions.fetch-dota-match]
+verify_jwt = false
+
+[functions.request-opendota-screenshot]
+verify_jwt = false
+
+[functions.trigger-opendota-archive-action]
+verify_jwt = false

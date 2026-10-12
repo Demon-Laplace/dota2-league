@@ -1,0 +1,109 @@
+# Version 1.0 workflow definition.
+name: Capture OpenDota Screenshots
+
+on:
+  # Automatic capture is paused. Run this workflow only through the admin-triggered
+  # workflow_dispatch path.
+  workflow_dispatch:
+    inputs:
+      match_id:
+        description: "Local matches.id UUID. Leave empty to process queued/recent missing screenshots."
+        required: false
+        type: string
+      limit:
+        description: "Maximum matches to process."
+        required: false
+        default: "20"
+        type: string
+      force:
+        description: "Regenerate screenshots that already exist."
+        required: false
+        default: false
+        type: boolean
+      archive_date:
+        description: "Archive one Beijing business date of structured snapshots to GitHub, YYYY-MM-DD."
+        required: false
+        type: string
+      archive_month:
+        description: "Archive a month of structured snapshots to GitHub, YYYY-MM."
+        required: false
+        type: string
+      archive_only:
+        description: "Only archive structured snapshots; do not process screenshot queue."
+        required: false
+        default: false
+        type: boolean
+
+concurrency:
+  group: capture-opendota-screenshots
+  cancel-in-progress: false
+
+jobs:
+  capture-opendota-screenshots:
+    # Development branches must use separate credentials and a separate archive.
+    if: github.ref_name == (vars.OPENDOTA_AUTOMATION_BRANCH || 'design/modern-league-ui') || vars.SUPABASE_DEV_PROJECT_ID != ''
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    env:
+      SUPABASE_URL: ${{ github.ref_name == (vars.OPENDOTA_AUTOMATION_BRANCH || 'design/modern-league-ui') && secrets.SUPABASE_URL || vars.SUPABASE_DEV_URL }}
+      SUPABASE_PROJECT_ID: ${{ github.ref_name == (vars.OPENDOTA_AUTOMATION_BRANCH || 'design/modern-league-ui') && secrets.SUPABASE_PROJECT_ID || vars.SUPABASE_DEV_PROJECT_ID }}
+      SUPABASE_SERVICE_ROLE_KEY: ${{ github.ref_name == (vars.OPENDOTA_AUTOMATION_BRANCH || 'design/modern-league-ui') && secrets.SUPABASE_SERVICE_ROLE_KEY || secrets.SUPABASE_DEV_SERVICE_ROLE_KEY }}
+      STEAM_WEB_API_KEY: ${{ secrets.STEAM_WEB_API_KEY }}
+      GITHUB_TOKEN: ${{ github.token }}
+      SNAPSHOT_ARCHIVE_BRANCH: ${{ github.ref_name == (vars.OPENDOTA_AUTOMATION_BRANCH || 'design/modern-league-ui') && (vars.SNAPSHOT_ARCHIVE_BRANCH || github.ref_name) || github.ref_name }}
+      SNAPSHOT_ARCHIVE_PREFIX: ${{ vars.SNAPSHOT_ARCHIVE_PREFIX || 'data/opendota' }}
+      DOTA_LEAGUE_ID: ${{ vars.DOTA_LEAGUE_ID || '19878' }}
+      SCREENSHOT_MATCH_ID: ${{ github.event.inputs.match_id || '' }}
+      PRODUCTION_AUTOMATION_BRANCH: ${{ vars.OPENDOTA_AUTOMATION_BRANCH || 'design/modern-league-ui' }}
+      PRODUCTION_SUPABASE_PROJECT_ID: ${{ secrets.SUPABASE_PROJECT_ID }}
+      SCREENSHOT_LIMIT: ${{ github.event.inputs.limit || '20' }}
+      SCREENSHOT_FORCE: ${{ github.event.inputs.force || 'false' }}
+      SCREENSHOT_SCHEDULE_MODE: ${{ vars.SCREENSHOT_SCHEDULE_MODE || 'smart' }}
+      SNAPSHOT_ARCHIVE_DATE: ${{ github.event.inputs.archive_date || '' }}
+      SNAPSHOT_ARCHIVE_MONTH: ${{ github.event.inputs.archive_month || '' }}
+      SNAPSHOT_ARCHIVE_ONLY: ${{ github.event.inputs.archive_only || 'false' }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Check required secrets
+        shell: bash
+        run: |
+          if [[ "$GITHUB_REF_NAME" != "$PRODUCTION_AUTOMATION_BRANCH" ]]; then
+            if [[ -z "$PRODUCTION_SUPABASE_PROJECT_ID" || "$SUPABASE_PROJECT_ID" == "$PRODUCTION_SUPABASE_PROJECT_ID" ]]; then
+              echo "Development capture requires a separate Supabase project." >&2
+              exit 1
+            fi
+            if [[ "$SUPABASE_URL" != "https://${SUPABASE_PROJECT_ID}.supabase.co" || "$SNAPSHOT_ARCHIVE_BRANCH" != "$GITHUB_REF_NAME" ]]; then
+              echo "Development capture must use its own Supabase URL and branch archive." >&2
+              exit 1
+            fi
+          fi
+          missing=()
+          if [[ -z "${SUPABASE_SERVICE_ROLE_KEY:-}" ]]; then
+            missing+=("SUPABASE_SERVICE_ROLE_KEY")
+          fi
+          if [[ -z "${GITHUB_TOKEN:-}" ]]; then
+            missing+=("GITHUB_TOKEN")
+          fi
+          if (( ${#missing[@]} )); then
+            echo "Missing required GitHub Actions secret(s): ${missing[*]}" >&2
+            echo "Add SUPABASE_SERVICE_ROLE_KEY under repository Settings > Secrets and variables > Actions." >&2
+            echo "This must be the Supabase service_role key, not the anon/publishable key." >&2
+            exit 1
+          fi
+
+      - name: Install Playwright
+        run: |
+          npm_config_package_lock=false npm install --no-save playwright
+          npx playwright install --with-deps chromium
+
+      - name: Capture and upload screenshots
+        run: node .github/scripts/capture-opendota-screenshots.mjs

@@ -4,7 +4,8 @@ name: Deploy Supabase Edge Functions
 on:
   push:
     branches:
-      - "**"
+      - main
+      - design/modern-league-ui
     paths:
       - "supabase/functions/**"
       - "supabase/config.toml"
@@ -17,6 +18,7 @@ concurrency:
 
 jobs:
   deploy-functions:
+    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/design/modern-league-ui'
     runs-on: ubuntu-latest
     permissions:
       contents: read
