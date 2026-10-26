@@ -16,8 +16,35 @@
 
 ## 隔离验证与部署
 
-开发分支不会自动部署数据库或 Edge Functions；部署工作流只允许
-`main` 和 `design/modern-league-ui`，手动运行也受分支限制。
+数据库与 Edge Functions 的生产部署动态跟随 GitHub Pages 的发布分支，
+从 Pages API 读取 `source.branch`，不再固定允许 `main` 和 `design/modern-league-ui`。
+只有当前发布分支上相关文件的 push 会部署生产环境，其他分支自动跳过。
+读取 Pages 配置失败或 Pages 不再使用“Deploy from a branch”时，生产部署会停止。
+
+两个工作流均可在 Actions 中手动运行：选择代码分支，再选择 `target`。
+`target` 默认是 `development`，只允许独立测试项目；选择 `production` 时，
+代码分支必须仍是 Pages 当前发布分支。部署前会重新校验，防止排队期间切换分支。
+数据库与函数按环境共用部署队列，不会因新任务取消正在执行的部署。
+
+生产环境继续使用现有 secrets：`SUPABASE_PROJECT_ID`、`SUPABASE_ACCESS_TOKEN`
+和数据库工作流所需的 `SUPABASE_DB_PASSWORD`。测试部署需要额外配置：
+
+| 类型 | 名称 | 用途 |
+| --- | --- | --- |
+| Repository variable | `SUPABASE_DEV_PROJECT_ID` | 独立测试项目 ID，必须不同于生产项目 |
+| Repository secret | `SUPABASE_DEV_ACCESS_TOKEN` | 能访问测试项目的 Supabase 令牌 |
+| Repository secret | `SUPABASE_DEV_DB_PASSWORD` | 测试项目数据库密码，仅数据库部署需要 |
+
+测试配置缺失时会报错停止，不会回退到生产凭据。测试新功能时，先手动运行
+`Deploy Supabase DB`，成功后再运行 `Deploy Supabase Edge Functions`，均选择
+开发分支和 `development`。本地页面或独立预览页面也必须连接这个测试项目。
+
+切换 Pages 发布分支前，将生产库已应用的迁移原文件同步到新分支，并确保新分支
+包含这些部署工作流、校验脚本及测试。切换后手动运行数据库工作流，选择
+`production` 检查并应用迁移，成功后再运行函数工作流。仅修改 Pages 设置不会触发
+这里的 push 工作流；切换分支也不会回滚数据库。不要通过修改已应用的迁移记录
+来绕过历史检查。工作流还需同步到仓库默认分支，以支持 Actions 的手动运行入口。
+
 **分支隔离不等于数据库隔离**：本地页面的默认配置仍指向现有 Supabase 项目。
 进行真实写入验证前，在 `app.js` 加载前设置 `window.__DOTA2SYS_CONFIG__`，
 使用独立测试项目的 `projectId`、`supabaseUrl`、`supabaseAnonKey`。
@@ -37,7 +64,7 @@ GitHub 的 `workflow_dispatch` 要求工作流先出现在默认分支；开发�
 `SUPABASE_PROJECT_ID` 不同。测试归档固定写入触发它的开发分支。
 `STEAM_WEB_API_KEY` 用于官方接口，`GITHUB_TOKEN` 用于归档提交。
 
-生产工作流分支由 `OPENDOTA_AUTOMATION_BRANCH` 指定，默认
+截图与归档工作流仍独立使用 `OPENDOTA_AUTOMATION_BRANCH`，默认
 `design/modern-league-ui`。归档默认写入该分支的 `data/opendota`；
 如调整 `SNAPSHOT_ARCHIVE_BRANCH` 或 `SNAPSHOT_ARCHIVE_PREFIX`，应确保网页能读取相应归档。
 前端联赛 ID 可通过 `dotaLeagueId` 配置，工作流使用 `DOTA_LEAGUE_ID`；两者应一致。
