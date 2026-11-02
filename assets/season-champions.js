@@ -1,5 +1,15 @@
 window.__DOTA2_CHAMPIONS__ = [
   {
+    "score": 333,
+    "source": "settlement-snapshot",
+    "tiLabel": "TI8",
+    "playerId": "8db8af93-8143-4822-8701-e8b8b34977ff",
+    "seasonId": "49284c7e-ba39-4ee1-9f10-e006af661b4a",
+    "seasonCode": "2026-10",
+    "seasonName": "2026 年 10 月赛季",
+    "championName": "浪哥"
+  },
+  {
     "seasonId": "33231b58-dfbe-45e1-96e0-8806decb6fbf",
     "seasonCode": "2026-09",
     "seasonName": "2026 年 9 月赛季",
